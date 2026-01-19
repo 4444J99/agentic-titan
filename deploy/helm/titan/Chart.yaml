@@ -1,0 +1,32 @@
+apiVersion: v2
+name: titan
+description: Agentic Titan - Polymorphic Agent Swarm for AI orchestration
+
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+
+keywords:
+  - ai
+  - agents
+  - multi-agent
+  - swarm
+  - llm
+  - orchestration
+
+home: https://github.com/4444J99/agentic-titan
+
+maintainers:
+  - name: Titan Team
+    email: titan@example.com
+
+dependencies:
+  - name: redis
+    version: "18.x.x"
+    repository: https://charts.bitnami.com/bitnami
+    condition: redis.enabled
+  - name: chromadb
+    version: "0.1.x"
+    repository: https://example.com/charts
+    condition: chromadb.enabled
+    # Note: ChromaDB doesn't have official Helm chart, using local templates

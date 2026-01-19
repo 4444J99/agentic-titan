@@ -1,0 +1,30 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: titan-config
+  namespace: titan
+  labels:
+    app.kubernetes.io/name: titan
+data:
+  # LLM Configuration
+  LLM_DEFAULT_PROVIDER: "ollama"
+  OLLAMA_HOST: "http://ollama:11434"
+
+  # Hive Mind
+  REDIS_HOST: "redis"
+  REDIS_PORT: "6379"
+  CHROMADB_HOST: "chromadb"
+  CHROMADB_PORT: "8000"
+
+  # Logging
+  LOG_LEVEL: "INFO"
+  LOG_FORMAT: "json"
+
+  # Agent Defaults
+  MAX_TURNS: "20"
+  MAX_TOOL_CALLS: "10"
+  DEFAULT_TIMEOUT: "300"
+
+  # Metrics
+  METRICS_ENABLED: "true"
+  METRICS_PORT: "8080"

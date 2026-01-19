@@ -1,0 +1,25 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "titan.fullname" . }}-config
+  labels:
+    {{- include "titan.labels" . | nindent 4 }}
+data:
+  # LLM Configuration
+  LLM_DEFAULT_PROVIDER: {{ .Values.llm.defaultProvider | quote }}
+  {{- if .Values.llm.ollama.enabled }}
+  OLLAMA_HOST: {{ .Values.llm.ollama.host | quote }}
+  {{- end }}
+
+  # Hive Mind
+  REDIS_HOST: {{ include "titan.redis.host" . | quote }}
+  REDIS_PORT: {{ .Values.hiveMind.redis.port | quote }}
+  CHROMADB_HOST: {{ include "titan.chromadb.host" . | quote }}
+  CHROMADB_PORT: {{ .Values.hiveMind.chromadb.port | quote }}
+
+  # Logging
+  LOG_LEVEL: "INFO"
+  LOG_FORMAT: "json"
+
+  # Metrics
+  METRICS_ENABLED: {{ .Values.metrics.enabled | quote }}

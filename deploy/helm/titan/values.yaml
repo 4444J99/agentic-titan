@@ -1,0 +1,205 @@
+# Agentic Titan Helm Chart Values
+# Override these in your environment-specific values files
+
+# Global settings
+global:
+  imageRegistry: ""
+  imagePullSecrets: []
+
+# API Server
+api:
+  enabled: true
+  replicaCount: 2
+
+  image:
+    repository: titan/api
+    tag: latest
+    pullPolicy: Always
+
+  service:
+    type: ClusterIP
+    port: 8000
+    metricsPort: 8080
+
+  resources:
+    requests:
+      cpu: "250m"
+      memory: "512Mi"
+    limits:
+      cpu: "1000m"
+      memory: "2Gi"
+
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 10
+    targetCPUUtilizationPercentage: 70
+    targetMemoryUtilizationPercentage: 80
+
+  # Health probes
+  livenessProbe:
+    path: /health
+    initialDelaySeconds: 10
+    periodSeconds: 30
+  readinessProbe:
+    path: /ready
+    initialDelaySeconds: 5
+    periodSeconds: 10
+
+  # Additional env vars
+  env: {}
+
+# Agent Workers
+agent:
+  enabled: true
+  replicaCount: 3
+
+  image:
+    repository: titan/agent
+    tag: latest
+    pullPolicy: Always
+
+  resources:
+    requests:
+      cpu: "500m"
+      memory: "1Gi"
+    limits:
+      cpu: "2000m"
+      memory: "4Gi"
+
+  autoscaling:
+    enabled: true
+    minReplicas: 3
+    maxReplicas: 50
+    targetCPUUtilizationPercentage: 60
+    targetMemoryUtilizationPercentage: 70
+
+  # Agent pool size per pod
+  poolSize: 5
+
+  # Graceful shutdown timeout (seconds)
+  terminationGracePeriodSeconds: 120
+
+  env: {}
+
+# LLM Configuration
+llm:
+  defaultProvider: "ollama"
+
+  ollama:
+    enabled: true
+    host: "http://ollama:11434"
+
+  anthropic:
+    enabled: false
+    # API key should be in secrets
+    # apiKey: ""
+
+  openai:
+    enabled: false
+    # apiKey: ""
+
+# Hive Mind (Shared Memory)
+hiveMind:
+  # Redis for fast KV and pub/sub
+  redis:
+    enabled: true
+    host: "redis"
+    port: 6379
+    # Use password from secret
+    passwordSecret: ""
+    passwordKey: "redis-password"
+
+  # ChromaDB for vector storage
+  chromadb:
+    enabled: true
+    host: "chromadb"
+    port: 8000
+
+# Built-in Redis (using Bitnami chart)
+redis:
+  enabled: true
+  architecture: standalone
+  auth:
+    enabled: false
+  master:
+    persistence:
+      enabled: true
+      size: 1Gi
+    resources:
+      requests:
+        cpu: "100m"
+        memory: "128Mi"
+      limits:
+        cpu: "500m"
+        memory: "512Mi"
+
+# ChromaDB (local templates since no official chart)
+chromadb:
+  enabled: true
+  persistence:
+    enabled: true
+    size: 10Gi
+  resources:
+    requests:
+      cpu: "250m"
+      memory: "512Mi"
+    limits:
+      cpu: "1000m"
+      memory: "2Gi"
+
+# Ingress
+ingress:
+  enabled: true
+  className: traefik
+  annotations:
+    traefik.ingress.kubernetes.io/router.entrypoints: web,websecure
+  hosts:
+    - host: titan.local
+      paths:
+        - path: /api
+          pathType: Prefix
+        - path: /health
+          pathType: Exact
+  tls: []
+  #  - secretName: titan-tls
+  #    hosts:
+  #      - titan.local
+
+# Metrics / Observability
+metrics:
+  enabled: true
+  serviceMonitor:
+    enabled: false
+    namespace: ""
+    interval: 30s
+
+# Security
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  fsGroup: 1000
+
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop:
+      - ALL
+
+# Node selection
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}
+
+# Extra environment variables for all pods
+extraEnv: []
+#  - name: MY_VAR
+#    value: "my-value"
+
+# Extra environment variables from secrets/configmaps
+extraEnvFrom: []
+#  - secretRef:
+#      name: my-secret

@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: titan
+  labels:
+    app.kubernetes.io/name: titan
+    app.kubernetes.io/part-of: agentic-titan
