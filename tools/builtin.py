@@ -3,7 +3,7 @@ Built-in Tools - Core tools available to all agents.
 
 Provides:
 - File operations (read, write, list)
-- Web search (simulated)
+- Web search (Tavily API integration)
 - Shell commands (sandboxed)
 - Math/calculation
 """
@@ -11,15 +11,128 @@ Provides:
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import logging
 import os
 import json
+import time
 from pathlib import Path
 from typing import Any
 
 from tools.base import Tool, ToolResult, ToolParameter, register_tool
 
 logger = logging.getLogger("titan.tools.builtin")
+
+
+# ============================================================================
+# Web Search Configuration
+# ============================================================================
+
+class WebSearchConfig:
+    """Configuration for web search providers."""
+
+    # Supported providers
+    PROVIDER_TAVILY = "tavily"
+    PROVIDER_SERPER = "serper"
+    PROVIDER_BRAVE = "brave"
+    PROVIDER_SIMULATED = "simulated"
+
+    def __init__(self) -> None:
+        self.provider = os.getenv("WEB_SEARCH_PROVIDER", self.PROVIDER_TAVILY)
+        self.tavily_api_key = os.getenv("TAVILY_API_KEY", "")
+        self.serper_api_key = os.getenv("SERPER_API_KEY", "")
+        self.brave_api_key = os.getenv("BRAVE_API_KEY", "")
+
+        # Rate limiting
+        self.rate_limit_requests = int(os.getenv("WEB_SEARCH_RATE_LIMIT", "10"))
+        self.rate_limit_window_seconds = int(os.getenv("WEB_SEARCH_RATE_WINDOW", "60"))
+
+        # Caching
+        self.cache_enabled = os.getenv("WEB_SEARCH_CACHE", "true").lower() == "true"
+        self.cache_ttl_seconds = int(os.getenv("WEB_SEARCH_CACHE_TTL", "3600"))
+
+    @property
+    def has_api_key(self) -> bool:
+        """Check if an API key is configured for the selected provider."""
+        if self.provider == self.PROVIDER_TAVILY:
+            return bool(self.tavily_api_key)
+        elif self.provider == self.PROVIDER_SERPER:
+            return bool(self.serper_api_key)
+        elif self.provider == self.PROVIDER_BRAVE:
+            return bool(self.brave_api_key)
+        return True  # Simulated doesn't need a key
+
+
+class RateLimiter:
+    """Simple in-memory rate limiter."""
+
+    def __init__(self, max_requests: int, window_seconds: int) -> None:
+        self.max_requests = max_requests
+        self.window_seconds = window_seconds
+        self._requests: list[float] = []
+
+    def is_allowed(self) -> bool:
+        """Check if a request is allowed under the rate limit."""
+        now = time.time()
+        # Remove old requests outside the window
+        self._requests = [t for t in self._requests if now - t < self.window_seconds]
+        return len(self._requests) < self.max_requests
+
+    def record_request(self) -> None:
+        """Record a new request."""
+        self._requests.append(time.time())
+
+    def get_wait_time(self) -> float:
+        """Get time to wait before next request is allowed."""
+        if self.is_allowed():
+            return 0.0
+        now = time.time()
+        oldest = min(self._requests)
+        return max(0.0, self.window_seconds - (now - oldest))
+
+
+class SearchCache:
+    """Simple in-memory cache for search results."""
+
+    def __init__(self, ttl_seconds: int = 3600) -> None:
+        self.ttl_seconds = ttl_seconds
+        self._cache: dict[str, tuple[float, Any]] = {}
+
+    def _make_key(self, query: str, num_results: int) -> str:
+        """Create a cache key from query parameters."""
+        raw = f"{query.lower().strip()}:{num_results}"
+        return hashlib.sha256(raw.encode()).hexdigest()[:16]
+
+    def get(self, query: str, num_results: int) -> Any | None:
+        """Get cached result if available and not expired."""
+        key = self._make_key(query, num_results)
+        if key in self._cache:
+            timestamp, result = self._cache[key]
+            if time.time() - timestamp < self.ttl_seconds:
+                return result
+            # Expired, remove it
+            del self._cache[key]
+        return None
+
+    def set(self, query: str, num_results: int, result: Any) -> None:
+        """Cache a search result."""
+        key = self._make_key(query, num_results)
+        self._cache[key] = (time.time(), result)
+
+    def clear(self) -> None:
+        """Clear all cached results."""
+        self._cache.clear()
+
+    def cleanup(self) -> int:
+        """Remove expired entries. Returns number of entries removed."""
+        now = time.time()
+        expired = [
+            k for k, (ts, _) in self._cache.items()
+            if now - ts >= self.ttl_seconds
+        ]
+        for key in expired:
+            del self._cache[key]
+        return len(expired)
 
 
 # ============================================================================
@@ -238,7 +351,15 @@ class ListDirectoryTool(Tool):
 # ============================================================================
 
 class WebSearchTool(Tool):
-    """Search the web for information."""
+    """Search the web for information using Tavily, Serper, or Brave APIs."""
+
+    def __init__(self) -> None:
+        self._config = WebSearchConfig()
+        self._rate_limiter = RateLimiter(
+            max_requests=self._config.rate_limit_requests,
+            window_seconds=self._config.rate_limit_window_seconds,
+        )
+        self._cache = SearchCache(ttl_seconds=self._config.cache_ttl_seconds)
 
     @property
     def name(self) -> str:
@@ -246,7 +367,8 @@ class WebSearchTool(Tool):
 
     @property
     def description(self) -> str:
-        return "Search the web for information on a topic. Returns relevant results."
+        provider = self._config.provider
+        return f"Search the web for information on a topic using {provider}. Returns relevant results."
 
     @property
     def parameters(self) -> list[ToolParameter]:
@@ -260,36 +382,251 @@ class WebSearchTool(Tool):
             ToolParameter(
                 name="num_results",
                 type="integer",
-                description="Number of results to return (default: 5)",
+                description="Number of results to return (default: 5, max: 20)",
                 required=False,
                 default=5,
             ),
+            ToolParameter(
+                name="search_depth",
+                type="string",
+                description="Search depth: 'basic' or 'advanced' (Tavily only, default: basic)",
+                required=False,
+                default="basic",
+            ),
+            ToolParameter(
+                name="include_answer",
+                type="boolean",
+                description="Include AI-generated answer summary (Tavily only, default: false)",
+                required=False,
+                default=False,
+            ),
         ]
 
-    async def execute(self, query: str, num_results: int = 5) -> ToolResult:
-        # TODO: Integrate with actual search API (Serper, Brave, etc.)
-        # For now, return a simulated response
-        logger.warning("WebSearchTool: Using simulated response")
+    async def execute(
+        self,
+        query: str,
+        num_results: int = 5,
+        search_depth: str = "basic",
+        include_answer: bool = False,
+    ) -> ToolResult:
+        # Validate and clamp num_results
+        num_results = max(1, min(num_results, 20))
 
-        simulated_results = [
+        # Check cache first
+        if self._config.cache_enabled:
+            cached = self._cache.get(query, num_results)
+            if cached:
+                logger.debug(f"WebSearchTool: Cache hit for '{query}'")
+                return ToolResult(
+                    success=True,
+                    output=cached,
+                    metadata={"query": query, "cached": True, "provider": self._config.provider},
+                )
+
+        # Check rate limit
+        if not self._rate_limiter.is_allowed():
+            wait_time = self._rate_limiter.get_wait_time()
+            return ToolResult(
+                success=False,
+                output=None,
+                error=f"Rate limit exceeded. Try again in {wait_time:.1f} seconds.",
+                metadata={"rate_limited": True, "wait_seconds": wait_time},
+            )
+
+        # Record the request
+        self._rate_limiter.record_request()
+
+        # Route to appropriate provider
+        provider = self._config.provider
+        try:
+            if provider == WebSearchConfig.PROVIDER_TAVILY:
+                results = await self._search_tavily(query, num_results, search_depth, include_answer)
+            elif provider == WebSearchConfig.PROVIDER_SERPER:
+                results = await self._search_serper(query, num_results)
+            elif provider == WebSearchConfig.PROVIDER_BRAVE:
+                results = await self._search_brave(query, num_results)
+            else:
+                # Fallback to simulated
+                results = self._search_simulated(query, num_results)
+
+            # Cache successful results
+            if self._config.cache_enabled and results:
+                self._cache.set(query, num_results, results)
+
+            return ToolResult(
+                success=True,
+                output=results,
+                metadata={
+                    "query": query,
+                    "provider": provider,
+                    "num_results": len(results) if isinstance(results, list) else 1,
+                    "cached": False,
+                },
+            )
+
+        except Exception as e:
+            logger.error(f"WebSearchTool: Search failed - {e}")
+            # Fallback to simulated on error if configured
+            if os.getenv("WEB_SEARCH_FALLBACK_SIMULATED", "true").lower() == "true":
+                logger.warning("WebSearchTool: Falling back to simulated results")
+                results = self._search_simulated(query, num_results)
+                return ToolResult(
+                    success=True,
+                    output=results,
+                    metadata={
+                        "query": query,
+                        "provider": "simulated",
+                        "fallback": True,
+                        "original_error": str(e),
+                    },
+                )
+            return ToolResult(success=False, output=None, error=str(e))
+
+    async def _search_tavily(
+        self,
+        query: str,
+        num_results: int,
+        search_depth: str,
+        include_answer: bool,
+    ) -> list[dict[str, Any]] | dict[str, Any]:
+        """Search using Tavily API."""
+        if not self._config.tavily_api_key:
+            raise ValueError("TAVILY_API_KEY not configured")
+
+        import httpx
+
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                "https://api.tavily.com/search",
+                json={
+                    "api_key": self._config.tavily_api_key,
+                    "query": query,
+                    "max_results": num_results,
+                    "search_depth": search_depth,
+                    "include_answer": include_answer,
+                    "include_raw_content": False,
+                },
+                timeout=30.0,
+            )
+            response.raise_for_status()
+            data = response.json()
+
+        # Extract results
+        results = []
+        for item in data.get("results", []):
+            results.append({
+                "title": item.get("title", ""),
+                "url": item.get("url", ""),
+                "snippet": item.get("content", ""),
+                "score": item.get("score", 0.0),
+            })
+
+        # Include answer if requested
+        if include_answer and data.get("answer"):
+            return {
+                "answer": data["answer"],
+                "results": results,
+            }
+
+        return results
+
+    async def _search_serper(self, query: str, num_results: int) -> list[dict[str, Any]]:
+        """Search using Serper API (Google Search)."""
+        if not self._config.serper_api_key:
+            raise ValueError("SERPER_API_KEY not configured")
+
+        import httpx
+
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                "https://google.serper.dev/search",
+                headers={
+                    "X-API-KEY": self._config.serper_api_key,
+                    "Content-Type": "application/json",
+                },
+                json={
+                    "q": query,
+                    "num": num_results,
+                },
+                timeout=30.0,
+            )
+            response.raise_for_status()
+            data = response.json()
+
+        # Extract organic results
+        results = []
+        for item in data.get("organic", [])[:num_results]:
+            results.append({
+                "title": item.get("title", ""),
+                "url": item.get("link", ""),
+                "snippet": item.get("snippet", ""),
+                "position": item.get("position", 0),
+            })
+
+        return results
+
+    async def _search_brave(self, query: str, num_results: int) -> list[dict[str, Any]]:
+        """Search using Brave Search API."""
+        if not self._config.brave_api_key:
+            raise ValueError("BRAVE_API_KEY not configured")
+
+        import httpx
+
+        async with httpx.AsyncClient() as client:
+            response = await client.get(
+                "https://api.search.brave.com/res/v1/web/search",
+                headers={
+                    "X-Subscription-Token": self._config.brave_api_key,
+                    "Accept": "application/json",
+                },
+                params={
+                    "q": query,
+                    "count": num_results,
+                },
+                timeout=30.0,
+            )
+            response.raise_for_status()
+            data = response.json()
+
+        # Extract web results
+        results = []
+        for item in data.get("web", {}).get("results", [])[:num_results]:
+            results.append({
+                "title": item.get("title", ""),
+                "url": item.get("url", ""),
+                "snippet": item.get("description", ""),
+                "age": item.get("age", ""),
+            })
+
+        return results
+
+    def _search_simulated(self, query: str, num_results: int) -> list[dict[str, Any]]:
+        """Return simulated search results for testing."""
+        logger.warning("WebSearchTool: Using simulated response")
+        return [
             {
                 "title": f"Result {i+1} for: {query}",
                 "url": f"https://example.com/result{i+1}",
                 "snippet": f"This is a simulated search result for '{query}'. "
                           f"In production, this would be real web content.",
+                "simulated": True,
             }
             for i in range(min(num_results, 5))
         ]
 
-        return ToolResult(
-            success=True,
-            output=simulated_results,
-            metadata={
-                "query": query,
-                "simulated": True,
-                "note": "Integrate with Serper/Brave API for real results",
-            },
-        )
+    def clear_cache(self) -> None:
+        """Clear the search result cache."""
+        self._cache.clear()
+        logger.info("WebSearchTool: Cache cleared")
+
+    def get_stats(self) -> dict[str, Any]:
+        """Get tool statistics."""
+        return {
+            "provider": self._config.provider,
+            "has_api_key": self._config.has_api_key,
+            "cache_enabled": self._config.cache_enabled,
+            "rate_limit": f"{self._config.rate_limit_requests}/{self._config.rate_limit_window_seconds}s",
+        }
 
 
 class WebFetchTool(Tool):

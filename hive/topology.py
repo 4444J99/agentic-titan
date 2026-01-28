@@ -1232,13 +1232,17 @@ class TopologyEngine:
             error_rate: Error rate during execution
             user_feedback: Optional user feedback (-1 to 1)
         """
+        # Calculate actual utilization metrics
+        utilization = self.get_agent_utilization()
+        communication = self.get_communication_overhead()
+
         if self._episodic_learner:
             from hive.learning import EpisodeOutcome
             outcome = EpisodeOutcome(
                 success=success,
                 completion_time_ms=completion_time_ms,
-                agent_utilization=0.7,  # TODO: Calculate from actual metrics
-                communication_overhead=1.0,  # TODO: Calculate from events
+                agent_utilization=utilization.get("average", 0.7),
+                communication_overhead=communication.get("overhead_ratio", 1.0),
                 topology_switches=len(self._topology_history),
                 error_rate=error_rate,
                 user_feedback=user_feedback,
@@ -1252,6 +1256,289 @@ class TopologyEngine:
         if self._episodic_learner:
             return self._episodic_learner.get_statistics()
         return None
+
+    # =========================================================================
+    # Agent Utilization Metrics
+    # =========================================================================
+
+    def get_agent_utilization(self) -> dict[str, Any]:
+        """
+        Calculate actual agent utilization metrics.
+
+        Returns:
+            Dictionary with utilization metrics per agent and aggregate stats.
+        """
+        if not self._current_topology:
+            return {"average": 0.0, "per_agent": {}}
+
+        agents = self._current_topology.list_agents()
+        if not agents:
+            return {"average": 0.0, "per_agent": {}}
+
+        per_agent: dict[str, dict[str, Any]] = {}
+        total_utilization = 0.0
+
+        for agent in agents:
+            # Get metrics from agent metadata if available
+            metadata = agent.metadata
+
+            # Calculate utilization based on available metrics
+            tasks_completed = metadata.get("tasks_completed", 0)
+            tasks_assigned = metadata.get("tasks_assigned", 1)
+            active_time_ms = metadata.get("active_time_ms", 0)
+            total_time_ms = metadata.get("total_time_ms", 1)
+            tokens_used = metadata.get("tokens_used", 0)
+            token_budget = metadata.get("token_budget", 1)
+
+            # Task completion ratio
+            task_ratio = tasks_completed / max(tasks_assigned, 1)
+
+            # Time utilization (active vs idle)
+            time_ratio = active_time_ms / max(total_time_ms, 1)
+
+            # Token utilization
+            token_ratio = tokens_used / max(token_budget, 1)
+
+            # Weighted utilization score
+            utilization = (
+                task_ratio * 0.4 +
+                time_ratio * 0.4 +
+                min(token_ratio, 1.0) * 0.2  # Cap at 100%
+            )
+
+            per_agent[agent.agent_id] = {
+                "utilization": round(utilization, 3),
+                "task_completion_ratio": round(task_ratio, 3),
+                "time_utilization": round(time_ratio, 3),
+                "token_utilization": round(min(token_ratio, 1.0), 3),
+                "tasks_completed": tasks_completed,
+                "tasks_assigned": tasks_assigned,
+                "active_time_ms": active_time_ms,
+                "tokens_used": tokens_used,
+                "role": agent.role,
+            }
+
+            total_utilization += utilization
+
+        average = total_utilization / len(agents) if agents else 0.0
+
+        return {
+            "average": round(average, 3),
+            "agent_count": len(agents),
+            "per_agent": per_agent,
+            "topology_type": self._current_topology.topology_type.value,
+        }
+
+    def get_communication_overhead(self) -> dict[str, Any]:
+        """
+        Calculate communication overhead metrics.
+
+        Returns:
+            Dictionary with communication metrics.
+        """
+        if not self._current_topology:
+            return {"overhead_ratio": 1.0, "messages": 0}
+
+        agents = self._current_topology.list_agents()
+        if not agents:
+            return {"overhead_ratio": 1.0, "messages": 0}
+
+        total_messages_sent = 0
+        total_messages_received = 0
+        total_bytes_transferred = 0
+        topology_switches = len(self._topology_history)
+
+        for agent in agents:
+            metadata = agent.metadata
+            total_messages_sent += metadata.get("messages_sent", 0)
+            total_messages_received += metadata.get("messages_received", 0)
+            total_bytes_transferred += metadata.get("bytes_transferred", 0)
+
+        # Calculate efficiency metrics
+        total_messages = total_messages_sent + total_messages_received
+        agent_count = len(agents)
+
+        # Theoretical minimum messages for different topologies
+        topology_type = self._current_topology.topology_type
+        if topology_type == TopologyType.SWARM:
+            # O(n²) communication
+            theoretical_min = agent_count * (agent_count - 1) if agent_count > 1 else 1
+        elif topology_type == TopologyType.STAR:
+            # O(n) communication through hub
+            theoretical_min = 2 * (agent_count - 1) if agent_count > 1 else 1
+        elif topology_type == TopologyType.RING:
+            # O(n) for round-robin
+            theoretical_min = agent_count if agent_count > 0 else 1
+        elif topology_type == TopologyType.PIPELINE:
+            # O(n) for sequential stages
+            theoretical_min = agent_count - 1 if agent_count > 1 else 1
+        elif topology_type == TopologyType.HIERARCHY:
+            # O(log n) for tree
+            import math
+            theoretical_min = int(math.log2(max(agent_count, 2))) * agent_count
+        else:  # MESH
+            # O(n) with multiple paths
+            theoretical_min = agent_count * 3 if agent_count > 0 else 1
+
+        # Overhead ratio: actual / theoretical (1.0 is optimal)
+        overhead_ratio = total_messages / max(theoretical_min, 1) if total_messages > 0 else 1.0
+
+        return {
+            "overhead_ratio": round(overhead_ratio, 3),
+            "total_messages": total_messages,
+            "messages_sent": total_messages_sent,
+            "messages_received": total_messages_received,
+            "bytes_transferred": total_bytes_transferred,
+            "theoretical_minimum": theoretical_min,
+            "topology_switches": topology_switches,
+            "topology_type": topology_type.value,
+            "agent_count": agent_count,
+        }
+
+    def update_agent_metrics(
+        self,
+        agent_id: str,
+        *,
+        tasks_completed: int | None = None,
+        tasks_assigned: int | None = None,
+        active_time_ms: int | None = None,
+        total_time_ms: int | None = None,
+        tokens_used: int | None = None,
+        token_budget: int | None = None,
+        messages_sent: int | None = None,
+        messages_received: int | None = None,
+        bytes_transferred: int | None = None,
+    ) -> bool:
+        """
+        Update metrics for a specific agent.
+
+        Args:
+            agent_id: Agent to update
+            **kwargs: Metric values to update
+
+        Returns:
+            True if update successful
+        """
+        if not self._current_topology:
+            return False
+
+        agent = self._current_topology.get_agent(agent_id)
+        if not agent:
+            return False
+
+        # Update metadata with provided values
+        updates = {
+            "tasks_completed": tasks_completed,
+            "tasks_assigned": tasks_assigned,
+            "active_time_ms": active_time_ms,
+            "total_time_ms": total_time_ms,
+            "tokens_used": tokens_used,
+            "token_budget": token_budget,
+            "messages_sent": messages_sent,
+            "messages_received": messages_received,
+            "bytes_transferred": bytes_transferred,
+        }
+
+        for key, value in updates.items():
+            if value is not None:
+                agent.metadata[key] = value
+
+        return True
+
+    def increment_agent_counter(
+        self,
+        agent_id: str,
+        counter: str,
+        amount: int = 1,
+    ) -> bool:
+        """
+        Increment a counter metric for an agent.
+
+        Args:
+            agent_id: Agent to update
+            counter: Counter name (e.g., "tasks_completed", "messages_sent")
+            amount: Amount to increment by
+
+        Returns:
+            True if update successful
+        """
+        if not self._current_topology:
+            return False
+
+        agent = self._current_topology.get_agent(agent_id)
+        if not agent:
+            return False
+
+        current = agent.metadata.get(counter, 0)
+        agent.metadata[counter] = current + amount
+        return True
+
+    def get_prometheus_metrics(self) -> list[tuple[str, str, float, dict[str, str]]]:
+        """
+        Get metrics formatted for Prometheus exposition.
+
+        Returns:
+            List of (metric_name, metric_type, value, labels) tuples
+        """
+        metrics: list[tuple[str, str, float, dict[str, str]]] = []
+
+        if not self._current_topology:
+            return metrics
+
+        topology_type = self._current_topology.topology_type.value
+
+        # Utilization metrics
+        utilization = self.get_agent_utilization()
+        metrics.append((
+            "titan_agent_utilization_average",
+            "gauge",
+            utilization["average"],
+            {"topology": topology_type},
+        ))
+
+        for agent_id, agent_metrics in utilization.get("per_agent", {}).items():
+            labels = {"agent_id": agent_id, "topology": topology_type, "role": agent_metrics.get("role", "unknown")}
+            metrics.append(("titan_agent_utilization", "gauge", agent_metrics["utilization"], labels))
+            metrics.append(("titan_agent_tasks_completed", "counter", agent_metrics["tasks_completed"], labels))
+            metrics.append(("titan_agent_tasks_assigned", "counter", agent_metrics["tasks_assigned"], labels))
+            metrics.append(("titan_agent_tokens_used", "counter", agent_metrics["tokens_used"], labels))
+
+        # Communication metrics
+        comm = self.get_communication_overhead()
+        metrics.append((
+            "titan_communication_overhead_ratio",
+            "gauge",
+            comm["overhead_ratio"],
+            {"topology": topology_type},
+        ))
+        metrics.append((
+            "titan_messages_total",
+            "counter",
+            float(comm["total_messages"]),
+            {"topology": topology_type},
+        ))
+        metrics.append((
+            "titan_bytes_transferred_total",
+            "counter",
+            float(comm["bytes_transferred"]),
+            {"topology": topology_type},
+        ))
+        metrics.append((
+            "titan_topology_switches_total",
+            "counter",
+            float(comm["topology_switches"]),
+            {},
+        ))
+
+        # Topology info
+        metrics.append((
+            "titan_agent_count",
+            "gauge",
+            float(len(self._current_topology.nodes)),
+            {"topology": topology_type},
+        ))
+
+        return metrics
 
     def __repr__(self) -> str:
         current = self._current_topology
