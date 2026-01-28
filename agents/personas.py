@@ -41,6 +41,14 @@ class PersonaRole(Enum):
     LEARNER = "learner"           # Learns from interactions
     CUSTOM = "custom"             # Custom role
 
+    # Inquiry personas (multi-perspective collaborative inquiry)
+    SCOPE_CLARIFIER = "scope_clarifier"    # Distills complexity into clarity
+    LOGICAL_ANALYST = "logical_analyst"    # Systematic rational exploration
+    MYTHIC_EXPLORER = "mythic_explorer"    # Metaphorical/narrative exploration
+    BRIDGE_BUILDER = "bridge_builder"      # Cross-domain connections
+    META_DESIGNER = "meta_designer"        # Self-improving feedback loops
+    PATTERN_SEEKER = "pattern_seeker"      # Emergent meta-patterns
+
 
 @dataclass
 class Persona:
@@ -139,6 +147,65 @@ LEARNER = Persona(
 
 
 # ============================================================================
+# Inquiry Personas (Multi-Perspective Collaborative Inquiry)
+# ============================================================================
+
+SCOPE_AI = Persona(
+    name="Scope AI",
+    role=PersonaRole.SCOPE_CLARIFIER,
+    emoji="\U0001F3AF",  # Direct hit
+    color="blue",
+    traits=["precise", "focused", "clarifying"],
+    communication_style="structured",
+)
+
+LOGIC_AI = Persona(
+    name="Logic AI",
+    role=PersonaRole.LOGICAL_ANALYST,
+    emoji="\U0001F9E0",  # Brain
+    color="green",
+    traits=["logical", "systematic", "rigorous"],
+    communication_style="analytical",
+)
+
+MYTHOS_AI = Persona(
+    name="Mythos AI",
+    role=PersonaRole.MYTHIC_EXPLORER,
+    emoji="\U0001F4A1",  # Light bulb
+    color="purple",
+    traits=["creative", "metaphorical", "narrative"],
+    communication_style="poetic",
+)
+
+BRIDGE_AI = Persona(
+    name="Bridge AI",
+    role=PersonaRole.BRIDGE_BUILDER,
+    emoji="\U0001F310",  # Globe with meridians
+    color="orange",
+    traits=["lateral", "pattern-matching", "connective"],
+    communication_style="exploratory",
+)
+
+META_AI = Persona(
+    name="Meta AI",
+    role=PersonaRole.META_DESIGNER,
+    emoji="\U0001F504",  # Counterclockwise arrows
+    color="red",
+    traits=["recursive", "self-referential", "improving"],
+    communication_style="reflective",
+)
+
+PATTERN_AI = Persona(
+    name="Pattern AI",
+    role=PersonaRole.PATTERN_SEEKER,
+    emoji="\U0001F332",  # Evergreen tree
+    color="indigo",
+    traits=["synthesizing", "emergent", "holistic"],
+    communication_style="integrative",
+)
+
+
+# ============================================================================
 # Persona Registry
 # ============================================================================
 
@@ -150,6 +217,13 @@ _PERSONA_REGISTRY: dict[str, Persona] = {
     "planner": PLANNER,
     "executor": EXECUTOR,
     "learner": LEARNER,
+    # Inquiry personas
+    "scope_ai": SCOPE_AI,
+    "logic_ai": LOGIC_AI,
+    "mythos_ai": MYTHOS_AI,
+    "bridge_ai": BRIDGE_AI,
+    "meta_ai": META_AI,
+    "pattern_ai": PATTERN_AI,
 }
 
 
@@ -185,6 +259,14 @@ if RICH_AVAILABLE:
             "planner": "bold magenta",
             "executor": "bold red",
             "learner": "white",
+            # Inquiry personas
+            "scope_clarifier": "bold blue",
+            "logical_analyst": "bold green",
+            "mythic_explorer": "bold magenta",
+            "bridge_builder": "bold yellow",
+            "meta_designer": "bold red",
+            "pattern_seeker": "bold cyan",
+            # UI elements
             "timestamp": "dim",
             "error": "bold red",
             "warning": "bold yellow",
