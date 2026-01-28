@@ -7,6 +7,7 @@ Available archetypes:
 - Coder: Writes and tests code
 - Reviewer: Reviews work for quality
 - Paper2Code: Converts research papers to implementations
+- CFO: Budget management and cost optimization
 """
 
 from agents.archetypes.orchestrator import OrchestratorAgent
@@ -14,6 +15,7 @@ from agents.archetypes.researcher import ResearcherAgent
 from agents.archetypes.coder import CoderAgent
 from agents.archetypes.reviewer import ReviewerAgent
 from agents.archetypes.paper2code import Paper2CodeAgent
+from agents.archetypes.cfo import CFOAgent
 
 __all__ = [
     "OrchestratorAgent",
@@ -21,4 +23,5 @@ __all__ = [
     "CoderAgent",
     "ReviewerAgent",
     "Paper2CodeAgent",
+    "CFOAgent",
 ]

@@ -6,9 +6,10 @@ Abstract base class for all agents in the Titan swarm. Provides:
 - Hive Mind integration for shared memory
 - Topology-aware communication
 - Built-in resilience patterns
+- PostgreSQL audit logging
 
 Ported from: metasystem-core/agent_utils/base_agent.py
-Extended with: Hive Mind integration, topology awareness, async support
+Extended with: Hive Mind integration, topology awareness, async support, audit logging
 """
 
 from __future__ import annotations
@@ -27,6 +28,7 @@ from agents.framework.errors import AgentError, TitanError
 if TYPE_CHECKING:
     from hive.memory import HiveMind
     from hive.topology import TopologyEngine
+    from titan.persistence.audit import AuditLogger
 
 
 logger = logging.getLogger("titan.agent")
@@ -134,6 +136,7 @@ class BaseAgent(ABC):
         *,
         hive_mind: HiveMind | None = None,
         topology_engine: TopologyEngine | None = None,
+        audit_logger: AuditLogger | None = None,
         max_turns: int = 20,
         timeout_ms: int = 300_000,
     ) -> None:
@@ -146,6 +149,7 @@ class BaseAgent(ABC):
             capabilities: List of capabilities this agent has
             hive_mind: Shared Hive Mind instance
             topology_engine: Topology engine for routing
+            audit_logger: Audit logger for persistent logging
             max_turns: Maximum execution turns
             timeout_ms: Execution timeout in milliseconds
         """
@@ -156,6 +160,7 @@ class BaseAgent(ABC):
         # External dependencies (injected)
         self._hive_mind = hive_mind
         self._topology_engine = topology_engine
+        self._audit_logger = audit_logger
 
         # Configuration
         self.max_turns = max_turns
@@ -262,6 +267,10 @@ class BaseAgent(ABC):
             # Initialize
             self.state = AgentState.INITIALIZING
             logger.info(f"Agent '{self.name}' initializing...")
+
+            # Audit: Log agent start
+            await self._audit_agent_started()
+
             await asyncio.wait_for(
                 self.initialize(),
                 timeout=self.timeout_ms / 1000,
@@ -288,6 +297,9 @@ class BaseAgent(ABC):
 
             execution_time_ms = int((datetime.now() - start_time).total_seconds() * 1000)
 
+            # Audit: Log agent completion
+            await self._audit_agent_completed(result, execution_time_ms)
+
             return AgentResult(
                 agent_id=self.agent_id,
                 session_id=self._session_id,
@@ -307,6 +319,13 @@ class BaseAgent(ABC):
             await self._safe_shutdown()
 
             execution_time_ms = int((datetime.now() - start_time).total_seconds() * 1000)
+
+            # Audit: Log agent failure
+            await self._audit_agent_failed(
+                f"Timeout after {self.timeout_ms}ms",
+                execution_time_ms,
+            )
+
             return AgentResult(
                 agent_id=self.agent_id,
                 session_id=self._session_id or "no-session",
@@ -323,6 +342,10 @@ class BaseAgent(ABC):
             await self._safe_shutdown()
 
             execution_time_ms = int((datetime.now() - start_time).total_seconds() * 1000)
+
+            # Audit: Log agent failure
+            await self._audit_agent_failed(str(e), execution_time_ms)
+
             return AgentResult(
                 agent_id=self.agent_id,
                 session_id=self._session_id or "no-session",
@@ -564,6 +587,126 @@ class BaseAgent(ABC):
             self._context.turn_number += 1
             return self._context.turn_number
         return 0
+
+    # =========================================================================
+    # Audit Logging
+    # =========================================================================
+
+    async def _audit_agent_started(self) -> None:
+        """Log agent start to audit log."""
+        if not self._audit_logger:
+            return
+        try:
+            await self._audit_logger.log_agent_started(
+                agent_id=self.agent_id,
+                session_id=self._session_id or "unknown",
+                agent_name=self.name,
+                capabilities=self.capabilities,
+                config={
+                    "max_turns": self.max_turns,
+                    "timeout_ms": self.timeout_ms,
+                },
+            )
+        except Exception as e:
+            logger.warning(f"Failed to audit agent start: {e}")
+
+    async def _audit_agent_completed(
+        self,
+        result: Any,
+        execution_time_ms: int,
+    ) -> None:
+        """Log agent completion to audit log."""
+        if not self._audit_logger:
+            return
+        try:
+            await self._audit_logger.log_agent_completed(
+                agent_id=self.agent_id,
+                session_id=self._session_id or "unknown",
+                result=result,
+                turns_taken=self._context.turn_number if self._context else 0,
+                execution_time_ms=execution_time_ms,
+            )
+        except Exception as e:
+            logger.warning(f"Failed to audit agent completion: {e}")
+
+    async def _audit_agent_failed(
+        self,
+        error: str,
+        execution_time_ms: int,
+    ) -> None:
+        """Log agent failure to audit log."""
+        if not self._audit_logger:
+            return
+        try:
+            await self._audit_logger.log_agent_failed(
+                agent_id=self.agent_id,
+                session_id=self._session_id or "unknown",
+                error=error,
+                turns_taken=self._context.turn_number if self._context else 0,
+                execution_time_ms=execution_time_ms,
+            )
+        except Exception as e:
+            logger.warning(f"Failed to audit agent failure: {e}")
+
+    async def audit_decision(
+        self,
+        decision_type: str,
+        rationale: str,
+        selected_option: str,
+        confidence: float,
+        alternatives: list[dict[str, Any]] | None = None,
+    ) -> None:
+        """
+        Log a decision to the audit log.
+
+        Args:
+            decision_type: Type of decision (tool_selection, model_selection, etc.)
+            rationale: Why this decision was made
+            selected_option: The chosen option
+            confidence: Confidence score (0-1)
+            alternatives: Other options considered
+        """
+        if not self._audit_logger:
+            return
+
+        try:
+            from titan.persistence.models import AuditEventType, DecisionType
+
+            # Map string to DecisionType
+            type_map = {
+                "tool_selection": DecisionType.TOOL_SELECTION,
+                "model_selection": DecisionType.MODEL_SELECTION,
+                "topology_selection": DecisionType.TOPOLOGY_SELECTION,
+                "task_delegation": DecisionType.TASK_DELEGATION,
+                "error_recovery": DecisionType.ERROR_RECOVERY,
+                "budget_allocation": DecisionType.BUDGET_ALLOCATION,
+            }
+            dt = type_map.get(decision_type, DecisionType.TOOL_SELECTION)
+
+            # Create audit event for the decision
+            event = await self._audit_logger.log_event(
+                event_type=AuditEventType.AGENT_COMPLETED,
+                action=f"Decision: {decision_type}",
+                agent_id=self.agent_id,
+                session_id=self._session_id,
+                output_data={
+                    "decision_type": decision_type,
+                    "selected": selected_option,
+                    "confidence": confidence,
+                },
+            )
+
+            # Log the decision linked to the event
+            await self._audit_logger.log_decision(
+                audit_event_id=event.id,
+                decision_type=dt,
+                rationale=rationale,
+                selected_option=selected_option,
+                confidence=confidence,
+                alternatives=alternatives,
+            )
+        except Exception as e:
+            logger.warning(f"Failed to audit decision: {e}")
 
     def __repr__(self) -> str:
         return f"<{self.__class__.__name__} '{self.name}' id={self.agent_id} state={self.state.value}>"

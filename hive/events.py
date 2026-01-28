@@ -3,6 +3,8 @@ Hive Mind - Event System
 
 Provides event-based communication for topology transitions and agent coordination.
 Enables graceful transitions between topologies with proper notification.
+
+Integrates with PostgreSQL audit logging for durable event storage.
 """
 
 from __future__ import annotations
@@ -12,8 +14,11 @@ import logging
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import Any, Callable, Coroutine
+from typing import TYPE_CHECKING, Any, Callable, Coroutine
 from uuid import uuid4
+
+if TYPE_CHECKING:
+    from titan.persistence.audit import AuditLogger
 
 logger = logging.getLogger("titan.hive.events")
 
@@ -94,13 +99,19 @@ class EventBus:
     - Multiple handlers per event type
     - Event filtering
     - Event history for debugging
+    - PostgreSQL audit logging sink
     """
 
-    def __init__(self, max_history: int = 1000) -> None:
+    def __init__(
+        self,
+        max_history: int = 1000,
+        audit_logger: AuditLogger | None = None,
+    ) -> None:
         self._handlers: dict[EventType, list[EventHandler]] = {}
         self._history: list[Event] = []
         self._max_history = max_history
         self._paused = False
+        self._audit_logger = audit_logger
 
     def subscribe(
         self,
@@ -130,6 +141,10 @@ class EventBus:
 
         return unsubscribe
 
+    def set_audit_logger(self, audit_logger: AuditLogger) -> None:
+        """Set the audit logger for persistent event storage."""
+        self._audit_logger = audit_logger
+
     async def publish(self, event: Event) -> None:
         """
         Publish an event to all subscribers.
@@ -146,6 +161,10 @@ class EventBus:
         if len(self._history) > self._max_history:
             self._history.pop(0)
 
+        # Persist to PostgreSQL audit log if available
+        if self._audit_logger:
+            await self._persist_to_audit_log(event)
+
         handlers = self._handlers.get(event.event_type, [])
         if not handlers:
             logger.debug(f"No handlers for {event.event_type.value}")
@@ -161,6 +180,37 @@ class EventBus:
         for i, result in enumerate(results):
             if isinstance(result, Exception):
                 logger.error(f"Handler error for {event.event_type.value}: {result}")
+
+    async def _persist_to_audit_log(self, event: Event) -> None:
+        """Persist event to PostgreSQL audit log."""
+        try:
+            from titan.persistence.models import AuditEventType
+
+            # Map hive events to audit event types
+            event_type_map = {
+                EventType.TOPOLOGY_CHANGED: AuditEventType.TOPOLOGY_CHANGED,
+                EventType.TOPOLOGY_CHANGING: AuditEventType.TOPOLOGY_CHANGED,
+                EventType.AGENT_JOINED: AuditEventType.AGENT_CREATED,
+                EventType.AGENT_LEFT: AuditEventType.AGENT_COMPLETED,
+                EventType.TASK_COMPLETED: AuditEventType.AGENT_COMPLETED,
+                EventType.TASK_FAILED: AuditEventType.AGENT_FAILED,
+            }
+
+            audit_type = event_type_map.get(event.event_type)
+            if audit_type:
+                await self._audit_logger.log_event(
+                    event_type=audit_type,
+                    action=f"Hive event: {event.event_type.value}",
+                    agent_id=event.source_id,
+                    input_data=event.payload,
+                    metadata={
+                        "hive_event_id": event.event_id,
+                        "hive_event_type": event.event_type.value,
+                        **event.metadata,
+                    },
+                )
+        except Exception as e:
+            logger.warning(f"Failed to persist event to audit log: {e}")
 
     async def emit(
         self,

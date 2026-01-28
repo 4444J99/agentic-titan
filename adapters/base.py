@@ -6,6 +6,7 @@ Provides a unified API for:
 - Streaming responses
 - Embeddings
 - Tool/function calling
+- Content filtering for safety
 """
 
 from __future__ import annotations
@@ -14,7 +15,11 @@ import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, AsyncIterator
+from typing import TYPE_CHECKING, Any, AsyncIterator
+
+if TYPE_CHECKING:
+    from titan.safety.filters import FilterPipeline
+    from titan.safety.sanitizer import OutputSanitizer
 
 logger = logging.getLogger("titan.adapters")
 
@@ -104,6 +109,10 @@ class LLMAdapter(ABC):
     - complete(): Single completion
     - stream(): Streaming completion
     - embed(): Text embeddings
+
+    Optional features:
+    - Content filtering for safety
+    - Output sanitization
     """
 
     provider: LLMProvider
@@ -111,6 +120,65 @@ class LLMAdapter(ABC):
     def __init__(self, config: LLMConfig) -> None:
         self.config = config
         self._client: Any = None
+        self._filter_pipeline: FilterPipeline | None = None
+        self._sanitizer: OutputSanitizer | None = None
+        self._filter_enabled: bool = True
+
+    def set_filter_pipeline(self, pipeline: FilterPipeline) -> None:
+        """Set the content filter pipeline."""
+        self._filter_pipeline = pipeline
+
+    def set_sanitizer(self, sanitizer: OutputSanitizer) -> None:
+        """Set the output sanitizer."""
+        self._sanitizer = sanitizer
+
+    def enable_filtering(self, enabled: bool = True) -> None:
+        """Enable or disable content filtering."""
+        self._filter_enabled = enabled
+
+    async def _filter_response(
+        self,
+        content: str,
+        agent_id: str | None = None,
+        session_id: str | None = None,
+    ) -> str:
+        """
+        Filter LLM response content for safety.
+
+        Args:
+            content: Response content to filter
+            agent_id: Agent ID for logging
+            session_id: Session ID for logging
+
+        Returns:
+            Filtered content, or original if filtering disabled/not configured
+        """
+        if not self._filter_enabled:
+            return content
+
+        # Apply content filter pipeline
+        if self._filter_pipeline:
+            result = await self._filter_pipeline.filter(
+                content,
+                agent_id=agent_id,
+                session_id=session_id,
+            )
+            if result.blocked:
+                logger.warning(
+                    f"Content blocked by filter: {len(result.critical_matches)} critical, "
+                    f"{len(result.high_matches)} high severity matches"
+                )
+                return "[Content blocked due to safety concerns]"
+            content = result.filtered_content or content
+
+        # Apply sanitizer
+        if self._sanitizer:
+            result = self._sanitizer.sanitize(content)
+            if result.was_modified:
+                logger.debug(f"Content sanitized: {result.changes_made}")
+            content = result.sanitized
+
+        return content
 
     @abstractmethod
     async def complete(

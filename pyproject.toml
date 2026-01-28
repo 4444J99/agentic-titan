@@ -72,8 +72,18 @@ memori = [
     "sqlalchemy>=2.0.0",
     "aiosqlite>=0.19.0",
 ]
+# Phase 12: PostgreSQL persistence
+postgres = [
+    "asyncpg>=0.29.0",
+    "sqlalchemy[asyncio]>=2.0.0",
+    "alembic>=1.13.0",
+]
+# Phase 12: Evaluation and testing
+evaluation = [
+    "deepeval>=0.21.0",
+]
 all = [
-    "agentic-titan[local-llm,vector-db,messaging,embeddings,dashboard,metrics,stress,documents,langfuse,lsp,memori]",
+    "agentic-titan[local-llm,vector-db,messaging,embeddings,dashboard,metrics,stress,documents,langfuse,lsp,memori,postgres,evaluation]",
 ]
 
 [project.scripts]
