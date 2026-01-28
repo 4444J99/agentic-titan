@@ -27,6 +27,7 @@ from titan.workflows.inquiry_config import get_workflow, list_workflows
 if TYPE_CHECKING:
     from hive.memory import HiveMind
     from titan.costs.budget import BudgetTracker
+    from titan.persistence.postgres import PostgresClient
 
 logger = logging.getLogger("titan.batch.orchestrator")
 
@@ -54,6 +55,7 @@ class BatchOrchestrator:
         self,
         hive_mind: HiveMind | None = None,
         budget_tracker: BudgetTracker | None = None,
+        postgres_client: PostgresClient | None = None,
         default_max_concurrent: int = 3,
         max_retries: int = 3,
         enable_celery: bool = True,
@@ -64,12 +66,14 @@ class BatchOrchestrator:
         Args:
             hive_mind: Shared memory for state persistence
             budget_tracker: Budget tracking integration
+            postgres_client: PostgreSQL client for persistence
             default_max_concurrent: Default max concurrent sessions
             max_retries: Maximum retries per session
             enable_celery: Whether to use Celery for distributed execution
         """
         self._hive_mind = hive_mind
         self._budget_tracker = budget_tracker
+        self._postgres: PostgresClient | None = postgres_client
         self._default_max_concurrent = default_max_concurrent
         self._max_retries = max_retries
         self._enable_celery = enable_celery
@@ -85,8 +89,115 @@ class BatchOrchestrator:
 
         # Background tasks
         self._monitoring_tasks: dict[UUID, asyncio.Task] = {}
+        self._initialized = False
 
         logger.info("Batch orchestrator initialized")
+
+    async def initialize(self) -> None:
+        """
+        Initialize the orchestrator, loading existing batches from PostgreSQL.
+
+        Should be called on startup to restore state.
+        """
+        if self._initialized:
+            return
+
+        # Try to connect to PostgreSQL if not provided
+        if self._postgres is None:
+            try:
+                from titan.persistence.postgres import get_postgres_client
+                self._postgres = get_postgres_client()
+                await self._postgres.connect()
+            except Exception as e:
+                logger.warning(f"PostgreSQL not available, using in-memory only: {e}")
+                self._postgres = None
+
+        # Load existing batches from PostgreSQL
+        if self._postgres and self._postgres.is_connected:
+            await self._load_batches_from_postgres()
+
+        self._initialized = True
+        logger.info("Batch orchestrator initialized from persistence")
+
+    async def _load_batches_from_postgres(self) -> int:
+        """
+        Load existing batches from PostgreSQL.
+
+        Returns:
+            Number of batches loaded.
+        """
+        if not self._postgres or not self._postgres.is_connected:
+            return 0
+
+        try:
+            # Load active batches (not in terminal state)
+            batch_rows = await self._postgres.list_batch_jobs(limit=1000)
+            loaded = 0
+
+            for row in batch_rows:
+                batch_id = row["id"]
+                if isinstance(batch_id, str):
+                    batch_id = UUID(batch_id)
+
+                # Skip if already in memory
+                if batch_id in self._batches:
+                    continue
+
+                # Load sessions for this batch
+                session_rows = await self._postgres.get_sessions_for_batch(batch_id)
+
+                # Reconstruct BatchJob
+                sessions = []
+                for sess_row in session_rows:
+                    sessions.append(QueuedSession(
+                        id=UUID(sess_row["id"]) if isinstance(sess_row["id"], str) else sess_row["id"],
+                        batch_id=batch_id,
+                        topic=sess_row["topic"],
+                        status=SessionQueueStatus(sess_row["status"]),
+                        worker_id=sess_row.get("worker_id"),
+                        celery_task_id=sess_row.get("celery_task_id"),
+                        artifact_uri=sess_row.get("artifact_uri"),
+                        inquiry_session_id=sess_row.get("inquiry_session_id"),
+                        tokens_used=sess_row.get("tokens_used", 0),
+                        cost_usd=sess_row.get("cost_usd", 0.0),
+                        retry_count=sess_row.get("retry_count", 0),
+                        error=sess_row.get("error"),
+                        created_at=sess_row["created_at"],
+                        started_at=sess_row.get("started_at"),
+                        completed_at=sess_row.get("completed_at"),
+                        metadata=sess_row.get("metadata", {}),
+                    ))
+
+                batch = BatchJob(
+                    id=batch_id,
+                    topics=row.get("topics", []),
+                    workflow_name=row.get("workflow_name", "expansive"),
+                    max_concurrent=row.get("max_concurrent", 3),
+                    budget_limit_usd=row.get("budget_limit_usd"),
+                    status=BatchStatus(row["status"]),
+                    sessions=sessions,
+                    synthesis_uri=row.get("synthesis_uri"),
+                    created_at=row["created_at"],
+                    started_at=row.get("started_at"),
+                    completed_at=row.get("completed_at"),
+                    error=row.get("error"),
+                    user_id=row.get("user_id"),
+                    metadata=row.get("metadata", {}),
+                )
+
+                self._batches[batch_id] = batch
+                loaded += 1
+
+                # Resume monitoring for active batches
+                if batch.status == BatchStatus.PROCESSING:
+                    self._start_monitoring(batch)
+
+            logger.info(f"Loaded {loaded} batches from PostgreSQL")
+            return loaded
+
+        except Exception as e:
+            logger.error(f"Failed to load batches from PostgreSQL: {e}")
+            return 0
 
     # =========================================================================
     # Batch Lifecycle Management
@@ -687,7 +798,12 @@ class BatchOrchestrator:
         )
 
     async def _persist_batch(self, batch: BatchJob) -> None:
-        """Persist batch state to HiveMind."""
+        """Persist batch state to PostgreSQL and HiveMind."""
+        # Persist to PostgreSQL
+        if self._postgres and self._postgres.is_connected:
+            await self._persist_batch_to_postgres(batch)
+
+        # Also persist to HiveMind for quick access
         if self._hive_mind:
             try:
                 await self._hive_mind.set(
@@ -696,7 +812,74 @@ class BatchOrchestrator:
                     ttl=3600 * 24 * 7,  # 7 days
                 )
             except Exception as e:
-                logger.warning(f"Failed to persist batch state: {e}")
+                logger.warning(f"Failed to persist batch state to HiveMind: {e}")
+
+    async def _persist_batch_to_postgres(self, batch: BatchJob) -> None:
+        """Persist batch and sessions to PostgreSQL."""
+        if not self._postgres or not self._postgres.is_connected:
+            return
+
+        try:
+            # Check if batch exists
+            existing = await self._postgres.get_batch_job(batch.id)
+
+            if existing:
+                # Update batch
+                await self._postgres.update_batch_job(
+                    batch.id,
+                    {
+                        "status": batch.status.value,
+                        "synthesis_uri": batch.synthesis_uri,
+                        "started_at": batch.started_at,
+                        "completed_at": batch.completed_at,
+                        "error": batch.error,
+                        "metadata": batch.metadata,
+                    },
+                )
+            else:
+                # Insert batch
+                await self._postgres.insert_batch_job(
+                    batch_id=batch.id,
+                    topics=batch.topics,
+                    workflow_name=batch.workflow_name,
+                    max_concurrent=batch.max_concurrent,
+                    status=batch.status.value,
+                    budget_limit_usd=batch.budget_limit_usd,
+                    user_id=batch.user_id,
+                    metadata=batch.metadata,
+                )
+
+                # Insert sessions
+                for session in batch.sessions:
+                    await self._postgres.insert_queued_session(
+                        session_id=session.id,
+                        batch_id=batch.id,
+                        topic=session.topic,
+                        status=session.status.value,
+                        metadata=session.metadata,
+                    )
+
+            # Update session states
+            for session in batch.sessions:
+                await self._postgres.update_queued_session(
+                    session.id,
+                    {
+                        "status": session.status.value,
+                        "worker_id": session.worker_id,
+                        "celery_task_id": session.celery_task_id,
+                        "artifact_uri": session.artifact_uri,
+                        "inquiry_session_id": session.inquiry_session_id,
+                        "tokens_used": session.tokens_used,
+                        "cost_usd": session.cost_usd,
+                        "retry_count": session.retry_count,
+                        "error": session.error,
+                        "started_at": session.started_at,
+                        "completed_at": session.completed_at,
+                    },
+                )
+
+        except Exception as e:
+            logger.warning(f"Failed to persist batch to PostgreSQL: {e}")
 
     def _start_monitoring(self, batch: BatchJob) -> None:
         """Start background monitoring task for a batch."""
@@ -767,6 +950,16 @@ def get_batch_orchestrator() -> BatchOrchestrator:
     global _default_orchestrator
     if _default_orchestrator is None:
         _default_orchestrator = BatchOrchestrator()
+    return _default_orchestrator
+
+
+async def get_initialized_batch_orchestrator() -> BatchOrchestrator:
+    """Get the default batch orchestrator, initialized with PostgreSQL."""
+    global _default_orchestrator
+    if _default_orchestrator is None:
+        _default_orchestrator = BatchOrchestrator()
+    if not _default_orchestrator._initialized:
+        await _default_orchestrator.initialize()
     return _default_orchestrator
 
 

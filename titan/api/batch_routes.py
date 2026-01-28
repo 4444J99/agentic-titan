@@ -193,6 +193,41 @@ async def submit_batch(request: SubmitBatchRequest) -> SubmitBatchResponse:
     )
 
 
+@batch_router.get("/list", response_model=list[BatchListResponse])
+async def list_batches(
+    status: str | None = Query(None, description="Filter by status"),
+    limit: int = Query(50, description="Maximum batches to return", le=100),
+) -> list[BatchListResponse]:
+    """List all batches, optionally filtered by status."""
+    orchestrator = get_batch_orchestrator()
+
+    # Parse status filter
+    status_filter = None
+    if status:
+        try:
+            status_filter = BatchStatus(status)
+        except ValueError:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid status: {status}. "
+                f"Valid values: {[s.value for s in BatchStatus]}",
+            )
+
+    batches = orchestrator.list_batches(status=status_filter)[:limit]
+
+    return [
+        BatchListResponse(
+            id=str(b.id),
+            status=b.status.value,
+            topic_count=len(b.topics),
+            workflow=b.workflow_name,
+            progress_percent=b.progress.percent_complete,
+            created_at=b.created_at.isoformat(),
+        )
+        for b in batches
+    ]
+
+
 @batch_router.get("/{batch_id}", response_model=BatchStatusResponse)
 async def get_batch_status(batch_id: str) -> BatchStatusResponse:
     """Get the current status and progress of a batch."""
@@ -411,41 +446,6 @@ async def export_batch(
             "Content-Length": str(len(archive_bytes)),
         },
     )
-
-
-@batch_router.get("/list", response_model=list[BatchListResponse])
-async def list_batches(
-    status: str | None = Query(None, description="Filter by status"),
-    limit: int = Query(50, description="Maximum batches to return", le=100),
-) -> list[BatchListResponse]:
-    """List all batches, optionally filtered by status."""
-    orchestrator = get_batch_orchestrator()
-
-    # Parse status filter
-    status_filter = None
-    if status:
-        try:
-            status_filter = BatchStatus(status)
-        except ValueError:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Invalid status: {status}. "
-                f"Valid values: {[s.value for s in BatchStatus]}",
-            )
-
-    batches = orchestrator.list_batches(status=status_filter)[:limit]
-
-    return [
-        BatchListResponse(
-            id=str(b.id),
-            status=b.status.value,
-            topic_count=len(b.topics),
-            workflow=b.workflow_name,
-            progress_percent=b.progress.percent_complete,
-            created_at=b.created_at.isoformat(),
-        )
-        for b in batches
-    ]
 
 
 @batch_router.post("/{batch_id}/synthesize")

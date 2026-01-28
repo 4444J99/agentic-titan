@@ -131,6 +131,11 @@ class PostgresClient:
             AUDIT_EVENTS_TABLE_SQL,
             AGENT_DECISIONS_TABLE_SQL,
         )
+        from titan.batch.models import (
+            BATCH_JOBS_TABLE_SQL,
+            QUEUED_SESSIONS_TABLE_SQL,
+            SESSION_ARTIFACTS_TABLE_SQL,
+        )
 
         if not self._pool:
             return
@@ -138,6 +143,10 @@ class PostgresClient:
         async with self._pool.acquire() as conn:
             await conn.execute(AUDIT_EVENTS_TABLE_SQL)
             await conn.execute(AGENT_DECISIONS_TABLE_SQL)
+            # Batch pipeline tables
+            await conn.execute(BATCH_JOBS_TABLE_SQL)
+            await conn.execute(QUEUED_SESSIONS_TABLE_SQL)
+            await conn.execute(SESSION_ARTIFACTS_TABLE_SQL)
             logger.info("Database tables initialized")
 
     async def disconnect(self) -> None:
@@ -511,6 +520,334 @@ class PostgresClient:
     def get_fallback_events(self) -> list[dict[str, Any]]:
         """Get events stored in fallback (in-memory) store."""
         return self._fallback_store.copy()
+
+    # =========================================================================
+    # Batch Job Persistence
+    # =========================================================================
+
+    async def insert_batch_job(
+        self,
+        batch_id: UUID,
+        topics: list[str],
+        workflow_name: str,
+        max_concurrent: int,
+        status: str,
+        budget_limit_usd: float | None = None,
+        user_id: str | None = None,
+        metadata: dict[str, Any] | None = None,
+    ) -> bool:
+        """
+        Insert a new batch job.
+
+        Returns:
+            True if inserted, False if fell back to in-memory.
+        """
+        if not self._connected or not self._pool:
+            return False
+
+        try:
+            await self.execute(
+                """
+                INSERT INTO batch_jobs
+                (id, topics, workflow_name, max_concurrent, budget_limit_usd,
+                 status, user_id, metadata)
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+                ON CONFLICT (id) DO NOTHING
+                """,
+                batch_id,
+                json.dumps(topics),
+                workflow_name,
+                max_concurrent,
+                budget_limit_usd,
+                status,
+                user_id,
+                json.dumps(metadata or {}),
+            )
+            return True
+        except Exception as e:
+            logger.error(f"Failed to insert batch job: {e}")
+            return False
+
+    async def update_batch_job(
+        self,
+        batch_id: UUID,
+        updates: dict[str, Any],
+    ) -> bool:
+        """
+        Update a batch job.
+
+        Args:
+            batch_id: Batch job ID
+            updates: Dictionary of field updates
+
+        Returns:
+            True if updated successfully.
+        """
+        if not self._connected or not self._pool:
+            return False
+
+        if not updates:
+            return True
+
+        # Build dynamic update query
+        set_clauses = []
+        params: list[Any] = []
+        param_idx = 1
+
+        for field_name, value in updates.items():
+            if field_name in ("topics", "metadata"):
+                value = json.dumps(value)
+            set_clauses.append(f"{field_name} = ${param_idx}")
+            params.append(value)
+            param_idx += 1
+
+        params.append(batch_id)
+        query = f"""
+            UPDATE batch_jobs
+            SET {", ".join(set_clauses)}
+            WHERE id = ${param_idx}
+        """
+
+        try:
+            await self.execute(query, *params)
+            return True
+        except Exception as e:
+            logger.error(f"Failed to update batch job {batch_id}: {e}")
+            return False
+
+    async def get_batch_job(self, batch_id: UUID | str) -> dict[str, Any] | None:
+        """
+        Get a batch job by ID.
+
+        Returns:
+            Batch job data or None if not found.
+        """
+        if not self._connected or not self._pool:
+            return None
+
+        target = UUID(batch_id) if isinstance(batch_id, str) else batch_id
+        row = await self.fetchrow(
+            "SELECT * FROM batch_jobs WHERE id = $1",
+            target,
+        )
+
+        if not row:
+            return None
+
+        # Parse JSONB fields
+        result = dict(row)
+        if "topics" in result and isinstance(result["topics"], str):
+            result["topics"] = json.loads(result["topics"])
+        if "metadata" in result and isinstance(result["metadata"], str):
+            result["metadata"] = json.loads(result["metadata"])
+        return result
+
+    async def list_batch_jobs(
+        self,
+        status: str | None = None,
+        user_id: str | None = None,
+        limit: int = 100,
+        offset: int = 0,
+    ) -> list[dict[str, Any]]:
+        """
+        List batch jobs with optional filtering.
+
+        Args:
+            status: Filter by status
+            user_id: Filter by user ID
+            limit: Maximum results
+            offset: Pagination offset
+
+        Returns:
+            List of batch jobs.
+        """
+        if not self._connected or not self._pool:
+            return []
+
+        conditions = []
+        params: list[Any] = []
+        param_idx = 1
+
+        if status:
+            conditions.append(f"status = ${param_idx}")
+            params.append(status)
+            param_idx += 1
+
+        if user_id:
+            conditions.append(f"user_id = ${param_idx}")
+            params.append(user_id)
+            param_idx += 1
+
+        where_clause = " AND ".join(conditions) if conditions else "TRUE"
+
+        query = f"""
+            SELECT * FROM batch_jobs
+            WHERE {where_clause}
+            ORDER BY created_at DESC
+            LIMIT ${param_idx} OFFSET ${param_idx + 1}
+        """
+        params.extend([limit, offset])
+
+        rows = await self.fetch(query, *params)
+
+        # Parse JSONB fields
+        results = []
+        for row in rows:
+            result = dict(row)
+            if "topics" in result and isinstance(result["topics"], str):
+                result["topics"] = json.loads(result["topics"])
+            if "metadata" in result and isinstance(result["metadata"], str):
+                result["metadata"] = json.loads(result["metadata"])
+            results.append(result)
+
+        return results
+
+    async def delete_batch_job(self, batch_id: UUID | str) -> bool:
+        """Delete a batch job and its sessions (cascade)."""
+        if not self._connected or not self._pool:
+            return False
+
+        target = UUID(batch_id) if isinstance(batch_id, str) else batch_id
+        try:
+            await self.execute("DELETE FROM batch_jobs WHERE id = $1", target)
+            return True
+        except Exception as e:
+            logger.error(f"Failed to delete batch job {batch_id}: {e}")
+            return False
+
+    # =========================================================================
+    # Queued Session Persistence
+    # =========================================================================
+
+    async def insert_queued_session(
+        self,
+        session_id: UUID,
+        batch_id: UUID,
+        topic: str,
+        status: str,
+        metadata: dict[str, Any] | None = None,
+    ) -> bool:
+        """
+        Insert a new queued session.
+
+        Returns:
+            True if inserted successfully.
+        """
+        if not self._connected or not self._pool:
+            return False
+
+        try:
+            await self.execute(
+                """
+                INSERT INTO queued_sessions
+                (id, batch_id, topic, status, metadata)
+                VALUES ($1, $2, $3, $4, $5)
+                ON CONFLICT (id) DO NOTHING
+                """,
+                session_id,
+                batch_id,
+                topic,
+                status,
+                json.dumps(metadata or {}),
+            )
+            return True
+        except Exception as e:
+            logger.error(f"Failed to insert queued session: {e}")
+            return False
+
+    async def update_queued_session(
+        self,
+        session_id: UUID | str,
+        updates: dict[str, Any],
+    ) -> bool:
+        """
+        Update a queued session.
+
+        Args:
+            session_id: Session ID
+            updates: Dictionary of field updates
+
+        Returns:
+            True if updated successfully.
+        """
+        if not self._connected or not self._pool:
+            return False
+
+        if not updates:
+            return True
+
+        target = UUID(session_id) if isinstance(session_id, str) else session_id
+
+        # Build dynamic update query
+        set_clauses = []
+        params: list[Any] = []
+        param_idx = 1
+
+        for field_name, value in updates.items():
+            if field_name == "metadata":
+                value = json.dumps(value)
+            set_clauses.append(f"{field_name} = ${param_idx}")
+            params.append(value)
+            param_idx += 1
+
+        params.append(target)
+        query = f"""
+            UPDATE queued_sessions
+            SET {", ".join(set_clauses)}
+            WHERE id = ${param_idx}
+        """
+
+        try:
+            await self.execute(query, *params)
+            return True
+        except Exception as e:
+            logger.error(f"Failed to update queued session {session_id}: {e}")
+            return False
+
+    async def get_queued_session(
+        self,
+        session_id: UUID | str,
+    ) -> dict[str, Any] | None:
+        """Get a queued session by ID."""
+        if not self._connected or not self._pool:
+            return None
+
+        target = UUID(session_id) if isinstance(session_id, str) else session_id
+        row = await self.fetchrow(
+            "SELECT * FROM queued_sessions WHERE id = $1",
+            target,
+        )
+
+        if not row:
+            return None
+
+        result = dict(row)
+        if "metadata" in result and isinstance(result["metadata"], str):
+            result["metadata"] = json.loads(result["metadata"])
+        return result
+
+    async def get_sessions_for_batch(
+        self,
+        batch_id: UUID | str,
+    ) -> list[dict[str, Any]]:
+        """Get all sessions for a batch."""
+        if not self._connected or not self._pool:
+            return []
+
+        target = UUID(batch_id) if isinstance(batch_id, str) else batch_id
+        rows = await self.fetch(
+            "SELECT * FROM queued_sessions WHERE batch_id = $1 ORDER BY created_at",
+            target,
+        )
+
+        results = []
+        for row in rows:
+            result = dict(row)
+            if "metadata" in result and isinstance(result["metadata"], str):
+                result["metadata"] = json.loads(result["metadata"])
+            results.append(result)
+
+        return results
 
     async def flush_fallback_to_postgres(self) -> int:
         """

@@ -52,10 +52,14 @@ def register_routers() -> None:
     """Register all API routers."""
     from titan.api.inquiry_routes import inquiry_router
     from titan.api.inquiry_ws import ws_router
+    from titan.api.batch_routes import batch_router
+    from titan.api.batch_ws import batch_ws_router
 
     api_router.include_router(inquiry_router)
+    api_router.include_router(batch_router)
     app.include_router(api_router)
     app.include_router(ws_router)  # WebSocket routes at root level
+    app.include_router(batch_ws_router)  # Batch WebSocket/SSE routes
 
 
 # Lazy registration to avoid circular imports
