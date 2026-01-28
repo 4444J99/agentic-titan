@@ -14,7 +14,7 @@ from __future__ import annotations
 import asyncio
 import logging
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from enum import Enum
 from typing import TYPE_CHECKING, Any
 from uuid import UUID, uuid4
@@ -71,7 +71,7 @@ class Budget:
     agent_id: str | None = None
     allocated_usd: float = 0.0
     spent_usd: float = 0.0
-    created_at: datetime = field(default_factory=datetime.utcnow)
+    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     expires_at: datetime | None = None
     metadata: dict[str, Any] = field(default_factory=dict)
 
@@ -97,7 +97,7 @@ class Budget:
         """Check if budget has expired."""
         if self.expires_at is None:
             return False
-        return datetime.utcnow() > self.expires_at
+        return datetime.now(timezone.utc) > self.expires_at
 
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
@@ -139,7 +139,7 @@ class SpendRecord:
     input_tokens: int = 0
     output_tokens: int = 0
     cached_tokens: int = 0
-    timestamp: datetime = field(default_factory=datetime.utcnow)
+    timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     metadata: dict[str, Any] = field(default_factory=dict)
 
 
@@ -168,8 +168,8 @@ class BudgetTracker:
         self._spend_history: list[SpendRecord] = []
         self._daily_spend: float = 0.0
         self._monthly_spend: float = 0.0
-        self._daily_reset: datetime = datetime.utcnow()
-        self._monthly_reset: datetime = datetime.utcnow()
+        self._daily_reset: datetime = datetime.now(timezone.utc)
+        self._monthly_reset: datetime = datetime.now(timezone.utc)
         self._lock = asyncio.Lock()
         self._alert_callbacks: list[Any] = []
 
@@ -220,7 +220,7 @@ class BudgetTracker:
             budget = Budget(
                 session_id=session_id,
                 allocated_usd=limit_usd or self.config.session_limit_usd,
-                expires_at=datetime.utcnow() + timedelta(hours=duration_hours)
+                expires_at=datetime.now(timezone.utc) + timedelta(hours=duration_hours)
                 if duration_hours else None,
             )
             self._budgets[session_id] = budget
@@ -567,7 +567,7 @@ class BudgetTracker:
 
     async def _check_period_resets(self) -> None:
         """Check and reset daily/monthly counters if needed."""
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
 
         # Daily reset
         if now.date() > self._daily_reset.date():

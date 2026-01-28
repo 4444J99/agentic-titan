@@ -10,7 +10,7 @@ import asyncio
 import logging
 import os
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum
 from typing import TYPE_CHECKING, Any, Callable, Coroutine
 from uuid import UUID, uuid4
@@ -46,7 +46,7 @@ class WatchdogAlert:
     level: AlertLevel = AlertLevel.INFO
     workflow_id: str = ""
     message: str = ""
-    timestamp: datetime = field(default_factory=datetime.utcnow)
+    timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     metadata: dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -155,7 +155,7 @@ class ExecutionWatchdog:
             # Create initial state
             state = WorkflowState(
                 workflow_id=workflow_id,
-                start_time=datetime.utcnow(),
+                start_time=datetime.now(timezone.utc),
             )
             self._workflows[workflow_id] = state
 

@@ -5,7 +5,7 @@ Tests for termination conditions and resource limits.
 """
 
 import pytest
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from titan.orchestration.termination import (
     WorkflowState,
@@ -34,7 +34,7 @@ class TestTerminationConditions:
     def workflow_state(self):
         return WorkflowState(
             workflow_id="test-workflow",
-            start_time=datetime.utcnow(),
+            start_time=datetime.now(timezone.utc),
         )
 
     # Timeout tests
@@ -48,7 +48,7 @@ class TestTerminationConditions:
         """Test that timeout condition triggers when time is up."""
         condition = TimeoutCondition(max_duration_seconds=0.001)
         # Artificially set start time in the past
-        workflow_state.start_time = datetime.utcnow() - timedelta(seconds=10)
+        workflow_state.start_time = datetime.now(timezone.utc) - timedelta(seconds=10)
         result = condition.check(workflow_state)
         assert result.should_terminate
         assert result.reason == TerminationReason.TIMEOUT
@@ -157,7 +157,7 @@ class TestCompositeConditions:
     def workflow_state(self):
         return WorkflowState(
             workflow_id="test-workflow",
-            start_time=datetime.utcnow(),
+            start_time=datetime.now(timezone.utc),
         )
 
     def test_composite_any_triggers(self, workflow_state):
@@ -197,7 +197,7 @@ class TestDefaultTerminationConditions:
     def workflow_state(self):
         return WorkflowState(
             workflow_id="test-workflow",
-            start_time=datetime.utcnow(),
+            start_time=datetime.now(timezone.utc),
         )
 
     def test_agent_defaults_reasonable(self, workflow_state):

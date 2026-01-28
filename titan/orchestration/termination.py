@@ -9,7 +9,7 @@ from __future__ import annotations
 import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from enum import Enum
 from typing import Any, Callable
 
@@ -65,7 +65,7 @@ class WorkflowState:
     @property
     def duration_seconds(self) -> float:
         """Get workflow duration in seconds."""
-        return (datetime.utcnow() - self.start_time).total_seconds()
+        return (datetime.now(timezone.utc) - self.start_time).total_seconds()
 
     @property
     def failure_rate(self) -> float:

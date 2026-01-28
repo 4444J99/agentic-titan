@@ -9,7 +9,7 @@ from __future__ import annotations
 import asyncio
 import logging
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum
 from typing import Any
 from uuid import UUID, uuid4
@@ -47,7 +47,7 @@ class ApprovalRequest:
     tool_name: str | None = None
     arguments: dict[str, Any] = field(default_factory=dict)
     context: dict[str, Any] = field(default_factory=dict)
-    created_at: datetime = field(default_factory=datetime.utcnow)
+    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     timeout_seconds: int = 300
     fallback_action: str = "deny"
 
@@ -102,7 +102,7 @@ class ApprovalResult:
     approved: bool = False
     responder: str | None = None
     reason: str | None = None
-    responded_at: datetime = field(default_factory=datetime.utcnow)
+    responded_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     metadata: dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:

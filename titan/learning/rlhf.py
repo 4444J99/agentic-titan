@@ -10,7 +10,7 @@ import asyncio
 import json
 import logging
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum
 from typing import TYPE_CHECKING, Any
 from uuid import UUID, uuid4
@@ -50,7 +50,7 @@ class RLHFSample:
     """
 
     id: UUID = field(default_factory=uuid4)
-    timestamp: datetime = field(default_factory=datetime.utcnow)
+    timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
 
     # Input/Output
     prompt: str = ""
@@ -258,7 +258,7 @@ class RLHFCollector:
         )
 
         tracking_id = str(sample.id)
-        self._pending_responses[tracking_id] = (sample, datetime.utcnow())
+        self._pending_responses[tracking_id] = (sample, datetime.now(timezone.utc))
 
         logger.debug(f"Started tracking response: {tracking_id}")
         return tracking_id
@@ -291,7 +291,7 @@ class RLHFCollector:
         sample, start_time = self._pending_responses.pop(tracking_id)
 
         # Record timing
-        sample.time_to_accept_ms = int((datetime.utcnow() - start_time).total_seconds() * 1000)
+        sample.time_to_accept_ms = int((datetime.now(timezone.utc) - start_time).total_seconds() * 1000)
 
         # Record feedback
         sample.human_rating = rating

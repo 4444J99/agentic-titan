@@ -21,7 +21,7 @@ import logging
 import statistics
 from collections import defaultdict
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from enum import Enum
 from typing import Any
 from uuid import UUID, uuid4
@@ -67,7 +67,7 @@ class PromptMetrics:
     cost_usd: float = 0.0
 
     # Metadata
-    timestamp: datetime = field(default_factory=datetime.utcnow)
+    timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     prompt_variant: str = "default"  # For A/B testing
     adaptations_applied: list[str] = field(default_factory=list)
     metadata: dict[str, Any] = field(default_factory=dict)
@@ -450,7 +450,7 @@ class PromptTracker:
 
     def prune_old_metrics(self) -> int:
         """Remove metrics older than retention period."""
-        cutoff = datetime.utcnow() - timedelta(days=self.retention_days)
+        cutoff = datetime.now(timezone.utc) - timedelta(days=self.retention_days)
         original_count = len(self._metrics)
 
         self._metrics = [m for m in self._metrics if m.timestamp >= cutoff]

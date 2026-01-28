@@ -9,7 +9,7 @@ from __future__ import annotations
 import asyncio
 import logging
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum
 from typing import TYPE_CHECKING, Any, Callable, Coroutine
 from uuid import UUID, uuid4
@@ -39,7 +39,7 @@ class FeedbackRequest:
     prompt_preview: str = ""
     response_preview: str = ""
     channel: FeedbackChannel = FeedbackChannel.DASHBOARD
-    created_at: datetime = field(default_factory=datetime.utcnow)
+    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     expires_at: datetime | None = None
     metadata: dict[str, Any] = field(default_factory=dict)
 
@@ -68,7 +68,7 @@ class FeedbackResponse:
     correction: str | None = None
     comment: str | None = None
     responder_id: str | None = None
-    responded_at: datetime = field(default_factory=datetime.utcnow)
+    responded_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
 
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""

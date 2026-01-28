@@ -18,7 +18,7 @@ from pathlib import Path
 from typing import Any
 
 import yaml
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from agents.framework.errors import SpecValidationError
 
@@ -115,8 +115,7 @@ class AgentSpecModel(BaseModel):
     metadata: AgentMetadata
     spec: "AgentSpecInner"
 
-    class Config:
-        populate_by_name = True
+    model_config = ConfigDict(populate_by_name=True)
 
 
 class AgentSpecInner(BaseModel):
@@ -152,8 +151,7 @@ class AgentSpecInner(BaseModel):
                 logger.warning(f"Unknown capability: {cap}")
         return v
 
-    class Config:
-        populate_by_name = True
+    model_config = ConfigDict(populate_by_name=True)
 
 
 # ============================================================================

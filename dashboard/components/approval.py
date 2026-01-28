@@ -10,7 +10,7 @@ import asyncio
 import json
 import logging
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
@@ -118,7 +118,7 @@ class ApprovalWebSocketHandler:
             session_id=session_id,
             tool_name=tool_name,
             arguments=arguments or {},
-            created_at=datetime.utcnow().isoformat(),
+            created_at=datetime.now(timezone.utc).isoformat(),
             timeout_seconds=timeout_seconds,
         )
 
@@ -138,7 +138,7 @@ class ApprovalWebSocketHandler:
             "approved": approved,
             "responder": responder,
             "reason": reason,
-            "responded_at": datetime.utcnow().isoformat(),
+            "responded_at": datetime.now(timezone.utc).isoformat(),
         })
 
         await self.broadcast(message)
