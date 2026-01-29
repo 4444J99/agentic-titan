@@ -227,50 +227,102 @@ agentic-titan/
 │   │   ├── orchestrator.py
 │   │   ├── researcher.py
 │   │   ├── coder.py
-│   │   └── reviewer.py
+│   │   ├── reviewer.py
+│   │   ├── cfo.py             # Budget management
+│   │   ├── devops.py          # Infrastructure automation
+│   │   ├── security_analyst.py # Security scanning
+│   │   ├── data_engineer.py   # ETL pipeline design
+│   │   └── product_manager.py # User story generation
 │   └── personas.py            # Persona system
 │
 ├── hive/                      # Shared intelligence
 │   ├── memory.py              # HiveMind (Redis + ChromaDB)
-│   └── topology.py            # Topology engine
+│   ├── topology.py            # Topology engine
+│   ├── criticality.py         # Phase transition detection (Phase 16)
+│   ├── fission_fusion.py      # Cluster dynamics (Phase 16)
+│   ├── information_center.py  # Pattern aggregation (Phase 16)
+│   └── neighborhood.py        # Multi-scale coupling (Phase 16)
 │
 ├── adapters/                  # LLM adapters
 │   ├── base.py                # LLMAdapter interface
 │   └── router.py              # Multi-provider routing
 │
-├── runtime/                   # Runtime fabric (Phase 2)
+├── runtime/                   # Runtime fabric
 │   ├── base.py                # Runtime interface
 │   ├── local.py               # Local Python runtime
 │   ├── docker.py              # Docker container runtime
 │   ├── openfaas.py            # OpenFaaS serverless runtime
-│   └── selector.py            # Intelligent runtime selection
+│   ├── selector.py            # Intelligent runtime selection
+│   └── firecracker/           # MicroVM isolation (Phase 18B)
+│       ├── config.py          # VM configuration
+│       ├── vm.py              # MicroVMManager
+│       ├── network.py         # TAP/NAT management
+│       ├── guest_agent.py     # VSOCK communication
+│       ├── runtime.py         # FirecrackerRuntime
+│       └── image_builder.py   # Rootfs/kernel builder
 │
 ├── titan/                     # Core package
 │   ├── spec.py                # Agent Spec DSL
 │   ├── cli.py                 # CLI interface
 │   ├── metrics.py             # Prometheus instrumentation
+│   ├── analysis/              # Analysis tools (Phase 17C)
+│   │   ├── contradictions.py  # Contradiction detection
+│   │   ├── detector.py        # ContradictionDetector
+│   │   └── dialectic.py       # DialecticSynthesizer
+│   ├── auth/                  # Authentication (Phase 15)
+│   │   ├── models.py          # User, APIKey models
+│   │   ├── jwt.py             # JWT creation/verification
+│   │   ├── api_keys.py        # API key management
+│   │   ├── middleware.py      # FastAPI dependencies
+│   │   └── storage.py         # PostgreSQL backend
+│   ├── batch/                 # Batch processing (Phase 13)
+│   │   ├── celery.py          # Celery integration
+│   │   └── tasks.py           # Task definitions
+│   ├── learning/              # RLHF pipeline (Phase 18)
+│   │   ├── preference_pairs.py # Preference dataset builder
+│   │   ├── reward_model.py    # Reward model training
+│   │   ├── dpo_trainer.py     # Direct Preference Optimization
+│   │   ├── eval_suite.py      # Evaluation metrics
+│   │   ├── experiment.py      # Experiment tracking
+│   │   ├── deployment.py      # A/B testing
+│   │   └── pipeline.py        # Learning coordinator
+│   ├── ray/                   # Optional Ray backend (Phase 14)
+│   │   ├── config.py          # RayConfig
+│   │   ├── serve.py           # Ray Serve deployments
+│   │   ├── actors.py          # Ray actors
+│   │   └── backend_selector.py # Celery/Ray/Local selection
+│   ├── safety/                # Safety systems
+│   │   ├── hitl.py            # Human-in-the-loop
+│   │   ├── filters.py         # Content filtering
+│   │   └── rbac.py            # Role-based access
+│   ├── workflows/             # Inquiry engine (Phase 17)
+│   │   ├── inquiry_engine.py  # Multi-AI orchestration
+│   │   ├── inquiry_config.py  # Stage configuration
+│   │   ├── inquiry_dag.py     # DAG execution
+│   │   └── cognitive_router.py # Model selection
 │   └── stress/                # Stress testing framework
 │       ├── runner.py          # StressTestRunner
-│       ├── scenarios.py       # Test scenarios (swarm, pipeline, chaos)
-│       └── metrics.py         # Stress metrics collection
+│       ├── scenarios.py       # Test scenarios
+│       └── metrics.py         # Stress metrics
 │
-├── dashboard/                 # Web dashboard (Phase 4)
+├── dashboard/                 # Web dashboard
 │   ├── app.py                 # FastAPI application
 │   └── templates/             # Jinja2 HTML templates
+│       └── models.html        # Epistemic signatures radar chart
 │
 ├── specs/                     # Agent specifications
-│   ├── researcher.titan.yaml
-│   ├── coder.titan.yaml
-│   ├── reviewer.titan.yaml
-│   └── orchestrator.titan.yaml
+│   └── *.titan.yaml           # Agent spec files
 │
 └── deploy/                    # Infrastructure
-    ├── compose.yaml           # Docker Compose (Redis, ChromaDB, observability)
-    ├── prometheus.yml         # Prometheus scrape configuration
+    ├── compose.yaml           # Docker Compose
+    ├── prometheus.yml         # Prometheus config
     ├── Dockerfile.api         # Dashboard container
-    └── grafana/               # Grafana provisioning
-        ├── dashboards/        # Pre-built dashboards
-        └── provisioning/      # Auto-provisioned datasources
+    ├── grafana/               # Grafana provisioning
+    └── k3s/                   # Kubernetes manifests (Phase 15)
+        ├── postgres.yaml      # PostgreSQL StatefulSet
+        ├── rbac.yaml          # ServiceAccounts, Roles
+        ├── network-policies.yaml
+        └── resource-quotas.yaml
 ```
 
 ## Observability
@@ -360,7 +412,22 @@ pytest
 
 # With coverage
 pytest --cov=titan --cov=agents --cov=hive
+
+# Run specific test categories
+pytest tests/ -m e2e          # End-to-end tests
+pytest tests/ -m integration  # Integration tests
+pytest tests/ -m "not slow"   # Skip slow tests
 ```
+
+**1095+ tests** covering:
+- Unit tests for all components
+- Integration tests for safety chain
+- E2E workflow tests (swarm, topology, budget)
+- Agent archetype tests (92 tests)
+- Stress testing framework (50-100 agents)
+- RLHF pipeline tests
+- Firecracker runtime tests
+- Authentication/authorization tests
 
 ### Adding a New Agent Archetype
 
@@ -415,6 +482,44 @@ This project synthesizes patterns from:
 - [x] Grafana dashboards (auto-provisioned)
 - [x] Web dashboard (FastAPI + WebSocket real-time updates)
 - [x] CLI commands: `stress`, `dashboard`, `metrics`, `observe`
+
+### Phase 13: Batch Processing ✅
+- [x] Celery task queue integration
+- [x] HiveMind-Celery worker registration
+- [x] Stalled batch detection and recovery
+- [x] Cleanup tasks (results, artifacts, old batches)
+
+### Phase 14: Ray & Learning Pipeline ✅
+- [x] Optional Ray Serve backend
+- [x] Learning pipeline coordinator
+- [x] Feedback processing with reward signals
+- [x] Episode linking for topology learning
+
+### Phase 15: Production Hardening ✅
+- [x] PostgreSQL deployment
+- [x] JWT authentication system
+- [x] API key management
+- [x] Rate limiting (Redis backend)
+- [x] Admin API endpoints
+- [x] Kubernetes RBAC and network policies
+
+### Phase 16: Advanced Topology ✅
+- [x] Criticality detection (phase transitions)
+- [x] Multi-scale neighbor coupling
+- [x] Fission-fusion dynamics
+- [x] Information centers (pattern aggregation)
+
+### Phase 17: Expansive Inquiry ✅
+- [x] DAG-based workflow execution
+- [x] Epistemic signatures visualization (radar charts)
+- [x] Contradiction/dialectic detection
+
+### Phase 18: RLHF & Sandbox ✅
+- [x] Preference pair dataset builder
+- [x] Reward model training
+- [x] DPO (Direct Preference Optimization) trainer
+- [x] A/B testing deployment
+- [x] Firecracker MicroVM runtime
 
 ## License
 

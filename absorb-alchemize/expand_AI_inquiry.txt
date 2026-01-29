@@ -1,4 +1,4 @@
- V1
+V1
 ---
 import React, { useState } from ‘react’;
 import { Brain, Lightbulb, Network, RotateCw, Eye, TreePine, Code, Calculator, Palette, BookOpen } from ‘lucide-react’;
