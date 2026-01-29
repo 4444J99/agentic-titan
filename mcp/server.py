@@ -6,7 +6,16 @@ Provides:
 - Tool: agent_status - Check agent state
 - Tool: list_agents - List active agents
 - Tool: agent_result - Get agent results
+- Tool: route_cognitive_task - Route tasks to optimal models
+- Tool: compare_models - Compare model cognitive signatures
+- Tool: start_inquiry - Start multi-perspective inquiry
+- Tool: inquiry_status - Check inquiry session status
 - Resource: agent_types - Available agent archetypes
+- Resource: learning/stats - Learning system statistics
+- Resource: models/signatures - Model cognitive signatures
+- Resource: topology/current - Current topology state
+- Resource: hive/events/recent - Recent hive events
+- Prompts: inquiry prompts for common workflows
 """
 
 from __future__ import annotations
@@ -20,6 +29,20 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
 from typing import Any, Callable, Awaitable
+
+from mcp.prompts import get_all_prompts, get_prompt, get_prompt_messages
+from mcp.resources import (
+    get_all_resources,
+    get_resource_definition,
+    read_resource,
+    format_resource_contents,
+)
+from mcp.notifications import (
+    get_notification_manager,
+    NotificationType,
+    start_notifications,
+    stop_notifications,
+)
 
 logger = logging.getLogger("titan.mcp")
 
@@ -244,6 +267,7 @@ class TitanMCPServer:
 
     def __init__(self) -> None:
         self._agent_manager = AgentManager()
+        self._notification_manager = get_notification_manager()
         self._initialized = False
         self._handlers: dict[str, Callable[..., Awaitable[Any]]] = {
             MCPMethod.INITIALIZE.value: self._handle_initialize,
@@ -252,6 +276,8 @@ class TitanMCPServer:
             MCPMethod.TOOLS_CALL.value: self._handle_tools_call,
             MCPMethod.RESOURCES_LIST.value: self._handle_resources_list,
             MCPMethod.RESOURCES_READ.value: self._handle_resources_read,
+            MCPMethod.PROMPTS_LIST.value: self._handle_prompts_list,
+            MCPMethod.PROMPTS_GET.value: self._handle_prompts_get,
         }
 
     def get_tools(self) -> list[MCPTool]:
@@ -326,11 +352,90 @@ class TitanMCPServer:
                     "required": ["session_id"],
                 },
             ),
+            MCPTool(
+                name="route_cognitive_task",
+                description="Route a cognitive task to the optimal AI model based on task requirements.",
+                inputSchema={
+                    "type": "object",
+                    "properties": {
+                        "task_description": {
+                            "type": "string",
+                            "description": "Description of the cognitive task",
+                        },
+                        "cognitive_type": {
+                            "type": "string",
+                            "description": "Type of cognitive task: structured_reasoning, creative_synthesis, mathematical_analysis, cross_domain, meta_analysis, pattern_recognition",
+                            "enum": ["structured_reasoning", "creative_synthesis", "mathematical_analysis", "cross_domain", "meta_analysis", "pattern_recognition"],
+                        },
+                        "preferred_model": {
+                            "type": "string",
+                            "description": "Optional preferred model ID",
+                        },
+                    },
+                    "required": ["task_description", "cognitive_type"],
+                },
+            ),
+            MCPTool(
+                name="compare_models",
+                description="Compare two AI models across cognitive dimensions.",
+                inputSchema={
+                    "type": "object",
+                    "properties": {
+                        "model_a": {
+                            "type": "string",
+                            "description": "First model ID",
+                        },
+                        "model_b": {
+                            "type": "string",
+                            "description": "Second model ID",
+                        },
+                    },
+                    "required": ["model_a", "model_b"],
+                },
+            ),
+            MCPTool(
+                name="start_inquiry",
+                description="Start a multi-perspective inquiry workflow on a topic.",
+                inputSchema={
+                    "type": "object",
+                    "properties": {
+                        "topic": {
+                            "type": "string",
+                            "description": "Topic to explore",
+                        },
+                        "workflow": {
+                            "type": "string",
+                            "description": "Workflow to use: expansive, quick, or creative",
+                            "enum": ["expansive", "quick", "creative"],
+                        },
+                        "run_immediately": {
+                            "type": "boolean",
+                            "description": "Whether to run the workflow immediately",
+                        },
+                    },
+                    "required": ["topic"],
+                },
+            ),
+            MCPTool(
+                name="inquiry_status",
+                description="Get the status of an inquiry session.",
+                inputSchema={
+                    "type": "object",
+                    "properties": {
+                        "session_id": {
+                            "type": "string",
+                            "description": "Inquiry session ID",
+                        },
+                    },
+                    "required": ["session_id"],
+                },
+            ),
         ]
 
     def get_resources(self) -> list[MCPResource]:
         """Get available MCP resources."""
-        return [
+        # Base resources
+        resources = [
             MCPResource(
                 uri="titan://agents/types",
                 name="Agent Types",
@@ -342,6 +447,19 @@ class TitanMCPServer:
                 description="List of tools available to agents",
             ),
         ]
+
+        # Add dynamic resources from resources module
+        for resource_def in get_all_resources():
+            resources.append(
+                MCPResource(
+                    uri=resource_def.uri,
+                    name=resource_def.name,
+                    description=resource_def.description,
+                    mimeType=resource_def.mime_type,
+                )
+            )
+
+        return resources
 
     async def handle_request(self, request: MCPRequest) -> MCPResponse:
         """Handle an incoming MCP request."""
@@ -376,21 +494,30 @@ class TitanMCPServer:
     async def _handle_initialize(self, params: dict[str, Any]) -> dict[str, Any]:
         """Handle initialize request."""
         self._initialized = True
+
+        # Start notification system
+        await start_notifications()
+
         return {
             "protocolVersion": "2024-11-05",
             "serverInfo": {
                 "name": "titan-mcp",
-                "version": "0.1.0",
+                "version": "0.2.0",
             },
             "capabilities": {
                 "tools": {},
                 "resources": {},
+                "prompts": {},
             },
         }
 
     async def _handle_shutdown(self, params: dict[str, Any]) -> None:
         """Handle shutdown request."""
         self._initialized = False
+
+        # Stop notification system
+        await stop_notifications()
+
         return None
 
     async def _handle_tools_list(self, params: dict[str, Any]) -> dict[str, Any]:
@@ -496,6 +623,18 @@ class TitanMCPServer:
                 ],
             }
 
+        elif name == "route_cognitive_task":
+            return await self._handle_route_cognitive_task(arguments)
+
+        elif name == "compare_models":
+            return await self._handle_compare_models(arguments)
+
+        elif name == "start_inquiry":
+            return await self._handle_start_inquiry(arguments)
+
+        elif name == "inquiry_status":
+            return await self._handle_inquiry_status(arguments)
+
         else:
             return {
                 "content": [{"type": "text", "text": f"Unknown tool: {name}"}],
@@ -570,9 +709,304 @@ class TitanMCPServer:
                 ],
             }
 
+        # Try dynamic resources
+        if uri.startswith("titan://"):
+            try:
+                data = await read_resource(uri)
+                return format_resource_contents(uri, data)
+            except ValueError:
+                pass
+
         return {
             "contents": [{"uri": uri, "mimeType": "text/plain", "text": "Resource not found"}],
         }
+
+    async def _handle_prompts_list(self, params: dict[str, Any]) -> dict[str, Any]:
+        """Handle prompts/list request."""
+        prompts = get_all_prompts()
+        return {"prompts": [p.to_dict() for p in prompts]}
+
+    async def _handle_prompts_get(self, params: dict[str, Any]) -> dict[str, Any]:
+        """Handle prompts/get request."""
+        name = params.get("name")
+        arguments = params.get("arguments", {})
+
+        prompt = get_prompt(name)
+        if not prompt:
+            return {
+                "description": f"Unknown prompt: {name}",
+                "messages": [],
+            }
+
+        try:
+            messages = get_prompt_messages(name, arguments)
+            return {
+                "description": prompt.description,
+                "messages": messages,
+            }
+        except ValueError as e:
+            return {
+                "description": str(e),
+                "messages": [],
+            }
+
+    # ========================================================================
+    # New Tool Handlers
+    # ========================================================================
+
+    async def _handle_route_cognitive_task(
+        self,
+        arguments: dict[str, Any],
+    ) -> dict[str, Any]:
+        """Handle route_cognitive_task tool call."""
+        try:
+            from titan.workflows.cognitive_router import (
+                get_cognitive_router,
+                CognitiveTaskType,
+            )
+
+            task_description = arguments["task_description"]
+            cognitive_type_str = arguments["cognitive_type"]
+            preferred_model = arguments.get("preferred_model")
+
+            # Map string to enum
+            cognitive_type = CognitiveTaskType(cognitive_type_str)
+
+            router = get_cognitive_router()
+            routing = await router.route_for_task(
+                cognitive_type,
+                preferred_model=preferred_model,
+            )
+
+            return {
+                "content": [
+                    {
+                        "type": "text",
+                        "text": json.dumps({
+                            "recommended_model": routing.model_id,
+                            "score": routing.score,
+                            "reasoning": routing.reasoning,
+                            "cognitive_type": cognitive_type_str,
+                            "task": task_description[:200],
+                        }),
+                    }
+                ],
+            }
+
+        except Exception as e:
+            logger.error(f"Route cognitive task failed: {e}")
+            return {
+                "content": [{"type": "text", "text": f"Error: {e}"}],
+                "isError": True,
+            }
+
+    async def _handle_compare_models(
+        self,
+        arguments: dict[str, Any],
+    ) -> dict[str, Any]:
+        """Handle compare_models tool call."""
+        try:
+            from titan.workflows.cognitive_router import get_cognitive_router
+
+            model_a = arguments["model_a"]
+            model_b = arguments["model_b"]
+
+            router = get_cognitive_router()
+            registry = router._model_registry
+
+            # Get traits for both models
+            traits_a = registry.get(model_a, {})
+            traits_b = registry.get(model_b, {})
+
+            if not traits_a:
+                return {
+                    "content": [{"type": "text", "text": f"Model not found: {model_a}"}],
+                    "isError": True,
+                }
+
+            if not traits_b:
+                return {
+                    "content": [{"type": "text", "text": f"Model not found: {model_b}"}],
+                    "isError": True,
+                }
+
+            # Compare across dimensions
+            dimensions = [
+                "structured_reasoning",
+                "creative_synthesis",
+                "mathematical_analysis",
+                "cross_domain",
+                "meta_analysis",
+                "pattern_recognition",
+            ]
+
+            comparison = {
+                "model_a": {
+                    "id": model_a,
+                    "scores": {d: traits_a.get(d, 0.5) for d in dimensions},
+                },
+                "model_b": {
+                    "id": model_b,
+                    "scores": {d: traits_b.get(d, 0.5) for d in dimensions},
+                },
+                "dimensions": dimensions,
+                "winner_by_dimension": {},
+            }
+
+            for d in dimensions:
+                score_a = traits_a.get(d, 0.5)
+                score_b = traits_b.get(d, 0.5)
+                if score_a > score_b:
+                    comparison["winner_by_dimension"][d] = model_a
+                elif score_b > score_a:
+                    comparison["winner_by_dimension"][d] = model_b
+                else:
+                    comparison["winner_by_dimension"][d] = "tie"
+
+            return {
+                "content": [
+                    {
+                        "type": "text",
+                        "text": json.dumps(comparison, indent=2),
+                    }
+                ],
+            }
+
+        except Exception as e:
+            logger.error(f"Compare models failed: {e}")
+            return {
+                "content": [{"type": "text", "text": f"Error: {e}"}],
+                "isError": True,
+            }
+
+    async def _handle_start_inquiry(
+        self,
+        arguments: dict[str, Any],
+    ) -> dict[str, Any]:
+        """Handle start_inquiry tool call."""
+        try:
+            from titan.workflows.inquiry_engine import get_inquiry_engine
+            from titan.workflows.inquiry_config import get_workflow
+
+            topic = arguments["topic"]
+            workflow_name = arguments.get("workflow", "expansive")
+            run_immediately = arguments.get("run_immediately", False)
+
+            workflow = get_workflow(workflow_name)
+            if not workflow:
+                return {
+                    "content": [{"type": "text", "text": f"Unknown workflow: {workflow_name}"}],
+                    "isError": True,
+                }
+
+            engine = get_inquiry_engine()
+            session = await engine.start_inquiry(topic, workflow)
+
+            # Notify
+            await self._notification_manager.notify(
+                NotificationType.INQUIRY_STARTED,
+                {
+                    "session_id": session.id,
+                    "topic": topic[:200],
+                    "workflow": workflow_name,
+                },
+            )
+
+            result = {
+                "session_id": session.id,
+                "topic": topic,
+                "workflow": workflow_name,
+                "status": session.status.value,
+                "total_stages": session.total_stages,
+            }
+
+            if run_immediately:
+                # Run in background
+                asyncio.create_task(engine.run_full_workflow(session))
+                result["message"] = "Workflow started running in background"
+
+            return {
+                "content": [
+                    {
+                        "type": "text",
+                        "text": json.dumps(result),
+                    }
+                ],
+            }
+
+        except Exception as e:
+            logger.error(f"Start inquiry failed: {e}")
+            return {
+                "content": [{"type": "text", "text": f"Error: {e}"}],
+                "isError": True,
+            }
+
+    async def _handle_inquiry_status(
+        self,
+        arguments: dict[str, Any],
+    ) -> dict[str, Any]:
+        """Handle inquiry_status tool call."""
+        try:
+            from titan.workflows.inquiry_engine import get_inquiry_engine
+
+            session_id = arguments["session_id"]
+            engine = get_inquiry_engine()
+            session = engine.get_session(session_id)
+
+            if not session:
+                return {
+                    "content": [{"type": "text", "text": f"Session not found: {session_id}"}],
+                    "isError": True,
+                }
+
+            result = {
+                "session_id": session.id,
+                "topic": session.topic,
+                "workflow": session.workflow.name,
+                "status": session.status.value,
+                "progress": session.progress,
+                "current_stage": session.current_stage,
+                "total_stages": session.total_stages,
+                "stages_completed": len(session.results),
+                "created_at": session.created_at.isoformat(),
+            }
+
+            if session.started_at:
+                result["started_at"] = session.started_at.isoformat()
+
+            if session.completed_at:
+                result["completed_at"] = session.completed_at.isoformat()
+
+            if session.error:
+                result["error"] = session.error
+
+            # Add stage summaries
+            result["stages"] = [
+                {
+                    "name": r.stage_name,
+                    "role": r.role,
+                    "model": r.model_used,
+                    "success": r.success,
+                    "duration_ms": r.duration_ms,
+                }
+                for r in session.results
+            ]
+
+            return {
+                "content": [
+                    {
+                        "type": "text",
+                        "text": json.dumps(result, indent=2),
+                    }
+                ],
+            }
+
+        except Exception as e:
+            logger.error(f"Inquiry status failed: {e}")
+            return {
+                "content": [{"type": "text", "text": f"Error: {e}"}],
+                "isError": True,
+            }
 
     async def run_stdio(self) -> None:
         """Run the server on stdin/stdout."""

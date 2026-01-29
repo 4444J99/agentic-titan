@@ -26,8 +26,10 @@ from typing import TYPE_CHECKING, Any, AsyncGenerator, Callable
 
 from titan.workflows.inquiry_config import (
     CognitiveStyle,
+    InfluenceMode,
     InquiryStage,
     InquiryWorkflow,
+    UserInterjection,
     EXPANSIVE_INQUIRY_WORKFLOW,
 )
 from titan.workflows.inquiry_prompts import get_prompt, get_prompt_with_budget_awareness
@@ -55,6 +57,7 @@ class InquiryStatus(str, Enum):
 
     PENDING = "pending"
     RUNNING = "running"
+    PAUSED = "paused"
     COMPLETED = "completed"
     FAILED = "failed"
     CANCELLED = "cancelled"
@@ -116,6 +119,13 @@ class InquirySession:
     completed_at: datetime | None = None
     error: str | None = None
     metadata: dict[str, Any] = field(default_factory=dict)
+    # Conversational interleaving
+    interjections: list[UserInterjection] = field(default_factory=list)
+    pause_requested: bool = False
+    # Temporal tracking for re-inquiry
+    parent_session_id: str | None = None
+    chain_id: str | None = None
+    version: int = 1
 
     @property
     def total_stages(self) -> int:
@@ -196,12 +206,27 @@ class InquirySession:
             "total_stages": self.total_stages,
             "progress": self.progress,
             "results": [r.to_dict() for r in self.results],
+            "interjections": [i.to_dict() for i in self.interjections],
             "created_at": self.created_at.isoformat(),
             "started_at": self.started_at.isoformat() if self.started_at else None,
             "completed_at": self.completed_at.isoformat() if self.completed_at else None,
             "error": self.error,
             "metadata": self.metadata,
+            "parent_session_id": self.parent_session_id,
+            "chain_id": self.chain_id,
+            "version": self.version,
         }
+
+    def get_unprocessed_interjections(self) -> list[UserInterjection]:
+        """Get interjections that haven't been processed yet."""
+        return [i for i in self.interjections if not i.processed]
+
+    def get_interjections_for_stage(self, stage_index: int) -> list[UserInterjection]:
+        """Get interjections relevant to a specific stage."""
+        return [
+            i for i in self.interjections
+            if i.injected_at_stage < stage_index and not i.processed
+        ]
 
 
 class InquiryEngine:
@@ -823,6 +848,236 @@ class InquiryEngine:
             logger.info(f"Cancelled session {session_id}")
             return True
         return False
+
+    # =========================================================================
+    # Conversational Interleaving
+    # =========================================================================
+
+    def pause_session(self, session_id: str) -> bool:
+        """
+        Request pause of a running session at the next stage boundary.
+
+        The session will complete the current stage and then pause
+        before starting the next stage.
+
+        Args:
+            session_id: Session to pause
+
+        Returns:
+            True if pause was requested successfully
+        """
+        session = self._sessions.get(session_id)
+        if not session:
+            logger.warning(f"Session not found: {session_id}")
+            return False
+
+        if session.status not in (InquiryStatus.RUNNING, InquiryStatus.PENDING):
+            logger.warning(f"Cannot pause session in state: {session.status}")
+            return False
+
+        session.pause_requested = True
+        logger.info(f"Pause requested for session {session_id}")
+        return True
+
+    def inject_user_input(
+        self,
+        session_id: str,
+        content: str,
+        mode: InfluenceMode | str = InfluenceMode.CONTEXT,
+    ) -> UserInterjection | None:
+        """
+        Inject user input into a paused or running session.
+
+        Args:
+            session_id: Session to inject into
+            content: User's input text
+            mode: How the input should influence the inquiry
+
+        Returns:
+            The created UserInterjection, or None if failed
+        """
+        session = self._sessions.get(session_id)
+        if not session:
+            logger.warning(f"Session not found: {session_id}")
+            return None
+
+        # Convert string mode to enum
+        if isinstance(mode, str):
+            mode = InfluenceMode(mode)
+
+        # Create interjection
+        interjection = UserInterjection(
+            content=content,
+            injected_at_stage=session.current_stage,
+            influence_mode=mode,
+        )
+
+        session.interjections.append(interjection)
+        logger.info(
+            f"User interjection added to session {session_id} "
+            f"at stage {session.current_stage} (mode: {mode.value})"
+        )
+
+        return interjection
+
+    def resume_session(self, session_id: str) -> bool:
+        """
+        Resume a paused session.
+
+        Args:
+            session_id: Session to resume
+
+        Returns:
+            True if session was resumed
+        """
+        session = self._sessions.get(session_id)
+        if not session:
+            logger.warning(f"Session not found: {session_id}")
+            return False
+
+        if session.status != InquiryStatus.PAUSED:
+            logger.warning(f"Cannot resume session in state: {session.status}")
+            return False
+
+        session.status = InquiryStatus.RUNNING
+        session.pause_requested = False
+        logger.info(f"Session {session_id} resumed")
+        return True
+
+    async def run_interleaved_workflow(
+        self,
+        session: InquirySession,
+    ) -> AsyncGenerator[dict[str, Any], None]:
+        """
+        Run workflow with support for pausing and user interjections.
+
+        This is similar to stream_workflow but checks for pause requests
+        and processes interjections between stages.
+
+        Args:
+            session: The inquiry session
+
+        Yields:
+            Progress events including pause and interjection events
+        """
+        yield {
+            "type": "session_started",
+            "session_id": session.id,
+            "topic": session.topic,
+            "total_stages": session.total_stages,
+        }
+
+        try:
+            while len(session.results) < session.total_stages:
+                # Check for cancellation
+                if session.status == InquiryStatus.CANCELLED:
+                    yield {
+                        "type": "session_cancelled",
+                        "session_id": session.id,
+                    }
+                    break
+
+                # Check for pause request
+                if session.pause_requested:
+                    session.status = InquiryStatus.PAUSED
+                    session.pause_requested = False
+                    yield {
+                        "type": "session_paused",
+                        "session_id": session.id,
+                        "current_stage": session.current_stage,
+                        "stages_completed": len(session.results),
+                    }
+                    # Wait for resume
+                    while session.status == InquiryStatus.PAUSED:
+                        await asyncio.sleep(0.1)
+                        # Check if cancelled while paused
+                        if session.status == InquiryStatus.CANCELLED:
+                            yield {
+                                "type": "session_cancelled",
+                                "session_id": session.id,
+                            }
+                            return
+                    yield {
+                        "type": "session_resumed",
+                        "session_id": session.id,
+                    }
+
+                # Process any pending interjections
+                unprocessed = session.get_unprocessed_interjections()
+                for interjection in unprocessed:
+                    yield {
+                        "type": "interjection_processing",
+                        "session_id": session.id,
+                        "interjection": interjection.to_dict(),
+                    }
+                    interjection.processed = True
+
+                # Run next stage
+                stage_index = len(session.results)
+                stage = session.workflow.stages[stage_index]
+
+                yield {
+                    "type": "stage_started",
+                    "session_id": session.id,
+                    "stage_index": stage_index,
+                    "stage_name": stage.name,
+                    "role": stage.role,
+                }
+
+                result = await self.run_stage(session)
+
+                yield {
+                    "type": "stage_completed",
+                    "session_id": session.id,
+                    "stage_index": stage_index,
+                    "result": result.to_dict(),
+                }
+
+            if session.status not in (InquiryStatus.CANCELLED, InquiryStatus.PAUSED):
+                session.status = InquiryStatus.COMPLETED
+                session.completed_at = datetime.now()
+
+                yield {
+                    "type": "session_completed",
+                    "session_id": session.id,
+                    "results_count": len(session.results),
+                }
+
+        except Exception as e:
+            session.status = InquiryStatus.FAILED
+            session.error = str(e)
+            session.completed_at = datetime.now()
+
+            yield {
+                "type": "session_failed",
+                "session_id": session.id,
+                "error": str(e),
+            }
+
+    def _get_interjection_context(self, session: InquirySession) -> str:
+        """
+        Build context string from user interjections.
+
+        Args:
+            session: The inquiry session
+
+        Returns:
+            Context string incorporating user interjections
+        """
+        relevant = session.get_interjections_for_stage(session.current_stage + 1)
+        if not relevant:
+            return ""
+
+        parts = ["User clarifications/directions:"]
+        for i, interjection in enumerate(relevant, 1):
+            mode_label = {
+                InfluenceMode.CONTEXT: "Additional context",
+                InfluenceMode.REDIRECT: "Direction change",
+                InfluenceMode.CLARIFY: "Clarification",
+            }.get(interjection.influence_mode, "Input")
+            parts.append(f"{i}. [{mode_label}]: {interjection.content}")
+
+        return "\n".join(parts)
 
     # =========================================================================
     # Event Handlers

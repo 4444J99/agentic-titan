@@ -1,0 +1,231 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h1>Inquiry Sessions</h1>
+
+<div class="grid">
+    <div>
+        <!-- Quick Start -->
+        <article>
+            <header>
+                <h3>Start New Inquiry</h3>
+            </header>
+            <form id="inquiry-form">
+                <label for="topic">Topic</label>
+                <input type="text" id="topic" name="topic" placeholder="Enter a topic to explore..." required>
+
+                <label for="workflow">Workflow</label>
+                <select id="workflow" name="workflow">
+                    <option value="expansive">Expansive (6 stages)</option>
+                    <option value="quick">Quick (3 stages)</option>
+                    <option value="creative">Creative (4 stages)</option>
+                </select>
+
+                <label>
+                    <input type="checkbox" id="run-immediately" name="run_immediately" checked>
+                    Run immediately
+                </label>
+
+                <button type="submit">Start Inquiry</button>
+            </form>
+        </article>
+    </div>
+
+    <div>
+        <!-- Stats -->
+        <article>
+            <header>
+                <h3>Session Statistics</h3>
+            </header>
+            <div class="grid-4">
+                <div class="stat-card">
+                    <h3 id="stat-total">{{ stats.total }}</h3>
+                    <p>Total</p>
+                </div>
+                <div class="stat-card">
+                    <h3 id="stat-running">{{ stats.running }}</h3>
+                    <p>Running</p>
+                </div>
+                <div class="stat-card">
+                    <h3 id="stat-completed">{{ stats.completed }}</h3>
+                    <p>Completed</p>
+                </div>
+                <div class="stat-card">
+                    <h3 id="stat-failed">{{ stats.failed }}</h3>
+                    <p>Failed</p>
+                </div>
+            </div>
+        </article>
+    </div>
+</div>
+
+<!-- Session List -->
+<article>
+    <header>
+        <h3>Recent Sessions</h3>
+        <div>
+            <select id="status-filter">
+                <option value="">All</option>
+                <option value="running">Running</option>
+                <option value="paused">Paused</option>
+                <option value="completed">Completed</option>
+                <option value="failed">Failed</option>
+            </select>
+            <button class="outline" onclick="refreshSessions()">Refresh</button>
+        </div>
+    </header>
+
+    <table role="grid">
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Topic</th>
+                <th>Workflow</th>
+                <th>Status</th>
+                <th>Progress</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody id="session-list">
+            {% for session in sessions %}
+            <tr data-session-id="{{ session.id }}">
+                <td><code>{{ session.id[:12] }}...</code></td>
+                <td>{{ session.topic[:40] }}{% if session.topic|length > 40 %}...{% endif %}</td>
+                <td>{{ session.workflow_name }}</td>
+                <td>
+                    <span class="status-badge status-{{ session.status }}">{{ session.status }}</span>
+                </td>
+                <td>
+                    <progress value="{{ session.progress }}" max="100"></progress>
+                    <small>{{ session.progress|int }}%</small>
+                </td>
+                <td>
+                    <a href="/inquiry/{{ session.id }}" class="button outline small">View</a>
+                    {% if session.status == 'paused' %}
+                    <button class="small" onclick="resumeSession('{{ session.id }}')">Resume</button>
+                    {% elif session.status == 'running' %}
+                    <button class="small secondary" onclick="pauseSession('{{ session.id }}')">Pause</button>
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</article>
+
+<style>
+    .status-badge {
+        padding: 0.25rem 0.5rem;
+        border-radius: 4px;
+        font-size: 0.8rem;
+        font-weight: bold;
+    }
+    .status-pending { background: var(--secondary); color: white; }
+    .status-running { background: var(--primary); color: white; }
+    .status-paused { background: var(--warning); color: black; }
+    .status-completed { background: var(--success); color: white; }
+    .status-failed { background: var(--error); color: white; }
+    .status-cancelled { background: var(--muted-color); color: white; }
+
+    button.small, .button.small {
+        padding: 0.25rem 0.5rem;
+        font-size: 0.8rem;
+    }
+</style>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    const inquiryForm = document.getElementById('inquiry-form');
+
+    inquiryForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+
+        const topic = document.getElementById('topic').value;
+        const workflow = document.getElementById('workflow').value;
+        const runImmediately = document.getElementById('run-immediately').checked;
+
+        try {
+            const response = await fetch('/api/inquiry/sessions', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    topic,
+                    workflow,
+                    run_immediately: runImmediately
+                })
+            });
+
+            if (response.ok) {
+                const session = await response.json();
+                window.location.href = `/inquiry/${session.id}`;
+            } else {
+                alert('Failed to start inquiry');
+            }
+        } catch (error) {
+            console.error('Error:', error);
+            alert('Error starting inquiry');
+        }
+    });
+
+    async function refreshSessions() {
+        const status = document.getElementById('status-filter').value;
+        const url = status ? `/api/inquiry/sessions?status=${status}` : '/api/inquiry/sessions';
+
+        try {
+            const response = await fetch(url);
+            const sessions = await response.json();
+            updateSessionList(sessions);
+        } catch (error) {
+            console.error('Error refreshing sessions:', error);
+        }
+    }
+
+    function updateSessionList(sessions) {
+        const tbody = document.getElementById('session-list');
+        tbody.innerHTML = sessions.map(s => `
+            <tr data-session-id="${s.id}">
+                <td><code>${s.id.slice(0, 12)}...</code></td>
+                <td>${s.topic.slice(0, 40)}${s.topic.length > 40 ? '...' : ''}</td>
+                <td>${s.workflow_name}</td>
+                <td><span class="status-badge status-${s.status}">${s.status}</span></td>
+                <td>
+                    <progress value="${s.progress}" max="100"></progress>
+                    <small>${Math.round(s.progress)}%</small>
+                </td>
+                <td>
+                    <a href="/inquiry/${s.id}" class="button outline small">View</a>
+                </td>
+            </tr>
+        `).join('');
+    }
+
+    async function pauseSession(sessionId) {
+        try {
+            await fetch(`/api/inquiry/sessions/${sessionId}/pause`, { method: 'POST' });
+            refreshSessions();
+        } catch (error) {
+            console.error('Error pausing session:', error);
+        }
+    }
+
+    async function resumeSession(sessionId) {
+        try {
+            await fetch(`/api/inquiry/sessions/${sessionId}/resume`, { method: 'POST' });
+            refreshSessions();
+        } catch (error) {
+            console.error('Error resuming session:', error);
+        }
+    }
+
+    // Auto-refresh status filter changes
+    document.getElementById('status-filter').addEventListener('change', refreshSessions);
+
+    // Real-time updates
+    function onWebSocketMessage(data) {
+        if (data.type && data.type.startsWith('inquiry/')) {
+            refreshSessions();
+        }
+    }
+</script>
+{% endblock %}

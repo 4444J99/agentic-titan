@@ -1,0 +1,346 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h1>Contradiction Analysis</h1>
+
+<div class="grid">
+    <!-- Analysis Input -->
+    <div>
+        <article>
+            <header><h3>Detect Contradictions</h3></header>
+            <form id="detect-form">
+                <label for="text-a">Statement A</label>
+                <textarea id="text-a" placeholder="Enter first statement or content..." rows="4" required></textarea>
+
+                <label for="text-b">Statement B</label>
+                <textarea id="text-b" placeholder="Enter second statement to compare..." rows="4" required></textarea>
+
+                <label for="sensitivity">Sensitivity</label>
+                <select id="sensitivity">
+                    <option value="low">Low (obvious conflicts only)</option>
+                    <option value="medium" selected>Medium (balanced detection)</option>
+                    <option value="high">High (subtle conflicts)</option>
+                </select>
+
+                <button type="submit">Analyze Contradictions</button>
+            </form>
+        </article>
+
+        <!-- Session Analysis -->
+        <article>
+            <header><h3>Analyze Inquiry Session</h3></header>
+            <form id="session-form">
+                <label for="session-id">Session ID</label>
+                <input type="text" id="session-id" placeholder="inq-..." required>
+                <button type="submit">Analyze Session</button>
+            </form>
+        </article>
+    </div>
+
+    <!-- Dialectic Synthesis -->
+    <div>
+        <article>
+            <header><h3>Dialectic Synthesis</h3></header>
+            <form id="synthesis-form">
+                <label for="thesis">Thesis</label>
+                <textarea id="thesis" placeholder="Enter the thesis statement..." rows="3" required></textarea>
+
+                <label for="antithesis">Antithesis</label>
+                <textarea id="antithesis" placeholder="Enter the opposing antithesis..." rows="3" required></textarea>
+
+                <label for="strategy">Synthesis Strategy</label>
+                <select id="strategy">
+                    <option value="auto">Auto-detect</option>
+                    <option value="higher_order">Higher-Order Abstraction</option>
+                    <option value="integration">Integration</option>
+                    <option value="contextual">Contextual Resolution</option>
+                    <option value="complementary">Complementary Framing</option>
+                    <option value="temporal">Temporal Resolution</option>
+                    <option value="perspectival">Perspectival Shift</option>
+                </select>
+
+                <button type="submit">Synthesize</button>
+            </form>
+        </article>
+    </div>
+</div>
+
+<!-- Results Section -->
+<article id="results-section" style="display: none;">
+    <header>
+        <h3>Analysis Results</h3>
+        <button class="outline small" onclick="clearResults()">Clear</button>
+    </header>
+    <div id="results-content"></div>
+</article>
+
+<!-- Contradiction Matrix -->
+<article id="matrix-section" style="display: none;">
+    <header><h3>Contradiction Matrix</h3></header>
+    <div id="matrix-container">
+        <canvas id="matrix-chart"></canvas>
+    </div>
+</article>
+
+<!-- Dialectic Flow -->
+<article id="dialectic-section" style="display: none;">
+    <header><h3>Dialectic Flow</h3></header>
+    <div class="dialectic-flow" id="dialectic-flow">
+        <div class="thesis-box">
+            <h4>Thesis</h4>
+            <p id="thesis-display"></p>
+        </div>
+        <div class="flow-arrow">vs</div>
+        <div class="antithesis-box">
+            <h4>Antithesis</h4>
+            <p id="antithesis-display"></p>
+        </div>
+        <div class="flow-arrow">+</div>
+        <div class="synthesis-box">
+            <h4>Synthesis</h4>
+            <p id="synthesis-display"></p>
+            <small id="synthesis-meta"></small>
+        </div>
+    </div>
+</article>
+
+<style>
+    .dialectic-flow {
+        display: flex;
+        align-items: stretch;
+        gap: 1rem;
+        flex-wrap: wrap;
+    }
+
+    .thesis-box, .antithesis-box, .synthesis-box {
+        flex: 1;
+        min-width: 200px;
+        padding: 1rem;
+        border-radius: 8px;
+        background: var(--card-background-color);
+    }
+
+    .thesis-box {
+        border-left: 4px solid var(--primary);
+    }
+
+    .antithesis-box {
+        border-left: 4px solid var(--error);
+    }
+
+    .synthesis-box {
+        border-left: 4px solid var(--success);
+    }
+
+    .flow-arrow {
+        display: flex;
+        align-items: center;
+        font-size: 1.5rem;
+        font-weight: bold;
+        color: var(--muted-color);
+    }
+
+    .contradiction-card {
+        background: var(--card-background-color);
+        padding: 1rem;
+        border-radius: 8px;
+        margin-bottom: 1rem;
+        border-left: 4px solid var(--warning);
+    }
+
+    .contradiction-card.critical {
+        border-left-color: var(--error);
+    }
+
+    .contradiction-card.high {
+        border-left-color: #ff6b6b;
+    }
+
+    .contradiction-card.medium {
+        border-left-color: var(--warning);
+    }
+
+    .contradiction-card.low {
+        border-left-color: var(--muted-color);
+    }
+
+    .contradiction-type {
+        display: inline-block;
+        padding: 0.2rem 0.5rem;
+        border-radius: 4px;
+        font-size: 0.75rem;
+        text-transform: uppercase;
+        background: var(--primary);
+        color: white;
+    }
+
+    .severity-badge {
+        margin-left: 0.5rem;
+        padding: 0.2rem 0.4rem;
+        border-radius: 4px;
+        font-size: 0.7rem;
+    }
+
+    .severity-critical { background: var(--error); color: white; }
+    .severity-high { background: #ff6b6b; color: white; }
+    .severity-medium { background: var(--warning); color: black; }
+    .severity-low { background: var(--muted-color); color: white; }
+
+    #matrix-container {
+        height: 300px;
+    }
+
+    button.small {
+        padding: 0.25rem 0.5rem;
+        font-size: 0.8rem;
+    }
+</style>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+    // Contradiction Detection
+    document.getElementById('detect-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+
+        const textA = document.getElementById('text-a').value;
+        const textB = document.getElementById('text-b').value;
+        const sensitivity = document.getElementById('sensitivity').value;
+
+        try {
+            const response = await fetch('/api/analysis/contradictions/detect', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    content_pairs: [{ text_a: textA, text_b: textB }],
+                    sensitivity
+                })
+            });
+
+            const result = await response.json();
+            displayContradictions(result);
+        } catch (error) {
+            console.error('Error:', error);
+            alert('Analysis failed');
+        }
+    });
+
+    // Session Analysis
+    document.getElementById('session-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+
+        const sessionId = document.getElementById('session-id').value;
+
+        try {
+            const response = await fetch(`/api/analysis/inquiry/${sessionId}/contradictions`);
+            const result = await response.json();
+            displaySessionAnalysis(result);
+        } catch (error) {
+            console.error('Error:', error);
+            alert('Session analysis failed');
+        }
+    });
+
+    // Dialectic Synthesis
+    document.getElementById('synthesis-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+
+        const thesis = document.getElementById('thesis').value;
+        const antithesis = document.getElementById('antithesis').value;
+        const strategy = document.getElementById('strategy').value;
+
+        try {
+            const response = await fetch('/api/analysis/dialectic/synthesize', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ thesis, antithesis, strategy })
+            });
+
+            const result = await response.json();
+            displaySynthesis(thesis, antithesis, result);
+        } catch (error) {
+            console.error('Error:', error);
+            alert('Synthesis failed');
+        }
+    });
+
+    function displayContradictions(result) {
+        const section = document.getElementById('results-section');
+        const content = document.getElementById('results-content');
+
+        if (result.contradictions.length === 0) {
+            content.innerHTML = '<p>No contradictions detected.</p>';
+        } else {
+            content.innerHTML = result.contradictions.map(c => `
+                <div class="contradiction-card ${c.severity}">
+                    <span class="contradiction-type">${c.contradiction_type}</span>
+                    <span class="severity-badge severity-${c.severity}">${c.severity}</span>
+                    <span style="float: right; color: var(--muted-color);">Confidence: ${Math.round(c.confidence * 100)}%</span>
+                    <p style="margin-top: 1rem;">${c.description}</p>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 1rem;">
+                        <div>
+                            <strong>Statement A:</strong>
+                            <p style="font-style: italic;">"${c.text_a_excerpt}"</p>
+                        </div>
+                        <div>
+                            <strong>Statement B:</strong>
+                            <p style="font-style: italic;">"${c.text_b_excerpt}"</p>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        section.style.display = 'block';
+    }
+
+    function displaySessionAnalysis(result) {
+        const section = document.getElementById('results-section');
+        const content = document.getElementById('results-content');
+
+        let html = `<p>Analyzed ${result.stage_pairs_analyzed} stage pairs.</p>`;
+
+        if (result.contradictions.length === 0) {
+            html += '<p>No contradictions found between stages.</p>';
+        } else {
+            html += result.contradictions.map((c, i) => `
+                <div class="contradiction-card ${c.severity}">
+                    <strong>${c.stage_a}</strong> vs <strong>${c.stage_b}</strong>
+                    <span class="contradiction-type">${c.type}</span>
+                    <span class="severity-badge severity-${c.severity}">${c.severity}</span>
+                    <p>${c.description}</p>
+                    ${result.dialectic_suggestions[i] ? `
+                        <details>
+                            <summary>Suggested Resolution</summary>
+                            <p>${result.dialectic_suggestions[i].synthesis}</p>
+                            <small>Strategy: ${result.dialectic_suggestions[i].strategy}</small>
+                        </details>
+                    ` : ''}
+                </div>
+            `).join('');
+        }
+
+        content.innerHTML = html;
+        section.style.display = 'block';
+    }
+
+    function displaySynthesis(thesis, antithesis, result) {
+        const section = document.getElementById('dialectic-section');
+
+        document.getElementById('thesis-display').textContent = thesis;
+        document.getElementById('antithesis-display').textContent = antithesis;
+        document.getElementById('synthesis-display').textContent = result.synthesis;
+        document.getElementById('synthesis-meta').textContent =
+            `Strategy: ${result.strategy_used} | Confidence: ${Math.round(result.confidence * 100)}%`;
+
+        section.style.display = 'block';
+    }
+
+    function clearResults() {
+        document.getElementById('results-section').style.display = 'none';
+        document.getElementById('matrix-section').style.display = 'none';
+        document.getElementById('dialectic-section').style.display = 'none';
+    }
+</script>
+{% endblock %}

@@ -205,6 +205,71 @@ class TitanDashboard:
                 },
             )
 
+        @self.app.get("/inquiry", response_class=HTMLResponse)
+        async def inquiry_page(request: Request) -> HTMLResponse:
+            """Inquiry sessions page."""
+            sessions = await self._get_inquiry_sessions()
+            stats = self._get_inquiry_stats(sessions)
+            return templates.TemplateResponse(
+                "inquiry.html",
+                {
+                    "request": request,
+                    "title": "Inquiry Sessions",
+                    "sessions": sessions,
+                    "stats": stats,
+                },
+            )
+
+        @self.app.get("/inquiry/{session_id}", response_class=HTMLResponse)
+        async def inquiry_detail_page(request: Request, session_id: str) -> HTMLResponse:
+            """Inquiry session detail page."""
+            session, stages = await self._get_inquiry_detail(session_id)
+            if not session:
+                raise HTTPException(status_code=404, detail="Session not found")
+
+            import json
+            stages_json = json.dumps([
+                {
+                    "name": s["name"],
+                    "emoji": s.get("emoji", ""),
+                    "result": s.get("result"),
+                }
+                for s in stages
+            ])
+
+            return templates.TemplateResponse(
+                "inquiry_detail.html",
+                {
+                    "request": request,
+                    "title": f"Inquiry: {session.get('topic', '')[:30]}",
+                    "session": session,
+                    "stages": stages,
+                    "stages_json": stages_json,
+                },
+            )
+
+        @self.app.get("/analysis", response_class=HTMLResponse)
+        async def analysis_page(request: Request) -> HTMLResponse:
+            """Contradiction analysis page."""
+            return templates.TemplateResponse(
+                "analysis.html",
+                {
+                    "request": request,
+                    "title": "Contradiction Analysis",
+                },
+            )
+
+        @self.app.get("/knowledge", response_class=HTMLResponse)
+        async def knowledge_page(request: Request) -> HTMLResponse:
+            """Knowledge graph browser page."""
+            return templates.TemplateResponse(
+                "knowledge.html",
+                {
+                    "request": request,
+                    "title": "Knowledge Graph",
+                },
+            )
+
         # ====================================================================
         # API Routes
         # ====================================================================
@@ -411,6 +476,68 @@ class TitanDashboard:
         if self._topology_history:
             return self._topology_history[-1]["to"]
         return "swarm"
+
+    async def _get_inquiry_sessions(self) -> list[dict[str, Any]]:
+        """Get inquiry sessions for dashboard."""
+        try:
+            from titan.workflows.inquiry_engine import get_inquiry_engine
+            engine = get_inquiry_engine()
+            sessions = engine.list_sessions()
+            return [s.to_dict() for s in sessions]
+        except ImportError:
+            return []
+        except Exception as e:
+            logger.warning(f"Error getting inquiry sessions: {e}")
+            return []
+
+    def _get_inquiry_stats(self, sessions: list[dict[str, Any]]) -> dict[str, int]:
+        """Get inquiry statistics."""
+        stats = {"total": 0, "running": 0, "completed": 0, "failed": 0}
+        for s in sessions:
+            stats["total"] += 1
+            status = s.get("status", "pending")
+            if status in stats:
+                stats[status] += 1
+        return stats
+
+    async def _get_inquiry_detail(
+        self, session_id: str
+    ) -> tuple[dict[str, Any] | None, list[dict[str, Any]]]:
+        """Get inquiry session detail with stages."""
+        try:
+            from titan.workflows.inquiry_engine import get_inquiry_engine
+            engine = get_inquiry_engine()
+            session = engine.get_session(session_id)
+
+            if not session:
+                return None, []
+
+            session_dict = session.to_dict()
+
+            # Build stages with results
+            stages = []
+            for i, stage in enumerate(session.workflow.stages):
+                stage_info = {
+                    "name": stage.name,
+                    "role": stage.role,
+                    "description": stage.description,
+                    "emoji": stage.emoji,
+                    "result": None,
+                }
+                # Find matching result
+                for result in session.results:
+                    if result.stage_index == i:
+                        stage_info["result"] = result.to_dict()
+                        break
+                stages.append(stage_info)
+
+            return session_dict, stages
+
+        except ImportError:
+            return None, []
+        except Exception as e:
+            logger.warning(f"Error getting inquiry detail: {e}")
+            return None, []
 
     def register_agent(self, agent_id: str, name: str, role: str = "worker") -> None:
         """Register an agent with the dashboard."""

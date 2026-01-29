@@ -1,0 +1,377 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h1>Knowledge Graph</h1>
+
+<div class="grid">
+    <!-- Search Panel -->
+    <div>
+        <article>
+            <header><h3>Search Knowledge</h3></header>
+            <form id="search-form">
+                <input type="text" id="search-query" placeholder="Search topics, concepts, inquiries..." required>
+                <div class="grid">
+                    <select id="search-source">
+                        <option value="">All Sources</option>
+                        <option value="inquiry">Inquiries</option>
+                        <option value="learning">Learning</option>
+                        <option value="concept">Concepts</option>
+                    </select>
+                    <input type="number" id="search-limit" value="10" min="1" max="100" placeholder="Limit">
+                </div>
+                <button type="submit">Search</button>
+            </form>
+
+            <!-- Search Results -->
+            <div id="search-results" style="display: none;">
+                <h4>Results <small id="results-count"></small></h4>
+                <ul id="results-list"></ul>
+            </div>
+        </article>
+
+        <!-- Statistics -->
+        <article>
+            <header><h3>Knowledge Statistics</h3></header>
+            <div class="grid-4" id="stats-grid">
+                <div class="stat-card">
+                    <h3 id="stat-entries">--</h3>
+                    <p>Entries</p>
+                </div>
+                <div class="stat-card">
+                    <h3 id="stat-inquiries">--</h3>
+                    <p>Inquiries</p>
+                </div>
+                <div class="stat-card">
+                    <h3 id="stat-concepts">--</h3>
+                    <p>Concepts</p>
+                </div>
+                <div class="stat-card">
+                    <h3 id="stat-backends">--</h3>
+                    <p>Backends</p>
+                </div>
+            </div>
+        </article>
+    </div>
+
+    <!-- Graph Controls -->
+    <div>
+        <article>
+            <header><h3>Graph View</h3></header>
+            <div class="graph-controls">
+                <label for="graph-depth">Depth</label>
+                <input type="range" id="graph-depth" min="1" max="5" value="2">
+                <span id="depth-value">2</span>
+
+                <label for="graph-type">Node Type</label>
+                <select id="graph-type">
+                    <option value="">All Types</option>
+                    <option value="inquiry">Inquiries</option>
+                    <option value="stage">Stages</option>
+                    <option value="topology">Topology</option>
+                </select>
+
+                <button onclick="loadGraph()">Refresh Graph</button>
+            </div>
+        </article>
+    </div>
+</div>
+
+<!-- Knowledge Graph Visualization -->
+<article>
+    <header>
+        <h3>Knowledge Graph</h3>
+        <small id="graph-info"></small>
+    </header>
+    <div id="graph-container" style="width: 100%; height: 500px; background: var(--card-background-color); border-radius: 8px;">
+        <svg id="knowledge-graph" width="100%" height="100%"></svg>
+    </div>
+</article>
+
+<!-- Node Details -->
+<article id="node-details" style="display: none;">
+    <header>
+        <h3>Node Details</h3>
+        <button class="outline small" onclick="closeNodeDetails()">Close</button>
+    </header>
+    <div id="node-content"></div>
+</article>
+
+<style>
+    .graph-controls {
+        display: grid;
+        gap: 0.5rem;
+    }
+
+    #graph-container {
+        position: relative;
+    }
+
+    .node {
+        cursor: pointer;
+    }
+
+    .node circle {
+        stroke: #fff;
+        stroke-width: 2px;
+    }
+
+    .node.inquiry circle {
+        fill: var(--primary);
+    }
+
+    .node.stage circle {
+        fill: var(--success);
+    }
+
+    .node.topology circle {
+        fill: var(--warning);
+    }
+
+    .node.topic circle {
+        fill: #ff6b6b;
+    }
+
+    .node text {
+        font-size: 12px;
+        fill: var(--color);
+    }
+
+    .link {
+        stroke: var(--muted-color);
+        stroke-opacity: 0.6;
+    }
+
+    #search-results ul {
+        list-style: none;
+        padding: 0;
+    }
+
+    #search-results li {
+        padding: 0.75rem;
+        background: var(--card-background-color);
+        border-radius: 4px;
+        margin-bottom: 0.5rem;
+        cursor: pointer;
+    }
+
+    #search-results li:hover {
+        background: var(--primary-hover);
+    }
+
+    .result-key {
+        font-family: monospace;
+        font-size: 0.8rem;
+        color: var(--primary);
+    }
+
+    .result-preview {
+        color: var(--muted-color);
+        font-size: 0.9rem;
+    }
+
+    .result-score {
+        float: right;
+        font-size: 0.75rem;
+        color: var(--muted-color);
+    }
+
+    button.small {
+        padding: 0.25rem 0.5rem;
+        font-size: 0.8rem;
+    }
+</style>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://d3js.org/d3.v7.min.js"></script>
+<script>
+    let simulation;
+    let graphData = { nodes: [], links: [] };
+
+    // Load initial stats
+    async function loadStats() {
+        try {
+            const response = await fetch('/api/knowledge/stats');
+            const stats = await response.json();
+
+            document.getElementById('stat-entries').textContent = stats.total_entries;
+            document.getElementById('stat-inquiries').textContent = stats.total_inquiries;
+            document.getElementById('stat-concepts').textContent = stats.total_concepts;
+
+            const activeBackends = Object.values(stats.storage_backends).filter(v => v).length;
+            document.getElementById('stat-backends').textContent = activeBackends;
+        } catch (error) {
+            console.error('Error loading stats:', error);
+        }
+    }
+
+    // Load graph data
+    async function loadGraph() {
+        const depth = document.getElementById('graph-depth').value;
+        const nodeType = document.getElementById('graph-type').value;
+
+        let url = `/api/knowledge/graph?depth=${depth}`;
+        if (nodeType) url += `&node_type=${nodeType}`;
+
+        try {
+            const response = await fetch(url);
+            graphData = await response.json();
+
+            document.getElementById('graph-info').textContent =
+                `${graphData.nodes.length} nodes, ${graphData.edges.length} edges`;
+
+            renderGraph();
+        } catch (error) {
+            console.error('Error loading graph:', error);
+        }
+    }
+
+    // Render D3 force graph
+    function renderGraph() {
+        const container = document.getElementById('graph-container');
+        const svg = d3.select('#knowledge-graph');
+
+        svg.selectAll('*').remove();
+
+        const width = container.clientWidth;
+        const height = container.clientHeight;
+
+        // Create simulation
+        simulation = d3.forceSimulation(graphData.nodes)
+            .force('link', d3.forceLink(graphData.edges)
+                .id(d => d.id)
+                .distance(100))
+            .force('charge', d3.forceManyBody().strength(-300))
+            .force('center', d3.forceCenter(width / 2, height / 2))
+            .force('collision', d3.forceCollide().radius(30));
+
+        // Add links
+        const link = svg.append('g')
+            .selectAll('line')
+            .data(graphData.edges)
+            .join('line')
+            .attr('class', 'link')
+            .attr('stroke-width', d => Math.sqrt(d.value || 1));
+
+        // Add nodes
+        const node = svg.append('g')
+            .selectAll('.node')
+            .data(graphData.nodes)
+            .join('g')
+            .attr('class', d => `node ${d.type}`)
+            .call(d3.drag()
+                .on('start', dragstarted)
+                .on('drag', dragged)
+                .on('end', dragended))
+            .on('click', (event, d) => showNodeDetails(d));
+
+        node.append('circle')
+            .attr('r', d => d.size || 15);
+
+        node.append('text')
+            .attr('dx', 18)
+            .attr('dy', 4)
+            .text(d => d.label);
+
+        // Update positions
+        simulation.on('tick', () => {
+            link
+                .attr('x1', d => d.source.x)
+                .attr('y1', d => d.source.y)
+                .attr('x2', d => d.target.x)
+                .attr('y2', d => d.target.y);
+
+            node.attr('transform', d => `translate(${d.x},${d.y})`);
+        });
+    }
+
+    function dragstarted(event) {
+        if (!event.active) simulation.alphaTarget(0.3).restart();
+        event.subject.fx = event.subject.x;
+        event.subject.fy = event.subject.y;
+    }
+
+    function dragged(event) {
+        event.subject.fx = event.x;
+        event.subject.fy = event.y;
+    }
+
+    function dragended(event) {
+        if (!event.active) simulation.alphaTarget(0);
+        event.subject.fx = null;
+        event.subject.fy = null;
+    }
+
+    function showNodeDetails(node) {
+        const section = document.getElementById('node-details');
+        const content = document.getElementById('node-content');
+
+        content.innerHTML = `
+            <dl>
+                <dt>ID</dt>
+                <dd><code>${node.id}</code></dd>
+                <dt>Label</dt>
+                <dd>${node.label}</dd>
+                <dt>Type</dt>
+                <dd>${node.type}</dd>
+                ${Object.entries(node.properties || {}).map(([k, v]) => `
+                    <dt>${k}</dt>
+                    <dd>${v}</dd>
+                `).join('')}
+            </dl>
+        `;
+
+        section.style.display = 'block';
+    }
+
+    function closeNodeDetails() {
+        document.getElementById('node-details').style.display = 'none';
+    }
+
+    // Search
+    document.getElementById('search-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+
+        const query = document.getElementById('search-query').value;
+        const source = document.getElementById('search-source').value;
+        const limit = document.getElementById('search-limit').value;
+
+        let url = `/api/knowledge/search?query=${encodeURIComponent(query)}&limit=${limit}`;
+        if (source) url += `&source=${source}`;
+
+        try {
+            const response = await fetch(url);
+            const results = await response.json();
+
+            document.getElementById('results-count').textContent = `(${results.total_results} found)`;
+            document.getElementById('results-list').innerHTML = results.results.map(r => `
+                <li onclick="highlightNode('${r.key}')">
+                    <span class="result-key">${r.key}</span>
+                    <span class="result-score">${Math.round(r.score * 100)}%</span>
+                    <p class="result-preview">${r.content_preview}</p>
+                </li>
+            `).join('');
+
+            document.getElementById('search-results').style.display = 'block';
+        } catch (error) {
+            console.error('Error searching:', error);
+        }
+    });
+
+    function highlightNode(nodeId) {
+        // Find and highlight node in graph
+        d3.selectAll('.node circle')
+            .attr('stroke', d => d.id === nodeId ? '#ff0' : '#fff')
+            .attr('stroke-width', d => d.id === nodeId ? 4 : 2);
+    }
+
+    // Depth slider update
+    document.getElementById('graph-depth').addEventListener('input', (e) => {
+        document.getElementById('depth-value').textContent = e.target.value;
+    });
+
+    // Initialize
+    loadStats();
+    loadGraph();
+</script>
+{% endblock %}

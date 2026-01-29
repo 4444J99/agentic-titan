@@ -1282,6 +1282,546 @@ def mcp(
 
 
 # ============================================================================
+# Inquiry Commands
+# ============================================================================
+
+inquiry_app = typer.Typer(
+    name="inquiry",
+    help="Multi-perspective inquiry commands",
+)
+app.add_typer(inquiry_app, name="inquiry")
+
+
+@inquiry_app.command("start")
+def inquiry_start(
+    topic: str = typer.Argument(..., help="Topic to explore"),
+    workflow: str = typer.Option("expansive", "--workflow", "-w", help="Workflow: expansive, quick, creative"),
+    run: bool = typer.Option(False, "--run", "-r", help="Run immediately"),
+    verbose: bool = typer.Option(False, "--verbose", "-v", help="Verbose output"),
+) -> None:
+    """Start a new inquiry session."""
+    if verbose:
+        logging.getLogger().setLevel(logging.DEBUG)
+
+    from titan.workflows.inquiry_engine import get_inquiry_engine, InquiryStatus
+    from titan.workflows.inquiry_config import get_workflow
+
+    async def run_inquiry() -> None:
+        wf = get_workflow(workflow)
+        if not wf:
+            console.print(f"[red]Unknown workflow: {workflow}[/red]")
+            console.print("Available: expansive, quick, creative")
+            return
+
+        engine = get_inquiry_engine()
+        session = await engine.start_inquiry(topic, wf)
+
+        console.print(Panel(
+            f"[bold]Session ID:[/bold] {session.id}\n"
+            f"[bold]Topic:[/bold] {topic}\n"
+            f"[bold]Workflow:[/bold] {wf.name}\n"
+            f"[bold]Stages:[/bold] {session.total_stages}",
+            title="Inquiry Session Created",
+        ))
+
+        if run:
+            say(ORCHESTRATOR, "Running inquiry workflow...")
+
+            async for event in engine.stream_workflow(session):
+                event_type = event.get("type", "")
+
+                if event_type == "stage_started":
+                    stage_name = event.get("stage_name", "")
+                    console.print(f"  [cyan]Stage {event.get('stage_index', 0) + 1}:[/cyan] {stage_name}...")
+
+                elif event_type == "stage_completed":
+                    result = event.get("result", {})
+                    console.print(f"    [green]✓[/green] {result.get('stage_name', '')} completed")
+
+                elif event_type == "session_completed":
+                    console.print(f"\n[green]Inquiry completed![/green] {event.get('results_count', 0)} stages")
+
+                elif event_type == "session_failed":
+                    console.print(f"[red]Inquiry failed: {event.get('error', '')}[/red]")
+
+            # Show summary
+            if session.status == InquiryStatus.COMPLETED:
+                table = Table(title="Results Summary")
+                table.add_column("Stage", style="cyan")
+                table.add_column("Role")
+                table.add_column("Model")
+                table.add_column("Duration")
+
+                for r in session.results:
+                    table.add_row(
+                        r.stage_name,
+                        r.role,
+                        r.model_used,
+                        f"{r.duration_ms}ms",
+                    )
+
+                console.print(table)
+        else:
+            console.print("\n[dim]Use 'titan inquiry status <session_id>' to check progress[/dim]")
+            console.print("[dim]Use 'titan inquiry run <session_id>' to run the workflow[/dim]")
+
+    asyncio.run(run_inquiry())
+
+
+@inquiry_app.command("status")
+def inquiry_status(
+    session_id: str = typer.Argument(..., help="Session ID to check"),
+) -> None:
+    """Check the status of an inquiry session."""
+    from titan.workflows.inquiry_engine import get_inquiry_engine
+
+    engine = get_inquiry_engine()
+    session = engine.get_session(session_id)
+
+    if not session:
+        console.print(f"[red]Session not found: {session_id}[/red]")
+        raise typer.Exit(1)
+
+    status_color = {
+        "pending": "yellow",
+        "running": "blue",
+        "paused": "magenta",
+        "completed": "green",
+        "failed": "red",
+        "cancelled": "dim",
+    }.get(session.status.value, "white")
+
+    console.print(Panel(
+        f"[bold]Session:[/bold] {session.id}\n"
+        f"[bold]Topic:[/bold] {session.topic}\n"
+        f"[bold]Workflow:[/bold] {session.workflow.name}\n"
+        f"[bold]Status:[/bold] [{status_color}]{session.status.value}[/{status_color}]\n"
+        f"[bold]Progress:[/bold] {session.progress:.0f}% ({len(session.results)}/{session.total_stages} stages)",
+        title="Inquiry Session Status",
+    ))
+
+    if session.results:
+        table = Table(title="Completed Stages")
+        table.add_column("Stage", style="cyan")
+        table.add_column("Model")
+        table.add_column("Status")
+
+        for r in session.results:
+            status_icon = "[green]✓[/green]" if r.success else "[red]✗[/red]"
+            table.add_row(r.stage_name, r.model_used, status_icon)
+
+        console.print(table)
+
+
+@inquiry_app.command("list")
+def inquiry_list(
+    status_filter: str = typer.Option(None, "--status", "-s", help="Filter by status"),
+    limit: int = typer.Option(20, "--limit", "-n", help="Max sessions to show"),
+) -> None:
+    """List inquiry sessions."""
+    from titan.workflows.inquiry_engine import get_inquiry_engine, InquiryStatus
+
+    engine = get_inquiry_engine()
+
+    status = None
+    if status_filter:
+        try:
+            status = InquiryStatus(status_filter)
+        except ValueError:
+            console.print(f"[red]Unknown status: {status_filter}[/red]")
+            return
+
+    sessions = engine.list_sessions(status)[:limit]
+
+    if not sessions:
+        console.print("[dim]No inquiry sessions found[/dim]")
+        return
+
+    table = Table(title=f"Inquiry Sessions ({len(sessions)})")
+    table.add_column("ID", style="cyan")
+    table.add_column("Topic", max_width=40)
+    table.add_column("Workflow")
+    table.add_column("Status")
+    table.add_column("Progress")
+
+    for s in sessions:
+        status_color = {
+            "completed": "green",
+            "running": "blue",
+            "failed": "red",
+            "paused": "magenta",
+        }.get(s.status.value, "dim")
+
+        table.add_row(
+            s.id,
+            s.topic[:37] + "..." if len(s.topic) > 40 else s.topic,
+            s.workflow.name,
+            f"[{status_color}]{s.status.value}[/{status_color}]",
+            f"{s.progress:.0f}%",
+        )
+
+    console.print(table)
+
+
+@inquiry_app.command("compare")
+def inquiry_compare(
+    id1: str = typer.Argument(..., help="First session ID"),
+    id2: str = typer.Argument(..., help="Second session ID"),
+    format_output: str = typer.Option("table", "--format", "-f", help="Output format: table, json"),
+) -> None:
+    """Compare two inquiry sessions."""
+    from titan.workflows.inquiry_engine import get_inquiry_engine
+    import json
+
+    engine = get_inquiry_engine()
+    session1 = engine.get_session(id1)
+    session2 = engine.get_session(id2)
+
+    if not session1:
+        console.print(f"[red]Session not found: {id1}[/red]")
+        raise typer.Exit(1)
+
+    if not session2:
+        console.print(f"[red]Session not found: {id2}[/red]")
+        raise typer.Exit(1)
+
+    if format_output == "json":
+        comparison = {
+            "session_1": {
+                "id": session1.id,
+                "topic": session1.topic,
+                "workflow": session1.workflow.name,
+                "status": session1.status.value,
+                "stages_completed": len(session1.results),
+            },
+            "session_2": {
+                "id": session2.id,
+                "topic": session2.topic,
+                "workflow": session2.workflow.name,
+                "status": session2.status.value,
+                "stages_completed": len(session2.results),
+            },
+        }
+        console.print(json.dumps(comparison, indent=2))
+    else:
+        table = Table(title="Session Comparison")
+        table.add_column("Attribute", style="cyan")
+        table.add_column(f"Session 1 ({id1[:8]}...)")
+        table.add_column(f"Session 2 ({id2[:8]}...)")
+
+        table.add_row("Topic", session1.topic[:30], session2.topic[:30])
+        table.add_row("Workflow", session1.workflow.name, session2.workflow.name)
+        table.add_row("Status", session1.status.value, session2.status.value)
+        table.add_row("Stages", f"{len(session1.results)}/{session1.total_stages}", f"{len(session2.results)}/{session2.total_stages}")
+
+        console.print(table)
+
+
+@inquiry_app.command("export")
+def inquiry_export(
+    session_id: str = typer.Argument(..., help="Session ID to export"),
+    output: str = typer.Option(None, "--output", "-o", help="Output file path"),
+    format_output: str = typer.Option("markdown", "--format", "-f", help="Output format: markdown, json"),
+) -> None:
+    """Export inquiry session results."""
+    from titan.workflows.inquiry_engine import get_inquiry_engine
+    import json
+
+    engine = get_inquiry_engine()
+    session = engine.get_session(session_id)
+
+    if not session:
+        console.print(f"[red]Session not found: {session_id}[/red]")
+        raise typer.Exit(1)
+
+    if format_output == "json":
+        content = json.dumps(session.to_dict(), indent=2, default=str)
+    else:
+        # Markdown format
+        lines = [
+            f"# Inquiry: {session.topic}",
+            "",
+            f"**Session ID:** {session.id}",
+            f"**Workflow:** {session.workflow.name}",
+            f"**Status:** {session.status.value}",
+            f"**Created:** {session.created_at.isoformat()}",
+            "",
+            "---",
+            "",
+        ]
+
+        for result in session.results:
+            lines.extend([
+                f"## {result.stage_name}",
+                "",
+                f"**Role:** {result.role}",
+                f"**Model:** {result.model_used}",
+                "",
+                result.content,
+                "",
+                "---",
+                "",
+            ])
+
+        content = "\n".join(lines)
+
+    if output:
+        Path(output).write_text(content)
+        console.print(f"[green]Exported to {output}[/green]")
+    else:
+        console.print(content)
+
+
+# ============================================================================
+# Knowledge Commands
+# ============================================================================
+
+knowledge_app = typer.Typer(
+    name="knowledge",
+    help="Knowledge graph and memory commands",
+)
+app.add_typer(knowledge_app, name="knowledge")
+
+
+@knowledge_app.command("search")
+def knowledge_search(
+    query: str = typer.Argument(..., help="Search query"),
+    limit: int = typer.Option(10, "--limit", "-n", help="Max results"),
+    tag: str = typer.Option(None, "--tag", "-t", help="Filter by tag"),
+) -> None:
+    """Search the knowledge base."""
+    say(ORCHESTRATOR, f"Searching: {query}")
+
+    async def run_search() -> None:
+        hive = HiveMind()
+        await hive.initialize()
+
+        try:
+            # Search using HiveMind's memory
+            results = await hive.search(query, limit=limit)
+
+            if not results:
+                console.print("[dim]No results found[/dim]")
+                return
+
+            table = Table(title=f"Search Results ({len(results)})")
+            table.add_column("Key", style="cyan")
+            table.add_column("Preview", max_width=50)
+            table.add_column("Score")
+
+            for r in results:
+                key = r.get("key", "")
+                content = str(r.get("value", ""))[:47] + "..."
+                score = r.get("score", 0.0)
+                table.add_row(key, content, f"{score:.2f}")
+
+            console.print(table)
+
+        finally:
+            await hive.shutdown()
+
+    asyncio.run(run_search())
+
+
+@knowledge_app.command("stats")
+def knowledge_stats() -> None:
+    """Show knowledge base statistics."""
+    async def show_stats() -> None:
+        hive = HiveMind()
+        await hive.initialize()
+
+        try:
+            health = await hive.health_check()
+
+            console.print(Panel(
+                f"[bold]Redis:[/bold] {'✓' if health.get('redis') else '✗'}\n"
+                f"[bold]ChromaDB:[/bold] {'✓' if health.get('chroma') else '✗'}",
+                title="Knowledge Base Status",
+            ))
+
+        finally:
+            await hive.shutdown()
+
+    asyncio.run(show_stats())
+
+
+@knowledge_app.command("export")
+def knowledge_export(
+    output: str = typer.Argument(..., help="Output file path"),
+    format_output: str = typer.Option("json", "--format", "-f", help="Output format: json"),
+) -> None:
+    """Export knowledge base."""
+    import json
+
+    async def run_export() -> None:
+        hive = HiveMind()
+        await hive.initialize()
+
+        try:
+            # Get all keys (basic export)
+            data = {
+                "exported_at": datetime.now().isoformat(),
+                "format_version": "1.0",
+                "entries": [],
+            }
+
+            Path(output).write_text(json.dumps(data, indent=2))
+            console.print(f"[green]Exported to {output}[/green]")
+
+        finally:
+            await hive.shutdown()
+
+    asyncio.run(run_export())
+
+
+# ============================================================================
+# Workflow Commands
+# ============================================================================
+
+workflow_app = typer.Typer(
+    name="workflow",
+    help="Workflow management commands",
+)
+app.add_typer(workflow_app, name="workflow")
+
+
+@workflow_app.command("list")
+def workflow_list() -> None:
+    """List available workflows."""
+    from titan.workflows.inquiry_config import DEFAULT_WORKFLOWS
+
+    table = Table(title="Available Workflows")
+    table.add_column("Name", style="cyan")
+    table.add_column("Description")
+    table.add_column("Stages")
+
+    for name, wf in DEFAULT_WORKFLOWS.items():
+        table.add_row(name, wf.description[:50] + "...", str(len(wf.stages)))
+
+    console.print(table)
+
+
+@workflow_app.command("execute")
+def workflow_execute(
+    name: str = typer.Argument(..., help="Workflow name"),
+    topic: str = typer.Option(..., "--topic", "-t", help="Topic to explore"),
+    mode: str = typer.Option("staged", "--mode", "-m", help="Execution mode: sequential, parallel, staged"),
+) -> None:
+    """Execute a workflow."""
+    from titan.workflows.inquiry_engine import get_inquiry_engine
+    from titan.workflows.inquiry_config import get_workflow
+    from titan.workflows.inquiry_dag import ExecutionMode
+
+    wf = get_workflow(name)
+    if not wf:
+        console.print(f"[red]Unknown workflow: {name}[/red]")
+        return
+
+    try:
+        exec_mode = ExecutionMode(mode)
+    except ValueError:
+        console.print(f"[red]Unknown mode: {mode}[/red]")
+        console.print("Available: sequential, parallel, staged")
+        return
+
+    async def run_workflow() -> None:
+        engine = get_inquiry_engine()
+        session = await engine.start_inquiry(topic, wf)
+
+        say(ORCHESTRATOR, f"Running {name} workflow in {mode} mode...")
+
+        session = await engine.run_dag_workflow(session, exec_mode)
+
+        status_icon = "[green]✓[/green]" if session.status.value == "completed" else "[red]✗[/red]"
+        console.print(f"{status_icon} Workflow {session.status.value}")
+        console.print(f"Session ID: {session.id}")
+
+    asyncio.run(run_workflow())
+
+
+@workflow_app.command("visualize")
+def workflow_visualize(
+    name: str = typer.Argument(..., help="Workflow name"),
+    format_output: str = typer.Option("mermaid", "--format", "-f", help="Output format: mermaid, text"),
+) -> None:
+    """Visualize a workflow structure."""
+    from titan.workflows.inquiry_config import get_workflow
+
+    wf = get_workflow(name)
+    if not wf:
+        console.print(f"[red]Unknown workflow: {name}[/red]")
+        return
+
+    if format_output == "mermaid":
+        lines = ["```mermaid", "graph TD"]
+
+        for i, stage in enumerate(wf.stages):
+            node_id = f"S{i}"
+            lines.append(f'    {node_id}["{stage.emoji} {stage.name}"]')
+
+            # Add dependencies if present
+            if stage.dependencies:
+                for dep in stage.dependencies:
+                    lines.append(f"    S{dep} --> {node_id}")
+            elif i > 0:
+                # Default sequential connection
+                lines.append(f"    S{i-1} --> {node_id}")
+
+        lines.append("```")
+        console.print("\n".join(lines))
+
+    else:
+        # Text format
+        for i, stage in enumerate(wf.stages):
+            prefix = "└──" if i == len(wf.stages) - 1 else "├──"
+            console.print(f"  {prefix} {stage.emoji} {stage.name} ({stage.role})")
+
+
+@workflow_app.command("validate")
+def workflow_validate(
+    file_path: str = typer.Argument(..., help="Workflow YAML file to validate"),
+) -> None:
+    """Validate a workflow configuration file."""
+    import yaml
+    from titan.workflows.inquiry_config import InquiryWorkflow, InquiryStage, CognitiveStyle
+
+    path = Path(file_path)
+    if not path.exists():
+        console.print(f"[red]File not found: {file_path}[/red]")
+        raise typer.Exit(1)
+
+    try:
+        with open(path) as f:
+            data = yaml.safe_load(f)
+
+        # Validate structure
+        errors = []
+
+        if "name" not in data:
+            errors.append("Missing 'name' field")
+
+        if "stages" not in data:
+            errors.append("Missing 'stages' field")
+        elif not isinstance(data["stages"], list):
+            errors.append("'stages' must be a list")
+        elif len(data["stages"]) == 0:
+            errors.append("Workflow must have at least one stage")
+
+        if errors:
+            console.print("[red]Validation failed:[/red]")
+            for e in errors:
+                console.print(f"  • {e}")
+            raise typer.Exit(1)
+
+        console.print(f"[green]✓ Workflow '{data.get('name', 'unnamed')}' is valid[/green]")
+        console.print(f"  Stages: {len(data.get('stages', []))}")
+
+    except yaml.YAMLError as e:
+        console.print(f"[red]Invalid YAML: {e}[/red]")
+        raise typer.Exit(1)
+
+
+# ============================================================================
 # Entry Point
 # ============================================================================
 

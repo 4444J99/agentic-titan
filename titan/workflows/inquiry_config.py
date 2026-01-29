@@ -11,6 +11,7 @@ Based on the "Expansive Inquiry" framework from expand_AI_inquiry.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from datetime import datetime
 from enum import Enum
 from typing import Any
 
@@ -24,6 +25,62 @@ class CognitiveStyle(str, Enum):
     CROSS_DOMAIN = "cross_domain"
     META_ANALYSIS = "meta_analysis"
     PATTERN_RECOGNITION = "pattern_recognition"
+
+
+class InfluenceMode(str, Enum):
+    """How user interjections influence the inquiry."""
+
+    CONTEXT = "context"  # Add to context for subsequent stages
+    REDIRECT = "redirect"  # Change inquiry direction
+    CLARIFY = "clarify"  # Clarify previous stage output
+
+
+@dataclass
+class UserInterjection:
+    """
+    A user interjection during an inquiry session.
+
+    Allows users to inject input between stages to guide,
+    redirect, or clarify the inquiry process.
+
+    Attributes:
+        content: The user's input text
+        injected_at_stage: Stage index when injected (after this stage)
+        influence_mode: How the interjection affects the inquiry
+        timestamp: When the interjection was made
+        processed: Whether this interjection has been processed
+        metadata: Additional metadata
+    """
+
+    content: str
+    injected_at_stage: int
+    influence_mode: InfluenceMode = InfluenceMode.CONTEXT
+    timestamp: datetime = field(default_factory=datetime.now)
+    processed: bool = False
+    metadata: dict[str, Any] = field(default_factory=dict)
+
+    def to_dict(self) -> dict[str, Any]:
+        """Convert to dictionary for serialization."""
+        return {
+            "content": self.content,
+            "injected_at_stage": self.injected_at_stage,
+            "influence_mode": self.influence_mode.value,
+            "timestamp": self.timestamp.isoformat(),
+            "processed": self.processed,
+            "metadata": self.metadata,
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> UserInterjection:
+        """Create from dictionary."""
+        return cls(
+            content=data["content"],
+            injected_at_stage=data["injected_at_stage"],
+            influence_mode=InfluenceMode(data.get("influence_mode", "context")),
+            timestamp=datetime.fromisoformat(data["timestamp"]) if data.get("timestamp") else datetime.now(),
+            processed=data.get("processed", False),
+            metadata=data.get("metadata", {}),
+        )
 
 
 @dataclass
