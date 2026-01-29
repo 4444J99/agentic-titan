@@ -270,6 +270,138 @@ if PROMETHEUS_AVAILABLE:
     )
 
     # ========================================================================
+    # Assembly Theory Metrics
+    # ========================================================================
+
+    ASSEMBLY_INDEX = Gauge(
+        "titan_assembly_index",
+        "Current assembly index (minimum steps to construct)",
+        ["session_id", "decision_type"],
+        registry=REGISTRY,
+    )
+
+    TOTAL_ASSEMBLY = Gauge(
+        "titan_total_assembly",
+        "Total assembly metric A = Σ(e^ai × (ni - 1)) / NT",
+        ["session_id"],
+        registry=REGISTRY,
+    )
+
+    SELECTION_SIGNAL = Gauge(
+        "titan_selection_signal",
+        "Selection signal strength (0=ABSENT, 1=WEAK, 2=MODERATE, 3=STRONG)",
+        ["session_id"],
+        registry=REGISTRY,
+    )
+
+    ASSEMBLY_PATHS = Counter(
+        "titan_assembly_paths_total",
+        "Total assembly paths recorded",
+        ["session_id", "path_type"],
+        registry=REGISTRY,
+    )
+
+    ASSEMBLY_STEPS = Counter(
+        "titan_assembly_steps_total",
+        "Total assembly steps recorded",
+        ["session_id", "step_type"],
+        registry=REGISTRY,
+    )
+
+    ASSEMBLY_PATH_LENGTH = Histogram(
+        "titan_assembly_path_length",
+        "Distribution of assembly path lengths",
+        ["path_type"],
+        buckets=(1, 2, 3, 5, 8, 13, 21, 34, 55),
+        registry=REGISTRY,
+    )
+
+    # ========================================================================
+    # Stigmergy Metrics
+    # ========================================================================
+
+    PHEROMONE_DEPOSITS = Counter(
+        "titan_pheromone_deposits_total",
+        "Total pheromone deposits",
+        ["trace_type"],
+        registry=REGISTRY,
+    )
+
+    PHEROMONE_INTENSITY = Gauge(
+        "titan_pheromone_intensity",
+        "Current pheromone intensity at location",
+        ["location", "trace_type"],
+        registry=REGISTRY,
+    )
+
+    TRAIL_FOLLOWS = Counter(
+        "titan_trail_follows_total",
+        "Total trail follows",
+        ["trace_type"],
+        registry=REGISTRY,
+    )
+
+    # ========================================================================
+    # Neighborhood Metrics
+    # ========================================================================
+
+    NEIGHBOR_INTERACTIONS = Counter(
+        "titan_neighbor_interactions_total",
+        "Total topological neighbor interactions",
+        ["interaction_type"],
+        registry=REGISTRY,
+    )
+
+    INFORMATION_PROPAGATION = Counter(
+        "titan_information_propagation_total",
+        "Total information propagation events",
+        registry=REGISTRY,
+    )
+
+    NEIGHBOR_COUNT = Gauge(
+        "titan_neighbor_count",
+        "Current number of topological neighbors per agent",
+        ["agent_id"],
+        registry=REGISTRY,
+    )
+
+    # ========================================================================
+    # Extended Topology Metrics
+    # ========================================================================
+
+    TERRITORY_COUNT = Gauge(
+        "titan_territory_count",
+        "Number of active territories",
+        registry=REGISTRY,
+    )
+
+    DETERRITORIALIZATIONS = Counter(
+        "titan_deterritorializations_total",
+        "Total deterritorialization events",
+        ["type"],  # external, internal, relative, absolute
+        registry=REGISTRY,
+    )
+
+    TERRITORIALIZATIONS = Counter(
+        "titan_territorializations_total",
+        "Total territorialization events",
+        ["type"],  # boundary, coding, overcoding
+        registry=REGISTRY,
+    )
+
+    LINES_OF_FLIGHT = Counter(
+        "titan_lines_of_flight_total",
+        "Total lines of flight initiated",
+        registry=REGISTRY,
+    )
+
+    ASSEMBLY_STATE = Gauge(
+        "titan_assembly_state",
+        "Current assembly state (0=FORMING, 1=STABLE, 2=UNSTABLE, 3=DISSOLVING, 4=TRANSFORMING)",
+        registry=REGISTRY,
+    )
+
+    # ========================================================================
     # System Info
     # ========================================================================
 
@@ -358,8 +490,12 @@ class MetricsCollector:
         """Set current topology."""
         if not self._enabled:
             return
-        # Clear all topology gauges
-        for t in ["swarm", "hierarchy", "pipeline", "mesh", "ring", "star"]:
+        # Clear all topology gauges (including extended types)
+        all_topologies = [
+            "swarm", "hierarchy", "pipeline", "mesh", "ring", "star",
+            "rhizomatic", "arborescent", "territorialized", "deterritorialized",
+        ]
+        for t in all_topologies:
             TOPOLOGY_CURRENT.labels(topology_type=t).set(0)
         # Set current
         TOPOLOGY_CURRENT.labels(topology_type=topology_type).set(1)
@@ -517,6 +653,130 @@ class MetricsCollector:
         if not self._enabled:
             return
         LEARNING_RECOMMENDATIONS.labels(recommended_topology=recommended_topology).inc()
+
+    # ========================================================================
+    # Assembly Theory Metrics
+    # ========================================================================
+
+    def set_assembly_index(
+        self, session_id: str, decision_type: str, index: int
+    ) -> None:
+        """Set the current assembly index for a session."""
+        if not self._enabled:
+            return
+        ASSEMBLY_INDEX.labels(session_id=session_id, decision_type=decision_type).set(
+            index
+        )
+
+    def set_total_assembly(self, session_id: str, value: float) -> None:
+        """Set the total assembly metric A."""
+        if not self._enabled:
+            return
+        TOTAL_ASSEMBLY.labels(session_id=session_id).set(value)
+
+    def set_selection_signal(self, session_id: str, signal: str) -> None:
+        """Set selection signal strength (ABSENT=0, WEAK=1, MODERATE=2, STRONG=3)."""
+        if not self._enabled:
+            return
+        signal_map = {"ABSENT": 0, "WEAK": 1, "MODERATE": 2, "STRONG": 3}
+        value = signal_map.get(signal.upper(), 0)
+        SELECTION_SIGNAL.labels(session_id=session_id).set(value)
+
+    def assembly_path_recorded(
+        self, session_id: str, path_type: str, length: int
+    ) -> None:
+        """Record an assembly path."""
+        if not self._enabled:
+            return
+        ASSEMBLY_PATHS.labels(session_id=session_id, path_type=path_type).inc()
+        ASSEMBLY_PATH_LENGTH.labels(path_type=path_type).observe(length)
+
+    def assembly_step_recorded(self, session_id: str, step_type: str) -> None:
+        """Record an assembly step."""
+        if not self._enabled:
+            return
+        ASSEMBLY_STEPS.labels(session_id=session_id, step_type=step_type).inc()
+
+    # ========================================================================
+    # Stigmergy Metrics
+    # ========================================================================
+
+    def pheromone_deposited(self, trace_type: str, location: str, intensity: float) -> None:
+        """Record pheromone deposit."""
+        if not self._enabled:
+            return
+        PHEROMONE_DEPOSITS.labels(trace_type=trace_type).inc()
+        PHEROMONE_INTENSITY.labels(location=location, trace_type=trace_type).set(intensity)
+
+    def trail_followed(self, trace_type: str) -> None:
+        """Record trail follow."""
+        if not self._enabled:
+            return
+        TRAIL_FOLLOWS.labels(trace_type=trace_type).inc()
+
+    # ========================================================================
+    # Neighborhood Metrics
+    # ========================================================================
+
+    def neighbor_interaction(self, interaction_type: str) -> None:
+        """Record neighbor interaction."""
+        if not self._enabled:
+            return
+        NEIGHBOR_INTERACTIONS.labels(interaction_type=interaction_type).inc()
+
+    def information_propagated(self) -> None:
+        """Record information propagation."""
+        if not self._enabled:
+            return
+        INFORMATION_PROPAGATION.inc()
+
+    def set_neighbor_count(self, agent_id: str, count: int) -> None:
+        """Set neighbor count for an agent."""
+        if not self._enabled:
+            return
+        NEIGHBOR_COUNT.labels(agent_id=agent_id).set(count)
+
+    # ========================================================================
+    # Extended Topology Metrics
+    # ========================================================================
+
+    def set_territory_count(self, count: int) -> None:
+        """Set number of active territories."""
+        if not self._enabled:
+            return
+        TERRITORY_COUNT.set(count)
+
+    def deterritorialization(self, dtype: str) -> None:
+        """Record deterritorialization event."""
+        if not self._enabled:
+            return
+        DETERRITORIALIZATIONS.labels(type=dtype).inc()
+
+    def territorialization(self, ttype: str) -> None:
+        """Record territorialization event."""
+        if not self._enabled:
+            return
+        TERRITORIALIZATIONS.labels(type=ttype).inc()
+
+    def line_of_flight(self) -> None:
+        """Record line of flight."""
+        if not self._enabled:
+            return
+        LINES_OF_FLIGHT.inc()
+
+    def set_assembly_state(self, state: str) -> None:
+        """Set assembly state (FORMING=0, STABLE=1, UNSTABLE=2, DISSOLVING=3, TRANSFORMING=4)."""
+        if not self._enabled:
+            return
+        state_map = {
+            "FORMING": 0,
+            "STABLE": 1,
+            "UNSTABLE": 2,
+            "DISSOLVING": 3,
+            "TRANSFORMING": 4,
+        }
+        value = state_map.get(state.upper(), 0)
+        ASSEMBLY_STATE.set(value)
 
     # ========================================================================
     # System Info

@@ -50,6 +50,39 @@ class EventType(str, Enum):
     EPISODE_RECORDED = "learning.episode.recorded"
     MODEL_UPDATED = "learning.model.updated"
 
+    # Stigmergy events
+    PHEROMONE_DEPOSITED = "stigmergy.pheromone.deposited"
+    PHEROMONE_DECAYED = "stigmergy.pheromone.decayed"
+    TRAIL_FOLLOWED = "stigmergy.trail.followed"
+
+    # Neighborhood events
+    NEIGHBOR_CHANGED = "neighborhood.neighbor.changed"
+    INFORMATION_PROPAGATED = "neighborhood.info.propagated"
+
+    # Assembly events
+    TERRITORY_CREATED = "assembly.territory.created"
+    TERRITORY_DISSOLVED = "assembly.territory.dissolved"
+    LINE_OF_FLIGHT = "assembly.line.of.flight"
+    CAPTURE_ATTEMPTED = "assembly.capture.attempted"
+    TERRITORIALIZED = "assembly.territorialized"
+    DETERRITORIALIZED = "assembly.deterritorialized"
+
+    # Governance events
+    PROPOSAL_CREATED = "governance.proposal.created"
+    VOTE_CAST = "governance.vote.cast"
+    PROPOSAL_PASSED = "governance.proposal.passed"
+    PROPOSAL_REJECTED = "governance.proposal.rejected"
+
+    # Colony events
+    COLONY_SIGNAL_EMITTED = "colony.signal.emitted"
+    CASTE_ASSIGNED = "colony.caste.assigned"
+    COLONY_TASK_CREATED = "colony.task.created"
+
+    # Cell events
+    CELL_APOPTOSIS = "cell.apoptosis"
+    CELL_SIGNAL_SENT = "cell.signal.sent"
+    CELL_DIFFERENTIATED = "cell.differentiated"
+
 
 @dataclass
 class Event:

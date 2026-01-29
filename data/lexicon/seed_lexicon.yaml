@@ -1,0 +1,629 @@
+# Body Lexicon Seed Data
+# Based on "Morphodynamics of Assembly" research
+# Categories: Inorganic Physics, Biological Superorganism, Animal Ethology,
+#             Human Organization, Philosophical Assemblage, Digital Algorithmic,
+#             Assembly Theory
+
+$BODY_LEXICON:
+  $CATEGORY_INORGANIC_PHYSICS:
+    galaxy:
+      aliases: ["galaxies", "galactic_body"]
+      referent: "Gravitationally bound stellar system-body; treated as an emergent cohesion structure."
+      notes: "Used as a macro-scale dissipative/gravitational assembly exemplar."
+
+    solar_system:
+      aliases: ["solar-system-body", "planetary_system"]
+      referent: "Star-centered orbital assembly of planets, debris, and fields."
+      notes: "Treated as a cohesive whole formed by gravity; macro-scale assembly."
+
+    celestial_body:
+      aliases: ["celestial_bodies", "astronomical_body"]
+      referent: "Generic class of space-bodies (stars, planets, moons, etc.)."
+      notes: "Category-level placeholder for astronomy-scale assemblies."
+
+    planet:
+      aliases: ["planets", "planetary_body"]
+      referent: "Differentiated spheroidal astronomical body."
+      notes: "Invoked as a canonical gravitationally assembled body."
+
+    star:
+      aliases: ["stars", "stellar_body"]
+      referent: "Self-gravitating fusion body."
+      notes: "Implicitly provides the central well for solar-system assembly."
+
+    planetary_ring_system:
+      aliases: ["planetary_rings", "ring_system"]
+      referent: "Orbiting particulate assembly bound by gravity and orbital mechanics."
+      notes: "Example of stable patterning under constraints."
+
+    protoplanetary_disk:
+      aliases: ["disk", "protoplanetary_disks", "dust_gas_disk"]
+      referent: "Dust+gas accretion field/body that seeds planet formation."
+      notes: "Canonical self-organizing precursor-body for planetary systems."
+
+    fluid_body:
+      aliases: ["fluid_bodies", "flow_body"]
+      referent: "Continuous medium capable of pattern formation under driving/gradient."
+      notes: "Bridge object to dissipative structures and convection."
+
+    benard_convection_cell_lattice:
+      aliases: ["benard_cells", "convection_cells", "hexagonal_convection_cells"]
+      referent: "Hexagonal convection-cell pattern as an emergent spatial lattice."
+      notes: "Dissipative structure exemplar: order-from-driving under constraints."
+
+    granular_matter_pile:
+      aliases: ["pile_of_sand", "sandpile", "granular_pile"]
+      referent: "Aggregate of grains exhibiting jamming, avalanches, and force-chains."
+      notes: "Used to discuss jamming-like thresholds and collective behavior."
+
+    grain_silo_pack:
+      aliases: ["silo_of_grain", "jammed_grain"]
+      referent: "Granular assembly constrained by container; prone to jamming/arching."
+      notes: "Constraint-driven assembly failure/locking case."
+
+    boulder_cluster:
+      aliases: ["cluster_of_boulders", "rock_cluster"]
+      referent: "Macroscopic granular assembly with frictional interlocks."
+      notes: "Another jamming-analogue body."
+
+    foam:
+      aliases: ["foams", "bubble_foam"]
+      referent: "Cellular jammed material with packing constraints and emergent rigidity."
+      notes: "Jamming/packing exemplar."
+
+    magnetic_bead_assembly:
+      aliases: ["magnetic_beads", "bead_assembly"]
+      referent: "Self-assembling particulate system via magnetic interactions."
+      notes: "Dynamic self-assembly exemplar."
+
+    bead_chain:
+      aliases: ["bead_chains", "magnetic_chain"]
+      referent: "Linear self-assembled bead structure (interaction-mediated)."
+      notes: "Substructure of magnetic-bead self-assembly."
+
+    particle_lattice:
+      aliases: ["bead_lattices", "self_assembled_lattice"]
+      referent: "Ordered self-assembled structure of interacting particles."
+      notes: "Order emergence under local rules/fields."
+
+  $CATEGORY_BIOLOGICAL_SUPERORGANISM:
+    gene:
+      aliases: ["genes"]
+      referent: "Informational unit participating in inheritance and selection."
+      notes: "Assembly drivers across levels; substrate of evolutionary coordination."
+
+    genome:
+      aliases: ["genomes"]
+      referent: "Integrated information-body containing many genes."
+      notes: "Higher-order informational assembly."
+
+    molecular_replicator:
+      aliases: ["independent_molecular_replicators", "replicator"]
+      referent: "Self-copying molecular system (e.g., RNA-world framing)."
+      notes: "Proto-body of biological assembly before cells."
+
+    chromosome:
+      aliases: ["chromosomes"]
+      referent: "Packaged genetic-information structure within cells."
+      notes: "Stabilizes/organizes informational assembly."
+
+    prokaryote:
+      aliases: ["prokaryotes"]
+      referent: "Single-cell organisms without nucleus (bacteria/archaea)."
+      notes: "Early cellular body tier."
+
+    bacterium:
+      aliases: ["bacteria"]
+      referent: "Prokaryotic microbial body."
+      notes: "Canonical prokaryote instance."
+
+    archaeon:
+      aliases: ["archaea"]
+      referent: "Prokaryotic microbial body (distinct domain)."
+      notes: "Canonical prokaryote instance."
+
+    eukaryotic_cell:
+      aliases: ["eukaryotes", "eukaryotic_cells", "eukaryotic_body"]
+      referent: "Complex cell with nucleus/organelles; product of major transitions."
+      notes: "Key assembly jump via symbiosis + regulation."
+
+    mitochondrion:
+      aliases: ["mitochondria"]
+      referent: "Symbiotic organelle derived from once free-living organism."
+      notes: "Explicit major-transition component-body."
+
+    chloroplast:
+      aliases: ["chloroplasts"]
+      referent: "Symbiotic photosynthetic organelle derived from once free-living organism."
+      notes: "Explicit major-transition component-body."
+
+    host_organism:
+      aliases: ["host", "host_cell", "host_organisms"]
+      referent: "Integrating body that incorporates other organisms as parts."
+      notes: "Central to endosymbiotic assembly."
+
+    multicellular_organism:
+      aliases: ["multicellular_organisms", "multicellularity"]
+      referent: "Many-celled organism with division of labor."
+      notes: "Assembly stabilized via adhesion + signaling + bottlenecks."
+
+    cell_adhesion_system:
+      aliases: ["adhesion_molecules", "adhesion_system"]
+      referent: "Molecular machinery enabling stable cell-cell binding."
+      notes: "Enabler for multicellular body cohesion."
+
+    cell_signaling_system:
+      aliases: ["cell_signaling", "signaling_system"]
+      referent: "Communication machinery coordinating cells."
+      notes: "Enabler for multicellular regulation and division of labor."
+
+    somatic_cell:
+      aliases: ["somatic_cells"]
+      referent: "Non-reproductive specialized cell within a multicellular body."
+      notes: "Division of labor; vulnerable to defection."
+
+    germline_cell:
+      aliases: ["germline", "germline_cells"]
+      referent: "Reproductive lineage cells carrying heritable continuity."
+      notes: "Bottleneck mechanism to align selection at organism level."
+
+    reproductive_bottleneck:
+      aliases: ["bottleneck", "reproductive_bottleneck_propagator"]
+      referent: "Lifecycle narrowing that forces re-coalescence through few propagules."
+      notes: "Anti-cheating stabilizer for multicellular cohesion."
+
+    apoptosis_program:
+      aliases: ["apoptosis", "programmed_cell_death"]
+      referent: "Self-termination mechanism for defective or surplus cells."
+      notes: "Policing/quality-control stabilizer of organism-body."
+
+    cancer_cell:
+      aliases: ["cancer", "cancer_cells"]
+      referent: "Defector cell lineage that prioritizes self-replication over organism."
+      notes: "Canonical internal-cohesion failure mode."
+
+    tissue:
+      aliases: ["tissues"]
+      referent: "Functional assemblage of similar cells in a multicellular organism."
+      notes: "Intermediate level of biological assembly."
+
+    eusocial_colony:
+      aliases: ["eusocial_colonies", "insect_superorganism", "superorganism"]
+      referent: "Colony with reproductive division of labor functioning as a higher-order body."
+      notes: "Major-transition analogue: colony as organism-like body."
+
+    ant:
+      aliases: ["ants"]
+      referent: "Eusocial insect often used as colony/superorganism exemplar."
+      notes: "Instance of eusocial assembly."
+
+    bee:
+      aliases: ["bees"]
+      referent: "Eusocial insect often used as colony/superorganism exemplar."
+      notes: "Instance of eusocial assembly."
+
+    termite:
+      aliases: ["termites"]
+      referent: "Eusocial insect often used as colony/superorganism exemplar."
+      notes: "Instance of eusocial assembly."
+
+    colony_caste_system:
+      aliases: ["castes", "colony_castes"]
+      referent: "Differentiated roles within eusocial colony body."
+      notes: "Division-of-labor architecture."
+
+    queen:
+      aliases: ["queens"]
+      referent: "Primary reproductive unit within eusocial colony body."
+      notes: "Maps to germline-like function at colony level."
+
+  $CATEGORY_ANIMAL_ETHOLOGY:
+    flock:
+      aliases: ["flocks"]
+      referent: "Coordinated multi-animal motion/behavior body."
+      notes: "Graph-like coupling via local interaction rules."
+
+    herd:
+      aliases: ["herds"]
+      referent: "Coordinated multi-animal aggregation body."
+      notes: "Risk distribution, foraging, and defense; local coupling."
+
+    murmuration:
+      aliases: ["murmurations", "murmuration_of_starlings"]
+      referent: "Dense coordinated aerial flocking of starlings."
+      notes: "Cross-links: murmuration -> flock (specialization)."
+      links: ["flock"]
+
+    starling_flock:
+      aliases: ["starlings", "starling_murmuration"]
+      referent: "Species-specific instantiation of flocking body."
+      notes: "Used to illustrate topological-neighbor rule dynamics."
+
+    topological_neighbor_coupling:
+      aliases: ["six_to_seven_neighbor_rule", "topological_interaction_rule"]
+      referent: "Interaction regime: each unit couples to ~6-7 nearest neighbors."
+      notes: "Mechanism-body: defines cohesion topology more than metric distance."
+
+    predator_perturbation:
+      aliases: ["peregrine_falcon", "predator_body"]
+      referent: "External forcing body that induces collective reconfiguration."
+      notes: "Perturbation driver in flock dynamics."
+
+    murder:
+      aliases: ["murder_of_crows"]
+      referent: "Collective term for crow assembly."
+      notes: "Cross-links: murder -> crow_roost, murder -> crow_family_fission_fusion."
+
+    crow:
+      aliases: ["crows", "corvid"]
+      referent: "Corvid animal body used as social-assembly exemplar."
+      notes: "Supports fission-fusion social topology."
+
+    raven:
+      aliases: ["ravens", "corvid_raven"]
+      referent: "Corvid animal body; invoked alongside crows."
+      notes: "Species-level component within corvid assembly discussion."
+
+    communal_roost:
+      aliases: ["crow_roost", "roost"]
+      referent: "Nightly aggregation site/body producing large-scale fusion."
+      notes: "Information-center framing; stabilizes network-level benefits."
+
+    information_center_roost:
+      aliases: ["information_center", "information_center_body"]
+      referent: "Roost conceptualized as a routing/learning body."
+      notes: "Mechanism: information pooling and recruitment."
+
+    family_fission_unit:
+      aliases: ["small_family_group", "pair_body"]
+      referent: "Daytime small-unit body that later fuses into roost."
+      notes: "Fission-fusion dynamic emphasized."
+
+    crow_court:
+      aliases: ["crow_court_body", "policing_circle"]
+      referent: "Social policing/attack assemblage around a target individual."
+      notes: "Enforcement mechanism within animal assembly."
+
+    sheep_herd:
+      aliases: ["sheep"]
+      referent: "Species-specific herd exemplar."
+      notes: "Often used in territorialization examples (with dog/fence)."
+
+  $CATEGORY_HUMAN_ORGANIZATION:
+    crowd:
+      aliases: ["crowds", "physical_crowd"]
+      referent: "Co-present human aggregation body."
+      notes: "Base unit for riot/protest/flash-mob variants."
+
+    collective_mind_crowd:
+      aliases: ["collective_mind", "collective_mind_body"]
+      referent: "Crowd conceptualized as having emergent cognition."
+      notes: "Not literal mind; emergent coordination framing."
+
+    rock_concert_crowd:
+      aliases: ["concert_crowd"]
+      referent: "Event-specific crowd body."
+      notes: "Example of synchronized emotion/behavior at scale."
+
+    political_protest_crowd:
+      aliases: ["political_protest", "protest_crowd"]
+      referent: "Mobilized crowd for political expression."
+      notes: "Bridge to movement/riot bodies."
+
+    flash_mob:
+      aliases: ["flash_mobs"]
+      referent: "Rapidly-assembled temporary crowd-body."
+      notes: "Enabled by communication tech; high coordination speed."
+
+    smart_mob:
+      aliases: ["smart_mobs"]
+      referent: "Tech-coordinated crowd-body with emergent intelligence."
+      notes: "Explicit PDF term; links: smart_mob -> crowd."
+      links: ["crowd"]
+
+    gig_worker_coordination:
+      aliases: ["gig_worker_mobility_body", "platform_labor_coordination"]
+      referent: "Labor network coordinated via platforms/communication."
+      notes: "Example of coordination without centralized institution."
+
+    political_movement:
+      aliases: ["movement", "political_movement_body"]
+      referent: "Large-scale coordinated social/political body over time."
+      notes: "Time-extended assembly; often network-mediated."
+
+    bureaucracy:
+      aliases: ["bureaucracies"]
+      referent: "Rule-bound administrative machine-body."
+      notes: "Cross-links: bureaucracy -> arborescent_structure (hierarchy)."
+      links: ["$CATEGORY_PHILOSOPHICAL_ASSEMBLAGE:arborescent_structure"]
+
+    legal_constructed_body:
+      aliases: ["immortal_body", "law_constructed_body"]
+      referent: "Institution/body constituted by law beyond individual lifespans."
+      notes: "Institutional persistence; corporate/state analogy."
+
+    government:
+      aliases: ["government_body", "state_apparatus"]
+      referent: "Governing institutional body (executive/legislative/judicial ensemble)."
+      notes: "Questioned as an ontological assembly case."
+
+    law_structure:
+      aliases: ["legal_structure", "law"]
+      referent: "Externalized cohesion architecture: rules enforcing assembly stability."
+      notes: "Acts as binding layer for institutional bodies."
+
+    social_network:
+      aliases: ["social_networks", "social_graph"]
+      referent: "Relational substrate carrying ideas, norms, signals."
+      notes: "Medium-body enabling non-co-present coordination."
+
+    riot:
+      aliases: ["riots", "riot_body"]
+      referent: "Destabilized crowd-body characterized by rapid local cascades."
+      notes: "Failure mode / phase transition of crowd order."
+
+    human_supercomputer:
+      aliases: ["collective_intelligence", "human_supercomputer_body"]
+      referent: "Humans treated as distributed compute via coordination."
+      notes: "Analogy: humans as processing nodes; links -> swarm bodies."
+
+    jury:
+      aliases: ["jury_body", "grand_jury", "trial_jury"]
+      referent: "Deliberative adjudication body constituted by selection + procedure."
+      notes: "Requested extension beyond PDF examples; consistent with institution as body."
+      links: ["court", "law_structure"]
+
+    congress:
+      aliases: ["legislature", "parliament", "assembly"]
+      referent: "Legislative law-making body."
+      notes: "Cross-links: congress -> legislature (synonym set); congress -> government."
+      links: ["legislature", "government"]
+
+    legislature:
+      aliases: ["parliament", "assembly", "diet"]
+      referent: "General legislative body category."
+      notes: "Parent for congress/parliament variants."
+
+    executive_branch:
+      aliases: ["executive", "administration", "cabinet"]
+      referent: "Policy-executing institutional body."
+      notes: "Cross-links: executive_branch -> government."
+
+    judiciary:
+      aliases: ["judicial_branch", "courts"]
+      referent: "Adjudicative institutional body."
+      notes: "Cross-links: judiciary -> government."
+
+    choir:
+      aliases: ["chorus", "vocal_ensemble"]
+      referent: "Coordinated performance body producing unified sound."
+      notes: "Human non-governmental cohesion exemplar; maps to flock-like coordination."
+
+  $CATEGORY_PHILOSOPHICAL_ASSEMBLAGE:
+    assemblage:
+      aliases: ["agencement", "assemblage_body"]
+      referent: "Heterogeneous functional body assembled from diverse parts."
+      notes: "Core concept-body for cross-domain cohesion."
+
+    knight_assemblage:
+      aliases: ["knight", "man_horse_armor_stirrup"]
+      referent: "Composite assemblage: man+horse+armor+stirrup+code (chivalry)."
+      notes: "Example: concept+material+practice all count as parts."
+
+    territorialized_herd:
+      aliases: ["sheepdog_fence_pasture", "pastoral_territory"]
+      referent: "Herd-body stabilized/territorialized by dog, fence, and routine."
+      notes: "Illustrates governance by constraints + training."
+
+    arborescent_structure:
+      aliases: ["tree_structure", "hierarchy", "arborescence"]
+      referent: "Hierarchical branching organization (state/bureaucracy/military)."
+      notes: "Cross-links: arborescent_structure -> bureaucracy; -> state."
+
+    rhizome:
+      aliases: ["rhizomatic_structure", "network_structure"]
+      referent: "Non-hierarchical network structure enabling lateral spread."
+      notes: "Examples invoked: internet, grass, potato tubers, underground movements, Wikipedia."
+
+    war_machine:
+      aliases: ["nomadic_war_machine", "war_machine_body"]
+      referent: "Distributed/nomadic power-body contrasted with state hierarchy."
+      notes: "Rhizomatic pole in Deleuze/Guattari framing."
+
+    actor_network:
+      aliases: ["actor_network_theory", "ANT_network"]
+      referent: "Hybrid body of humans and nonhumans (actants) producing effects."
+      notes: "Lets nonhuman components be constitutive and causal."
+
+    actant:
+      aliases: ["actants"]
+      referent: "Agency-bearing unit within an actor-network (human or nonhuman)."
+      notes: "Instances: door_closer, microchip, virus, speed_bump, fiber_optic_cable, server, encryption_algorithm, paper_graph_inscription."
+
+    door_closer:
+      aliases: ["door_closer_actant"]
+      referent: "Nonhuman component that enforces behavior (closing doors)."
+      notes: "Actant instance."
+
+    microchip:
+      aliases: ["chip", "microchip_actant"]
+      referent: "Nonhuman computational component shaping network capacity."
+      notes: "Actant instance."
+
+    virus:
+      aliases: ["virus_actant"]
+      referent: "Biological/nonhuman agent affecting systems."
+      notes: "Actant instance; bridges bio and network governance."
+
+    speed_bump:
+      aliases: ["speed_bump_actant"]
+      referent: "Infrastructure actant modulating motion behavior."
+      notes: "Actant instance."
+
+    fiber_optic_cable:
+      aliases: ["fiber_optic_cables"]
+      referent: "Physical network conduit actant."
+      notes: "Actant instance; binds digital to material."
+
+    server:
+      aliases: ["servers"]
+      referent: "Computational infrastructure actant."
+      notes: "Actant instance."
+
+    encryption_algorithm:
+      aliases: ["encryption", "crypto_algorithm"]
+      referent: "Rule-procedure actant shaping trust and coordination."
+      notes: "Actant instance; overlaps with DAO/blockchain governance."
+
+    paper_graph_inscription:
+      aliases: ["paper", "graph", "inscription"]
+      referent: "Representation actant enabling stabilization and transport of facts."
+      notes: "Actant instance; binds knowledge production to artifacts."
+
+    internet:
+      aliases: ["the_internet"]
+      referent: "Rhizomatic technical-social network body."
+      notes: "Rhizome exemplar; cross-links to P2P, routing bodies."
+
+    wikipedia:
+      aliases: ["Wikipedia"]
+      referent: "Rhizomatic knowledge production body."
+      notes: "Rhizome exemplar."
+
+    underground_resistance_movement:
+      aliases: ["underground_movement", "resistance_network"]
+      referent: "Rhizomatic political body."
+      notes: "Rhizome exemplar."
+
+    state:
+      aliases: ["the_state"]
+      referent: "Sovereign hierarchical institutional body."
+      notes: "Arborescent pole; cross-links to government/bureaucracy."
+
+  $CATEGORY_DIGITAL_ALGORITHMIC:
+    swarm_robotics:
+      aliases: ["swarm_robotics_body"]
+      referent: "Multi-robot collective functioning as distributed body."
+      notes: "Physical instantiation of swarm principles."
+
+    particle_swarm_optimization:
+      aliases: ["PSO", "particle_swarm"]
+      referent: "Optimization swarm-body of virtual particles exploring a landscape."
+      notes: "Rules produce emergent convergence behavior."
+
+    ant_colony_optimization:
+      aliases: ["ACO", "ant_colony"]
+      referent: "Optimization body of virtual ants using pheromone traces."
+      notes: "Cross-links: ant_colony_optimization -> pheromone_field."
+
+    pheromone_field:
+      aliases: ["pheromone_map", "pheromone_trail_field"]
+      referent: "Distributed memory field that coordinates ant-like agents."
+      notes: "Acts as shared-state substrate body."
+
+    routing_network:
+      aliases: ["packet_routing_network", "network_graph"]
+      referent: "Graph-body over which flows travel (internet routing framing)."
+      notes: "Carries and constrains swarms of packets/agents."
+
+    botnet:
+      aliases: ["botnet_herd", "zombie_network"]
+      referent: "Herd-body of compromised computers coordinated to act together."
+      notes: "Explicit DDoS discussion; cross-links: botnet -> compromised_computer, -> command_and_control."
+
+    compromised_computer:
+      aliases: ["zombie", "bot", "infected_host"]
+      referent: "Single machine unit-body inside a botnet."
+      notes: "Node-level component of botnet body."
+
+    command_and_control_server:
+      aliases: ["C2", "controller", "central_controller"]
+      referent: "Central coordinating body directing botnet action."
+      notes: "Coordination kernel for distributed attack-body."
+
+    ddos_swarm:
+      aliases: ["ddos_attack", "traffic_flood"]
+      referent: "Distributed saturation body aimed at overwhelming target capacity."
+      notes: "Phase-transition style jamming of information throughput."
+
+    target_system:
+      aliases: ["target", "target_service"]
+      referent: "System body receiving load; can jam/fail under swarm pressure."
+      notes: "Victim-body in DDoS framing."
+
+    peer_to_peer_network:
+      aliases: ["P2P", "p2p_network"]
+      referent: "Decentralized coordination body without central controller."
+      notes: "Contrast class vs C2 structures."
+
+    decentralized_autonomous_organization:
+      aliases: ["DAO", "dao"]
+      referent: "Governance body implemented via smart contracts."
+      notes: "Rule-execution replaces traditional bureaucracy layers."
+
+    smart_contract:
+      aliases: ["smart_contracts"]
+      referent: "Executable rule-body on a blockchain substrate."
+      notes: "Constitutive mechanism for DAOs."
+
+    blockchain_governance:
+      aliases: ["blockchain", "on_chain_governance", "ledger_governance"]
+      referent: "Ledger-mediated coordination body."
+      notes: "Trust substrate; links to encryption_algorithm actant."
+
+    network_state:
+      aliases: ["network_state_body", "digital_polity"]
+      referent: "Digital community body that develops economy/culture and gains territory."
+      notes: "Hybrid digital->physical state formation framing."
+
+  $CATEGORY_ASSEMBLY_THEORY:
+    molecule:
+      aliases: ["molecules"]
+      referent: "Chemical body used as baseline assembled object in Assembly Theory."
+      notes: "Low-to-mid assembly history depending on synthesis pathway."
+
+    protein:
+      aliases: ["proteins"]
+      referent: "Folded biomolecular body; used as complexity/jamming analogue."
+      notes: "Appears both as bio object and as analogy; cross-links to molecule."
+
+    crow:
+      aliases: ["crow_body"]
+      referent: "Animal body used in Assembly Theory exemplars (as referenced)."
+      notes: "Used alongside murder of crows as higher assembly-history object."
+
+    murder_of_crows:
+      aliases: ["murder"]
+      referent: "Collective animal body treated as high-history assembly object."
+      notes: "Cross-links: murder_of_crows -> murder (animal_ethology)."
+      links: ["$CATEGORY_ANIMAL_ETHOLOGY:murder"]
+
+    smartphone:
+      aliases: ["phone", "cell_phone"]
+      referent: "High assembly-history artifact body."
+      notes: "Canonical contrast against natural objects; implies long causal assembly chain."
+
+    iphone:
+      aliases: ["iPhone"]
+      referent: "Specific smartphone example invoked as high-history object."
+      notes: "Cross-links: iphone -> smartphone."
+
+    factory:
+      aliases: ["manufacturing", "factory_body"]
+      referent: "Production environment-body that can explain high-AI objects."
+      notes: "Alternative explanation for detection of high assembly index in environment."
+
+    mars_context:
+      aliases: ["Mars", "mars_environment"]
+      referent: "Detection-site body for Assembly Theory astrobiology framing."
+      notes: "Used to motivate why high-AI objects might signal life."
+
+  $CROSS_LINKS_INDEX:
+    murmuration: ["$CATEGORY_ANIMAL_ETHOLOGY:flock"]
+    congress: ["$CATEGORY_HUMAN_ORGANIZATION:legislature"]
+    bureaucracy: ["$CATEGORY_PHILOSOPHICAL_ASSEMBLAGE:arborescent_structure"]
+    internet: ["$CATEGORY_PHILOSOPHICAL_ASSEMBLAGE:rhizome", "$CATEGORY_DIGITAL_ALGORITHMIC:routing_network"]
+    dao: ["$CATEGORY_DIGITAL_ALGORITHMIC:smart_contract", "$CATEGORY_DIGITAL_ALGORITHMIC:blockchain_governance"]
+    botnet: ["$CATEGORY_DIGITAL_ALGORITHMIC:compromised_computer", "$CATEGORY_DIGITAL_ALGORITHMIC:command_and_control_server"]
+    iphone: ["$CATEGORY_ASSEMBLY_THEORY:smartphone"]
+    murder_of_crows: ["$CATEGORY_ANIMAL_ETHOLOGY:murder"]

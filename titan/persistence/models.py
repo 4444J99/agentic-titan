@@ -229,3 +229,149 @@ CREATE TABLE IF NOT EXISTS agent_decisions (
 CREATE INDEX IF NOT EXISTS idx_agent_decisions_audit_event_id ON agent_decisions(audit_event_id);
 CREATE INDEX IF NOT EXISTS idx_agent_decisions_decision_type ON agent_decisions(decision_type);
 """
+
+# ============================================================================
+# Assembly Theory Tables
+# ============================================================================
+
+ASSEMBLY_PATHS_TABLE_SQL = """
+CREATE TABLE IF NOT EXISTS assembly_paths (
+    id UUID PRIMARY KEY,
+    session_id VARCHAR(100) NOT NULL,
+    path_type VARCHAR(50) NOT NULL,
+    assembly_index INT NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    completed_at TIMESTAMPTZ,
+    metadata JSONB DEFAULT '{}'
+);
+
+CREATE INDEX IF NOT EXISTS idx_assembly_paths_session_id ON assembly_paths(session_id);
+CREATE INDEX IF NOT EXISTS idx_assembly_paths_path_type ON assembly_paths(path_type);
+CREATE INDEX IF NOT EXISTS idx_assembly_paths_created_at ON assembly_paths(created_at);
+"""
+
+ASSEMBLY_STEPS_TABLE_SQL = """
+CREATE TABLE IF NOT EXISTS assembly_steps (
+    id UUID PRIMARY KEY,
+    path_id UUID REFERENCES assembly_paths(id) ON DELETE CASCADE,
+    step_number INT NOT NULL,
+    step_type VARCHAR(50) NOT NULL,
+    input_state JSONB,
+    output_state JSONB,
+    transformation TEXT,
+    duration_ms FLOAT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    metadata JSONB DEFAULT '{}'
+);
+
+CREATE INDEX IF NOT EXISTS idx_assembly_steps_path_id ON assembly_steps(path_id);
+CREATE INDEX IF NOT EXISTS idx_assembly_steps_step_type ON assembly_steps(step_type);
+CREATE INDEX IF NOT EXISTS idx_assembly_steps_created_at ON assembly_steps(created_at);
+"""
+
+ASSEMBLY_METRICS_TABLE_SQL = """
+CREATE TABLE IF NOT EXISTS assembly_metrics (
+    id UUID PRIMARY KEY,
+    session_id VARCHAR(100) NOT NULL,
+    timestamp TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    total_assembly FLOAT NOT NULL,
+    selection_signal VARCHAR(20) NOT NULL,
+    unique_paths INT NOT NULL DEFAULT 0,
+    total_objects INT NOT NULL DEFAULT 0,
+    max_assembly_index INT NOT NULL DEFAULT 0,
+    metadata JSONB DEFAULT '{}'
+);
+
+CREATE INDEX IF NOT EXISTS idx_assembly_metrics_session_id ON assembly_metrics(session_id);
+CREATE INDEX IF NOT EXISTS idx_assembly_metrics_timestamp ON assembly_metrics(timestamp);
+"""
+
+# ============================================================================
+# Stigmergy Tables
+# ============================================================================
+
+PHEROMONE_TRACES_TABLE_SQL = """
+CREATE TABLE IF NOT EXISTS pheromone_traces (
+    id UUID PRIMARY KEY,
+    agent_id VARCHAR(100) NOT NULL,
+    trace_type VARCHAR(50) NOT NULL,
+    location VARCHAR(255) NOT NULL,
+    intensity FLOAT NOT NULL CHECK (intensity >= 0),
+    decay_rate FLOAT NOT NULL DEFAULT 0.1,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    expires_at TIMESTAMPTZ,
+    payload JSONB DEFAULT '{}',
+    metadata JSONB DEFAULT '{}'
+);
+
+CREATE INDEX IF NOT EXISTS idx_pheromone_traces_location ON pheromone_traces(location);
+CREATE INDEX IF NOT EXISTS idx_pheromone_traces_trace_type ON pheromone_traces(trace_type);
+CREATE INDEX IF NOT EXISTS idx_pheromone_traces_expires_at ON pheromone_traces(expires_at);
+"""
+
+# ============================================================================
+# Territory Tables
+# ============================================================================
+
+TERRITORIES_TABLE_SQL = """
+CREATE TABLE IF NOT EXISTS territories (
+    id UUID PRIMARY KEY,
+    name VARCHAR(255) NOT NULL,
+    owner_agent_id VARCHAR(100),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    dissolved_at TIMESTAMPTZ,
+    boundary_config JSONB DEFAULT '{}',
+    metadata JSONB DEFAULT '{}'
+);
+
+CREATE INDEX IF NOT EXISTS idx_territories_owner_agent_id ON territories(owner_agent_id);
+CREATE INDEX IF NOT EXISTS idx_territories_created_at ON territories(created_at);
+"""
+
+TERRITORY_AGENTS_TABLE_SQL = """
+CREATE TABLE IF NOT EXISTS territory_agents (
+    id UUID PRIMARY KEY,
+    territory_id UUID REFERENCES territories(id) ON DELETE CASCADE,
+    agent_id VARCHAR(100) NOT NULL,
+    role VARCHAR(50) DEFAULT 'member',
+    is_boundary_agent BOOLEAN DEFAULT FALSE,
+    joined_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    left_at TIMESTAMPTZ,
+    metadata JSONB DEFAULT '{}'
+);
+
+CREATE INDEX IF NOT EXISTS idx_territory_agents_territory_id ON territory_agents(territory_id);
+CREATE INDEX IF NOT EXISTS idx_territory_agents_agent_id ON territory_agents(agent_id);
+"""
+
+# ============================================================================
+# Neighborhood Tables
+# ============================================================================
+
+NEIGHBOR_INTERACTIONS_TABLE_SQL = """
+CREATE TABLE IF NOT EXISTS neighbor_interactions (
+    id UUID PRIMARY KEY,
+    agent_a_id VARCHAR(100) NOT NULL,
+    agent_b_id VARCHAR(100) NOT NULL,
+    interaction_type VARCHAR(50) NOT NULL,
+    success BOOLEAN NOT NULL DEFAULT TRUE,
+    quality FLOAT CHECK (quality >= 0 AND quality <= 1),
+    timestamp TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    metadata JSONB DEFAULT '{}'
+);
+
+CREATE INDEX IF NOT EXISTS idx_neighbor_interactions_agent_a ON neighbor_interactions(agent_a_id);
+CREATE INDEX IF NOT EXISTS idx_neighbor_interactions_agent_b ON neighbor_interactions(agent_b_id);
+CREATE INDEX IF NOT EXISTS idx_neighbor_interactions_timestamp ON neighbor_interactions(timestamp);
+"""
+
+# Combined SQL for all assembly-related tables
+ALL_ASSEMBLY_TABLES_SQL = (
+    ASSEMBLY_PATHS_TABLE_SQL
+    + ASSEMBLY_STEPS_TABLE_SQL
+    + ASSEMBLY_METRICS_TABLE_SQL
+    + PHEROMONE_TRACES_TABLE_SQL
+    + TERRITORIES_TABLE_SQL
+    + TERRITORY_AGENTS_TABLE_SQL
+    + NEIGHBOR_INTERACTIONS_TABLE_SQL
+)

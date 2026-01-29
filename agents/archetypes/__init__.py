@@ -12,6 +12,25 @@ Available archetypes:
 - SecurityAnalyst: Code security and compliance
 - DataEngineer: ETL, data quality, and schema management
 - ProductManager: Requirements analysis and roadmap planning
+
+Governance Archetypes:
+- JuryAgent: Deliberative body with evidence evaluation and voting
+- ExecutiveAgent: Implements decisions and leads execution
+- LegislativeAgent: Proposes and debates policies
+- JudicialAgent: Reviews compliance and resolves disputes
+- BureaucracyAgent: Rule-based processing with specialized roles
+
+Biological Archetypes:
+- EusocialColonyAgent: Superorganism with castes and stigmergy
+- CellAgent: Multicellular patterns with apoptosis and signaling
+
+Philosophical Archetypes:
+- AssemblageAgent: Heterogeneous assembly with territorialization
+- ActorNetworkAgent: ANT-based actant enrollment and translation
+
+Digital Archetypes:
+- SwarmIntelligenceAgent: PSO/ACO optimization algorithms
+- DAOAgent: Decentralized governance with proposals and voting
 """
 
 from agents.archetypes.orchestrator import OrchestratorAgent
@@ -25,7 +44,29 @@ from agents.archetypes.security_analyst import SecurityAnalystAgent
 from agents.archetypes.data_engineer import DataEngineerAgent
 from agents.archetypes.product_manager import ProductManagerAgent
 
+# Governance archetypes
+from agents.archetypes.jury import JuryAgent
+from agents.archetypes.government import (
+    ExecutiveAgent,
+    LegislativeAgent,
+    JudicialAgent,
+)
+from agents.archetypes.bureaucracy import BureaucracyAgent
+
+# Biological archetypes
+from agents.archetypes.eusocial import EusocialColonyAgent
+from agents.archetypes.cell import CellAgent
+
+# Philosophical archetypes
+from agents.archetypes.assemblage import AssemblageAgent
+from agents.archetypes.actor_network import ActorNetworkAgent
+
+# Digital archetypes
+from agents.archetypes.swarm_intelligence import SwarmIntelligenceAgent
+from agents.archetypes.dao import DAOAgent
+
 __all__ = [
+    # Core archetypes
     "OrchestratorAgent",
     "ResearcherAgent",
     "CoderAgent",
@@ -36,4 +77,19 @@ __all__ = [
     "SecurityAnalystAgent",
     "DataEngineerAgent",
     "ProductManagerAgent",
+    # Governance archetypes
+    "JuryAgent",
+    "ExecutiveAgent",
+    "LegislativeAgent",
+    "JudicialAgent",
+    "BureaucracyAgent",
+    # Biological archetypes
+    "EusocialColonyAgent",
+    "CellAgent",
+    # Philosophical archetypes
+    "AssemblageAgent",
+    "ActorNetworkAgent",
+    # Digital archetypes
+    "SwarmIntelligenceAgent",
+    "DAOAgent",
 ]
