@@ -329,7 +329,13 @@ class RuntimeSelector:
         """Score all available runtimes."""
         scores = []
 
-        for runtime_type in [RuntimeType.LOCAL, RuntimeType.DOCKER]:
+        runtime_types = [RuntimeType.LOCAL, RuntimeType.DOCKER]
+
+        # Include Firecracker if available
+        if RuntimeType.FIRECRACKER in self._runtimes:
+            runtime_types.append(RuntimeType.FIRECRACKER)
+
+        for runtime_type in runtime_types:
             score = self._score_runtime(runtime_type, constraints, agent_spec)
             scores.append(score)
 
@@ -353,6 +359,8 @@ class RuntimeSelector:
             score, reasons = self._score_local(constraints, agent_spec)
         elif runtime_type == RuntimeType.DOCKER:
             score, reasons = self._score_docker(constraints, agent_spec)
+        elif runtime_type == RuntimeType.FIRECRACKER:
+            score, reasons = self._score_firecracker(constraints, agent_spec)
 
         # Apply strategy modifiers
         score = self._apply_strategy(runtime_type, score, constraints)
@@ -450,6 +458,58 @@ class RuntimeSelector:
             if "container" in runtimes:
                 score += 15
                 reasons.append("Container config present")
+
+        return score, reasons
+
+    def _score_firecracker(
+        self,
+        constraints: RuntimeConstraints,
+        agent_spec: dict[str, Any] | None,
+    ) -> tuple[float, list[str]]:
+        """Score Firecracker runtime."""
+        score = 45.0  # Slightly lower baseline (requires more setup)
+        reasons = []
+
+        # Advantages of Firecracker
+        if constraints.needs_isolation:
+            score += 30
+            reasons.append("Strong HW isolation")
+
+        # Firecracker has very fast boot times
+        if constraints.max_execution_time < 60:
+            score += 15
+            reasons.append("Fast boot for short tasks")
+
+        # Good for security-sensitive workloads
+        if agent_spec:
+            task_type = agent_spec.get("spec", {}).get("task_type", "")
+            if "security" in task_type.lower() or "sandbox" in task_type.lower():
+                score += 20
+                reasons.append("Security-sensitive task")
+
+        # Resource efficiency
+        if constraints.min_memory_mb <= 256:
+            score += 10
+            reasons.append("Low memory fits microVM")
+
+        # Disadvantages
+        if constraints.requires_gpu:
+            score -= 40
+            reasons.append("No GPU support")
+
+        if constraints.needs_persistence:
+            score -= 15
+            reasons.append("Limited persistence")
+
+        if constraints.auto_scale:
+            score -= 10
+            reasons.append("Manual scaling only")
+
+        # Platform check (Linux only)
+        import platform
+        if platform.system() != "Linux":
+            score = 0
+            reasons = ["Linux only"]
 
         return score, reasons
 

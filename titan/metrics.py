@@ -604,6 +604,87 @@ if PROMETHEUS_AVAILABLE:
     )
 
     # ========================================================================
+    # RLHF Training Metrics (Phase 18)
+    # ========================================================================
+
+    RLHF_TRAINING_RUNS = Counter(
+        "titan_rlhf_training_runs_total",
+        "Total RLHF training runs",
+        ["trainer_type"],
+        registry=REGISTRY,
+    )
+
+    RLHF_TRAINING_LOSS = Histogram(
+        "titan_rlhf_training_loss",
+        "RLHF training loss values",
+        buckets=(0.1, 0.2, 0.3, 0.5, 0.7, 1.0, 1.5, 2.0, 3.0, 5.0),
+        registry=REGISTRY,
+    )
+
+    RLHF_EVAL_WIN_RATE = Gauge(
+        "titan_rlhf_eval_win_rate",
+        "Model win rate vs baseline",
+        registry=REGISTRY,
+    )
+
+    RLHF_PREFERENCE_PAIRS = Counter(
+        "titan_rlhf_preference_pairs_total",
+        "Preference pairs created",
+        ["source"],
+        registry=REGISTRY,
+    )
+
+    RLHF_AB_TESTS_ACTIVE = Gauge(
+        "titan_rlhf_ab_tests_active",
+        "Number of active A/B tests",
+        registry=REGISTRY,
+    )
+
+    RLHF_AB_TEST_RESULTS = Counter(
+        "titan_rlhf_ab_test_results_total",
+        "A/B test results recorded",
+        ["model", "outcome"],
+        registry=REGISTRY,
+    )
+
+    # ========================================================================
+    # Firecracker Metrics (Phase 18)
+    # ========================================================================
+
+    FIRECRACKER_VMS_ACTIVE = Gauge(
+        "titan_firecracker_vms_active",
+        "Number of active Firecracker microVMs",
+        registry=REGISTRY,
+    )
+
+    FIRECRACKER_BOOT_TIME = Histogram(
+        "titan_firecracker_boot_time_seconds",
+        "VM boot time in seconds",
+        buckets=(0.1, 0.2, 0.5, 1.0, 2.0, 3.0, 5.0, 10.0),
+        registry=REGISTRY,
+    )
+
+    FIRECRACKER_EXECUTION_TIME = Histogram(
+        "titan_firecracker_execution_time_seconds",
+        "Code execution time in VM",
+        buckets=(0.1, 0.5, 1.0, 2.0, 5.0, 10.0, 30.0, 60.0),
+        registry=REGISTRY,
+    )
+
+    FIRECRACKER_VM_ERRORS = Counter(
+        "titan_firecracker_vm_errors_total",
+        "VM errors",
+        ["error_type"],
+        registry=REGISTRY,
+    )
+
+    FIRECRACKER_POOL_SIZE = Gauge(
+        "titan_firecracker_pool_size",
+        "VM pool size",
+        registry=REGISTRY,
+    )
+
+    # ========================================================================
     # System Info
     # ========================================================================
 
@@ -1146,6 +1227,86 @@ class MetricsCollector:
         if not self._enabled:
             return
         WAR_MACHINE_OPERATIONS.labels(operation_type=operation_type).inc()
+
+    # ========================================================================
+    # RLHF Training Metrics (Phase 18)
+    # ========================================================================
+
+    def rlhf_training_run(self, trainer_type: str) -> None:
+        """Record an RLHF training run."""
+        if not self._enabled:
+            return
+        RLHF_TRAINING_RUNS.labels(trainer_type=trainer_type).inc()
+
+    def rlhf_training_loss(self, loss: float) -> None:
+        """Record RLHF training loss."""
+        if not self._enabled:
+            return
+        RLHF_TRAINING_LOSS.observe(loss)
+
+    def rlhf_eval_win_rate(self, win_rate: float) -> None:
+        """Set model win rate vs baseline."""
+        if not self._enabled:
+            return
+        RLHF_EVAL_WIN_RATE.set(win_rate)
+
+    def rlhf_preference_pair_created(self, source: str) -> None:
+        """Record preference pair creation."""
+        if not self._enabled:
+            return
+        RLHF_PREFERENCE_PAIRS.labels(source=source).inc()
+
+    def rlhf_ab_tests_active(self, count: int) -> None:
+        """Set number of active A/B tests."""
+        if not self._enabled:
+            return
+        RLHF_AB_TESTS_ACTIVE.set(count)
+
+    def rlhf_ab_test_result(self, model: str, outcome: str) -> None:
+        """Record A/B test result."""
+        if not self._enabled:
+            return
+        RLHF_AB_TEST_RESULTS.labels(model=model, outcome=outcome).inc()
+
+    # ========================================================================
+    # Firecracker Metrics (Phase 18)
+    # ========================================================================
+
+    def firecracker_vm_started(self) -> None:
+        """Record VM started."""
+        if not self._enabled:
+            return
+        FIRECRACKER_VMS_ACTIVE.inc()
+
+    def firecracker_vm_stopped(self) -> None:
+        """Record VM stopped."""
+        if not self._enabled:
+            return
+        FIRECRACKER_VMS_ACTIVE.dec()
+
+    def firecracker_boot_time(self, seconds: float) -> None:
+        """Record VM boot time."""
+        if not self._enabled:
+            return
+        FIRECRACKER_BOOT_TIME.observe(seconds)
+
+    def firecracker_execution_time(self, seconds: float) -> None:
+        """Record code execution time in VM."""
+        if not self._enabled:
+            return
+        FIRECRACKER_EXECUTION_TIME.observe(seconds)
+
+    def firecracker_vm_error(self, error_type: str) -> None:
+        """Record VM error."""
+        if not self._enabled:
+            return
+        FIRECRACKER_VM_ERRORS.labels(error_type=error_type).inc()
+
+    def firecracker_pool_size(self, size: int) -> None:
+        """Set VM pool size."""
+        if not self._enabled:
+            return
+        FIRECRACKER_POOL_SIZE.set(size)
 
     # ========================================================================
     # System Info

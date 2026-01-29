@@ -100,8 +100,21 @@ auth = [
 ratelimit = [
     "slowapi>=0.1.9",
 ]
+# Phase 18: RLHF Training Pipeline
+rlhf = [
+    "trl>=0.7.0",           # Transformers RL (DPO trainer)
+    "peft>=0.6.0",          # Parameter-efficient fine-tuning (LoRA)
+    "wandb>=0.16.0",        # Experiment tracking
+    "accelerate>=0.25.0",   # Distributed training
+    "datasets>=2.16.0",     # HuggingFace datasets
+]
+# Phase 18: Firecracker MicroVM Runtime
+firecracker = [
+    "aiofiles>=23.0.0",     # Async file I/O
+    "aiohttp>=3.9.0",       # HTTP client for Firecracker API
+]
 all = [
-    "agentic-titan[local-llm,vector-db,messaging,embeddings,dashboard,metrics,stress,documents,langfuse,lsp,memori,postgres,evaluation,ray,celery,auth,ratelimit]",
+    "agentic-titan[local-llm,vector-db,messaging,embeddings,dashboard,metrics,stress,documents,langfuse,lsp,memori,postgres,evaluation,ray,celery,auth,ratelimit,rlhf,firecracker]",
 ]
 
 [project.scripts]

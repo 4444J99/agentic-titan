@@ -6,6 +6,7 @@ Supports:
 - Sandboxed: OS-level isolation (Seatbelt/Landlock)
 - Container: Docker/K3s isolated environments
 - Serverless: OpenFaaS for burst scaling
+- Firecracker: MicroVM isolation (Linux only)
 
 The Runtime Selector automatically chooses the best runtime based on:
 - GPU requirements
@@ -34,6 +35,24 @@ from runtime.sandbox import (
     create_sandboxed_runtime,
 )
 
+# Firecracker imports (conditionally available on Linux)
+try:
+    from runtime.firecracker import (
+        FIRECRACKER_AVAILABLE,
+        KVM_AVAILABLE,
+        FirecrackerConfig,
+        FirecrackerRuntime,
+        MicroVM,
+        MicroVMManager,
+    )
+except ImportError:
+    FIRECRACKER_AVAILABLE = False
+    KVM_AVAILABLE = False
+    FirecrackerConfig = None  # type: ignore
+    FirecrackerRuntime = None  # type: ignore
+    MicroVM = None  # type: ignore
+    MicroVMManager = None  # type: ignore
+
 __all__ = [
     # Base
     "Runtime",
@@ -54,4 +73,11 @@ __all__ = [
     "SandboxConfig",
     "SandboxType",
     "create_sandboxed_runtime",
+    # Firecracker (Linux only)
+    "FIRECRACKER_AVAILABLE",
+    "KVM_AVAILABLE",
+    "FirecrackerConfig",
+    "FirecrackerRuntime",
+    "MicroVM",
+    "MicroVMManager",
 ]

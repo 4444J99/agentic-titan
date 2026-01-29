@@ -28,6 +28,7 @@ class RuntimeType(str, Enum):
     DOCKER = "docker"        # Docker container
     K3S = "k3s"              # Kubernetes (K3s)
     OPENFAAS = "openfaas"    # OpenFaaS serverless
+    FIRECRACKER = "firecracker"  # Firecracker microVM (Linux only)
 
 
 class ProcessState(str, Enum):
