@@ -11,7 +11,7 @@ import asyncio
 import logging
 import os
 import time
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any
 
 from celery import shared_task
@@ -58,6 +58,32 @@ def get_artifact_store():
     from titan.batch.artifact_store import get_artifact_store
 
     return get_artifact_store()
+
+
+def get_hive_mind():
+    """Get or create HiveMind instance for cross-worker coordination."""
+    from hive.memory import HiveMind, MemoryConfig
+
+    hive = HiveMind(MemoryConfig())
+    return hive
+
+
+async def broadcast_worker_metrics(worker_id: str, metrics: dict[str, Any]) -> None:
+    """Broadcast worker metrics to HiveMind for coordination."""
+    try:
+        hive = get_hive_mind()
+        await hive.initialize()
+        await hive.set(
+            f"worker_metrics:{worker_id}",
+            {
+                "worker_id": worker_id,
+                "timestamp": datetime.now().isoformat(),
+                **metrics,
+            },
+            ttl=300,  # 5 minute TTL
+        )
+    except Exception as e:
+        logger.debug(f"Failed to broadcast worker metrics: {e}")
 
 
 # =============================================================================
@@ -324,40 +350,207 @@ def store_artifact_task(
 # =============================================================================
 
 @shared_task(name="titan.batch.worker.cleanup_old_results_task")
-def cleanup_old_results_task() -> dict[str, Any]:
+def cleanup_old_results_task(
+    retention_days: int = 30,
+) -> dict[str, Any]:
     """
     Clean up old task results and artifacts.
 
-    Runs periodically via Celery Beat.
-    """
-    logger.info("Running cleanup task")
+    Runs periodically via Celery Beat to prevent resource leaks.
 
-    # TODO: Implement cleanup logic
-    # - Remove results older than retention period
-    # - Clean up orphaned artifacts
+    Args:
+        retention_days: Number of days to retain results (default 30)
+
+    Returns:
+        Dictionary with cleanup statistics
+    """
+    logger.info(f"Running cleanup task (retention: {retention_days} days)")
+
+    stats: dict[str, Any] = {
+        "results_cleaned": 0,
+        "artifacts_cleaned": 0,
+        "batches_cleaned": 0,
+        "errors": [],
+    }
+    cutoff = datetime.now() - timedelta(days=retention_days)
+
+    try:
+        # 1. Clean old Celery results from backend
+        from titan.batch.celery_app import celery_app
+
+        backend = celery_app.backend
+        if hasattr(backend, "cleanup"):
+            try:
+                backend.cleanup()
+                stats["results_cleaned"] = 1
+                logger.info("Cleaned Celery backend results")
+            except Exception as e:
+                stats["errors"].append(f"Backend cleanup failed: {e}")
+                logger.warning(f"Backend cleanup failed: {e}")
+
+        # 2. Clean orphaned artifacts (completed batches > retention_days)
+        async def cleanup_artifacts() -> int:
+            artifact_store = get_artifact_store()
+            cleaned = 0
+
+            # Try to find orphaned artifacts
+            if hasattr(artifact_store, "find_orphaned_artifacts"):
+                orphaned = await artifact_store.find_orphaned_artifacts(before=cutoff)
+                for artifact_uri in orphaned:
+                    try:
+                        await artifact_store.delete_artifact(artifact_uri)
+                        cleaned += 1
+                    except Exception as e:
+                        logger.warning(f"Failed to delete artifact {artifact_uri}: {e}")
+            return cleaned
+
+        stats["artifacts_cleaned"] = run_async(cleanup_artifacts())
+
+        # 3. Clean completed batch records from PostgreSQL
+        async def cleanup_postgres() -> int:
+            try:
+                from titan.persistence.postgres import get_postgres_client
+
+                postgres = get_postgres_client()
+                if postgres.is_connected:
+                    return await postgres.delete_old_batches(
+                        before=cutoff,
+                        terminal_only=True,
+                    )
+            except Exception as e:
+                logger.warning(f"PostgreSQL cleanup failed: {e}")
+            return 0
+
+        stats["batches_cleaned"] = run_async(cleanup_postgres())
+
+        # 4. Log cleanup to HiveMind for tracking
+        async def log_cleanup() -> None:
+            try:
+                hive = get_hive_mind()
+                await hive.initialize()
+                await hive.set(
+                    f"cleanup_log:{datetime.now().strftime('%Y%m%d_%H%M%S')}",
+                    {
+                        "timestamp": datetime.now().isoformat(),
+                        "retention_days": retention_days,
+                        **stats,
+                    },
+                    ttl=86400 * 7,  # Keep for 7 days
+                )
+            except Exception as e:
+                logger.debug(f"Failed to log cleanup: {e}")
+
+        run_async(log_cleanup())
+
+    except Exception as e:
+        stats["errors"].append(str(e))
+        logger.error(f"Cleanup error: {e}")
+
+    logger.info(
+        f"Cleanup completed: {stats['results_cleaned']} results, "
+        f"{stats['artifacts_cleaned']} artifacts, {stats['batches_cleaned']} batches"
+    )
 
     return {
         "status": "completed",
         "timestamp": datetime.now().isoformat(),
+        **stats,
     }
 
 
 @shared_task(name="titan.batch.worker.check_stalled_batches_task")
-def check_stalled_batches_task() -> dict[str, Any]:
+def check_stalled_batches_task(
+    stall_threshold_minutes: int = 30,
+) -> dict[str, Any]:
     """
     Check for and handle stalled batches.
 
-    Runs periodically via Celery Beat.
-    """
-    logger.info("Checking for stalled batches")
+    Runs periodically via Celery Beat to detect batches that have
+    stopped making progress and attempt recovery.
 
-    # TODO: Implement stalled batch detection
-    # - Find batches with no progress for > 30 min
-    # - Retry stalled sessions or mark as failed
+    Args:
+        stall_threshold_minutes: Minutes without progress to consider stalled
+
+    Returns:
+        Dictionary with check statistics
+    """
+    logger.info(f"Checking for stalled batches (threshold: {stall_threshold_minutes}m)")
+
+    stats: dict[str, Any] = {
+        "checked": 0,
+        "stalled": 0,
+        "recovered": 0,
+        "failed": 0,
+        "errors": [],
+    }
+
+    try:
+        from titan.batch.orchestrator import get_batch_orchestrator
+
+        orchestrator = get_batch_orchestrator()
+
+        # Get stalled batches
+        async def check_and_recover() -> dict[str, int]:
+            stalled_batches = await orchestrator.get_stalled_batches(
+                threshold_minutes=stall_threshold_minutes
+            )
+            result = {
+                "checked": len(orchestrator._batches),
+                "stalled": len(stalled_batches),
+                "recovered": 0,
+                "failed": 0,
+            }
+
+            for batch_id in stalled_batches:
+                try:
+                    recovered = await orchestrator.recover_stalled_batch(batch_id)
+                    if recovered:
+                        result["recovered"] += 1
+                        logger.info(f"Recovered stalled batch {batch_id}")
+                    else:
+                        result["failed"] += 1
+                        logger.warning(f"Failed to recover batch {batch_id}")
+                except Exception as e:
+                    result["failed"] += 1
+                    logger.error(f"Error recovering batch {batch_id}: {e}")
+
+            return result
+
+        check_result = run_async(check_and_recover())
+        stats.update(check_result)
+
+        # Log to HiveMind for monitoring
+        async def log_check() -> None:
+            try:
+                hive = get_hive_mind()
+                await hive.initialize()
+                await hive.set(
+                    f"stalled_check:{datetime.now().strftime('%Y%m%d_%H%M%S')}",
+                    {
+                        "timestamp": datetime.now().isoformat(),
+                        "threshold_minutes": stall_threshold_minutes,
+                        **stats,
+                    },
+                    ttl=86400,  # Keep for 1 day
+                )
+            except Exception as e:
+                logger.debug(f"Failed to log stalled check: {e}")
+
+        run_async(log_check())
+
+    except Exception as e:
+        stats["errors"].append(str(e))
+        logger.error(f"Stalled batch check error: {e}")
+
+    logger.info(
+        f"Stalled check completed: {stats['checked']} checked, "
+        f"{stats['stalled']} stalled, {stats['recovered']} recovered"
+    )
 
     return {
         "status": "completed",
         "timestamp": datetime.now().isoformat(),
+        **stats,
     }
 
 

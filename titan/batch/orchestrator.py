@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import TYPE_CHECKING, Any, AsyncGenerator, Callable
 from uuid import UUID, uuid4
 
@@ -936,6 +936,176 @@ class BatchOrchestrator:
             logger.debug(f"Monitoring cancelled for batch {batch_id}")
         except Exception as e:
             logger.error(f"Error monitoring batch {batch_id}: {e}")
+
+    # =========================================================================
+    # Stalled Batch Detection and Recovery
+    # =========================================================================
+
+    async def get_stalled_batches(
+        self,
+        threshold_minutes: int = 30,
+    ) -> list[UUID]:
+        """
+        Find batches with no progress for longer than threshold.
+
+        A batch is considered stalled if:
+        - It's in RUNNING or PAUSED status
+        - No session activity for threshold_minutes
+        - Has sessions that should be progressing
+
+        Args:
+            threshold_minutes: Minutes without activity to consider stalled
+
+        Returns:
+            List of stalled batch IDs
+        """
+        from datetime import timedelta
+
+        stalled = []
+        cutoff = datetime.now() - timedelta(minutes=threshold_minutes)
+
+        for batch_id, batch in self._batches.items():
+            if batch.status not in (BatchStatus.PROCESSING, BatchStatus.PAUSED):
+                continue
+
+            # Check last activity time
+            last_activity = batch.started_at or batch.created_at
+
+            # Find most recent session activity
+            for session in batch.sessions:
+                if session.completed_at and session.completed_at > last_activity:
+                    last_activity = session.completed_at
+                if session.started_at and session.started_at > last_activity:
+                    last_activity = session.started_at
+
+            # Also check updated_at if available
+            if hasattr(batch, "updated_at") and batch.updated_at:
+                if batch.updated_at > last_activity:
+                    last_activity = batch.updated_at
+
+            if last_activity < cutoff:
+                # Verify there are sessions that should be progressing
+                active_sessions = batch.get_active_sessions()
+                pending_sessions = batch.get_pending_sessions()
+
+                if active_sessions or pending_sessions:
+                    # Has work to do but no progress
+                    stalled.append(batch_id)
+                    logger.debug(
+                        f"Batch {batch_id} stalled: last activity {last_activity}, "
+                        f"{len(active_sessions)} active, {len(pending_sessions)} pending"
+                    )
+
+        return stalled
+
+    async def recover_stalled_batch(
+        self,
+        batch_id: UUID | str,
+        strategy: str = "retry",
+    ) -> bool:
+        """
+        Attempt to recover a stalled batch.
+
+        Recovery strategies:
+        - retry: Reset stalled sessions and re-queue them
+        - skip: Mark stalled sessions as failed and continue
+        - fail: Mark entire batch as failed
+
+        Args:
+            batch_id: Batch to recover
+            strategy: Recovery strategy ("retry", "skip", "fail")
+
+        Returns:
+            True if recovery was successful
+        """
+        target = UUID(batch_id) if isinstance(batch_id, str) else batch_id
+        batch = self._batches.get(target)
+
+        if not batch:
+            logger.warning(f"Batch not found for recovery: {target}")
+            return False
+
+        logger.info(f"Attempting recovery of batch {target} with strategy: {strategy}")
+
+        if strategy == "retry":
+            return await self._recover_retry(batch)
+        elif strategy == "skip":
+            return await self._recover_skip(batch)
+        elif strategy == "fail":
+            return await self._recover_fail(batch)
+        else:
+            logger.warning(f"Unknown recovery strategy: {strategy}")
+            return False
+
+    async def _recover_retry(self, batch: BatchJob) -> bool:
+        """Reset stalled sessions and re-queue them."""
+        recovered = 0
+
+        for session in batch.sessions:
+            if session.status == SessionQueueStatus.RUNNING:
+                # Session stuck running - mark for retry
+                if session.retry_count < self._max_retries:
+                    session.status = SessionQueueStatus.PENDING
+                    session.retry_count += 1
+                    session.error = "Recovered from stalled state"
+                    session.worker_id = None
+                    session.celery_task_id = None
+                    recovered += 1
+                    logger.info(
+                        f"Reset stalled session {session.id} for retry "
+                        f"(attempt {session.retry_count})"
+                    )
+                else:
+                    # Exceeded max retries
+                    session.status = SessionQueueStatus.FAILED
+                    session.error = f"Exceeded max retries ({self._max_retries})"
+                    session.completed_at = datetime.now()
+                    logger.warning(f"Session {session.id} exceeded max retries")
+
+        if recovered > 0:
+            # Re-queue pending sessions
+            await self._queue_pending_sessions(batch)
+            await self._persist_batch(batch)
+            logger.info(f"Recovered {recovered} sessions for batch {batch.id}")
+
+        return recovered > 0
+
+    async def _recover_skip(self, batch: BatchJob) -> bool:
+        """Mark stalled sessions as failed and continue."""
+        skipped = 0
+
+        for session in batch.sessions:
+            if session.status == SessionQueueStatus.RUNNING:
+                session.status = SessionQueueStatus.FAILED
+                session.error = "Skipped - stalled without progress"
+                session.completed_at = datetime.now()
+                skipped += 1
+                logger.info(f"Skipped stalled session {session.id}")
+
+        # Check if batch should complete
+        await self._check_batch_completion(batch)
+        await self._persist_batch(batch)
+
+        return skipped > 0
+
+    async def _recover_fail(self, batch: BatchJob) -> bool:
+        """Mark entire batch as failed."""
+        # Cancel all non-terminal sessions
+        for session in batch.sessions:
+            if not session.is_terminal:
+                session.status = SessionQueueStatus.CANCELLED
+                session.error = "Batch recovery failed"
+                session.completed_at = datetime.now()
+
+        batch.status = BatchStatus.FAILED
+        batch.error = "Recovery failed - batch marked as failed"
+        batch.completed_at = datetime.now()
+
+        self._stop_monitoring(batch.id)
+        await self._persist_batch(batch)
+
+        logger.info(f"Batch {batch.id} marked as failed during recovery")
+        return True
 
 
 # =============================================================================

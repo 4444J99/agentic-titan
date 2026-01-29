@@ -232,6 +232,8 @@ def swarm(
     task: str = typer.Argument(..., help="Task for the swarm"),
     topology: str = typer.Option("auto", "--topology", "-t", help="Topology type"),
     agents: int = typer.Option(3, "--agents", "-a", help="Number of agents"),
+    max_tokens: int = typer.Option(50000, "--max-tokens", help="Max tokens budget"),
+    timeout: int = typer.Option(300, "--timeout", help="Timeout in seconds"),
     verbose: bool = typer.Option(False, "--verbose", "-v", help="Verbose output"),
 ) -> None:
     """Start an agent swarm for a task."""
@@ -241,6 +243,16 @@ def swarm(
     print_banner()
 
     async def run_swarm() -> None:
+        from agents.archetypes import (
+            ResearcherAgent,
+            CoderAgent,
+            ReviewerAgent,
+            OrchestratorAgent,
+            DataEngineerAgent,
+            ProductManagerAgent,
+            SecurityAnalystAgent,
+        )
+
         say(ORCHESTRATOR, "Initializing swarm...")
 
         # Initialize components
@@ -271,16 +283,200 @@ def swarm(
             f"Task: {task}\n"
             f"Topology: {selected}\n"
             f"Agents: {agents}\n"
+            f"Max Tokens: {max_tokens}\n"
             f"LLM Providers: {', '.join(p.value for p in providers)}",
             title="Swarm Configuration",
         ))
 
-        # TODO: Create and run agents
-        say(ORCHESTRATOR, "Swarm ready (implementation pending)")
+        # Analyze task to determine agent mix
+        agent_mix = await _analyze_task_for_agents(task, router)
+        say(ORCHESTRATOR, f"Suggested agents: {', '.join(agent_mix[:agents])}")
+
+        # Map archetype names to classes
+        archetype_map = {
+            "researcher": ResearcherAgent,
+            "coder": CoderAgent,
+            "reviewer": ReviewerAgent,
+            "orchestrator": OrchestratorAgent,
+            "data_engineer": DataEngineerAgent,
+            "product_manager": ProductManagerAgent,
+            "security_analyst": SecurityAnalystAgent,
+            "analyst": ResearcherAgent,  # Alias
+            "writer": ResearcherAgent,  # Map to closest
+            "planner": ProductManagerAgent,
+            "executor": CoderAgent,
+        }
+
+        # Create agents
+        created_agents = []
+        for i, archetype_name in enumerate(agent_mix[:agents]):
+            archetype_class = archetype_map.get(archetype_name.lower(), ResearcherAgent)
+            agent_name = f"{archetype_name}-{i+1}"
+
+            # Create agent with appropriate initialization
+            if archetype_class == ResearcherAgent:
+                agent = archetype_class(
+                    topic=task,
+                    name=agent_name,
+                    hive_mind=hive,
+                )
+            elif archetype_class == CoderAgent:
+                agent = archetype_class(
+                    task_description=task,
+                    name=agent_name,
+                    hive_mind=hive,
+                )
+            elif archetype_class == ReviewerAgent:
+                agent = archetype_class(
+                    content=task,
+                    name=agent_name,
+                    hive_mind=hive,
+                )
+            elif archetype_class == OrchestratorAgent:
+                agent = archetype_class(
+                    task=task,
+                    name=agent_name,
+                    hive_mind=hive,
+                )
+            else:
+                agent = archetype_class(
+                    name=agent_name,
+                    hive_mind=hive,
+                )
+
+            created_agents.append(agent)
+            topo.add_agent(agent)
+            say(ORCHESTRATOR, f"{agent_name} ready ({archetype_name})")
+
+        # Run the swarm
+        say(ORCHESTRATOR, f"Starting swarm with {len(created_agents)} agents...")
+
+        results = []
+        total_tokens = 0
+        start_time = asyncio.get_event_loop().time()
+
+        for agent in created_agents:
+            try:
+                # Check timeout
+                elapsed = asyncio.get_event_loop().time() - start_time
+                if elapsed > timeout:
+                    say(ORCHESTRATOR, "Timeout reached, stopping early")
+                    break
+
+                # Check token budget (rough estimate)
+                if total_tokens > max_tokens:
+                    say(ORCHESTRATOR, "Token budget exhausted")
+                    break
+
+                # Initialize and run agent
+                await agent.initialize()
+                result = await agent.run(task)
+                results.append({
+                    "agent": agent.name,
+                    "state": result.state.value,
+                    "turns": result.turns_taken,
+                    "duration_ms": result.execution_time_ms,
+                })
+
+                # Estimate tokens (rough)
+                total_tokens += result.turns_taken * 2000
+
+                say(ORCHESTRATOR, f"{agent.name} completed: {result.state.value}")
+
+            except Exception as e:
+                logger.error(f"Agent {agent.name} failed: {e}")
+                results.append({
+                    "agent": agent.name,
+                    "state": "failed",
+                    "error": str(e),
+                })
+
+        # Display results
+        successful = sum(1 for r in results if r.get("state") != "failed")
+        total_duration = int((asyncio.get_event_loop().time() - start_time) * 1000)
+
+        console.print(Panel(
+            f"Agents: {len(created_agents)}\n"
+            f"Successful: {successful}\n"
+            f"Estimated Tokens: {total_tokens}\n"
+            f"Duration: {total_duration / 1000:.2f}s",
+            title="Swarm Result",
+            border_style="green" if successful == len(created_agents) else "yellow",
+        ))
+
+        # Show per-agent results
+        table = Table(title="Agent Results")
+        table.add_column("Agent", style="cyan")
+        table.add_column("State")
+        table.add_column("Turns")
+        table.add_column("Duration")
+
+        for r in results:
+            state_style = "green" if r.get("state") == "completed" else "red"
+            table.add_row(
+                r["agent"],
+                f"[{state_style}]{r.get('state', 'unknown')}[/{state_style}]",
+                str(r.get("turns", "-")),
+                f"{r.get('duration_ms', 0) / 1000:.1f}s" if r.get("duration_ms") else "-",
+            )
+
+        console.print(table)
 
         await hive.shutdown()
 
     asyncio.run(run_swarm())
+
+
+async def _analyze_task_for_agents(task: str, router) -> list[str]:
+    """
+    Analyze task to determine optimal agent archetypes.
+
+    Args:
+        task: Task description to analyze
+        router: LLM router for analysis
+
+    Returns:
+        List of recommended archetype names
+    """
+    try:
+        prompt = f"""Analyze this task and suggest 3-5 agent archetypes from this list:
+- researcher: For information gathering, analysis, and synthesis
+- coder: For writing and debugging code
+- reviewer: For reviewing work quality and providing feedback
+- analyst: For data analysis and insights
+- planner: For planning and requirements
+- executor: For executing defined tasks
+
+Task: {task}
+
+Return ONLY the archetype names in a comma-separated list, nothing else."""
+
+        response = await router.generate(
+            messages=[{"role": "user", "content": prompt}],
+            max_tokens=100,
+        )
+
+        # Parse response
+        archetypes = [
+            a.strip().lower().replace("-", "_")
+            for a in response.content.split(",")
+            if a.strip()
+        ]
+
+        # Validate and deduplicate
+        valid_archetypes = [
+            a for a in archetypes
+            if a in ["researcher", "coder", "reviewer", "analyst", "planner", "executor"]
+        ]
+
+        if not valid_archetypes:
+            return ["researcher", "analyst", "reviewer"]
+
+        return valid_archetypes
+
+    except Exception as e:
+        logger.warning(f"Task analysis failed, using defaults: {e}")
+        return ["researcher", "analyst", "reviewer"]
 
 
 @app.command()

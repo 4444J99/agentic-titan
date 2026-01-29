@@ -130,6 +130,9 @@ class PostgresClient:
         from titan.persistence.models import (
             AUDIT_EVENTS_TABLE_SQL,
             AGENT_DECISIONS_TABLE_SQL,
+            BATCH_CLEANUP_LOG_TABLE_SQL,
+            BATCH_JOBS_STALLED_INDEX_SQL,
+            BATCH_JOBS_CLEANUP_INDEX_SQL,
         )
         from titan.batch.models import (
             BATCH_JOBS_TABLE_SQL,
@@ -147,6 +150,10 @@ class PostgresClient:
             await conn.execute(BATCH_JOBS_TABLE_SQL)
             await conn.execute(QUEUED_SESSIONS_TABLE_SQL)
             await conn.execute(SESSION_ARTIFACTS_TABLE_SQL)
+            # Cleanup and monitoring tables
+            await conn.execute(BATCH_CLEANUP_LOG_TABLE_SQL)
+            await conn.execute(BATCH_JOBS_STALLED_INDEX_SQL)
+            await conn.execute(BATCH_JOBS_CLEANUP_INDEX_SQL)
             logger.info("Database tables initialized")
 
     async def disconnect(self) -> None:
@@ -848,6 +855,101 @@ class PostgresClient:
             results.append(result)
 
         return results
+
+    async def delete_old_batches(
+        self,
+        before: datetime,
+        terminal_only: bool = True,
+    ) -> int:
+        """
+        Delete old batch jobs and their sessions.
+
+        Args:
+            before: Delete batches completed before this time
+            terminal_only: Only delete batches in terminal states
+
+        Returns:
+            Number of batches deleted
+        """
+        if not self._connected or not self._pool:
+            return 0
+
+        try:
+            terminal_states = (
+                "'completed'", "'failed'", "'cancelled'", "'partially_completed'"
+            )
+
+            if terminal_only:
+                query = f"""
+                    DELETE FROM batch_jobs
+                    WHERE completed_at < $1
+                    AND status IN ({", ".join(terminal_states)})
+                """
+            else:
+                query = """
+                    DELETE FROM batch_jobs
+                    WHERE completed_at < $1
+                """
+
+            result = await self.execute(query, before)
+            # Parse "DELETE N" result
+            deleted = 0
+            if result and isinstance(result, str):
+                parts = result.split()
+                if len(parts) >= 2 and parts[0] == "DELETE":
+                    try:
+                        deleted = int(parts[1])
+                    except ValueError:
+                        pass
+
+            logger.info(f"Deleted {deleted} old batch jobs from PostgreSQL")
+            return deleted
+
+        except Exception as e:
+            logger.error(f"Failed to delete old batches: {e}")
+            return 0
+
+    async def log_cleanup(
+        self,
+        cleanup_type: str,
+        items_processed: int = 0,
+        items_deleted: int = 0,
+        errors: list[str] | None = None,
+        metadata: dict[str, Any] | None = None,
+    ) -> bool:
+        """
+        Log a cleanup operation for audit purposes.
+
+        Args:
+            cleanup_type: Type of cleanup (results, artifacts, batches)
+            items_processed: Number of items processed
+            items_deleted: Number of items deleted
+            errors: List of error messages
+            metadata: Additional metadata
+
+        Returns:
+            True if logged successfully
+        """
+        if not self._connected or not self._pool:
+            return False
+
+        try:
+            await self.execute(
+                """
+                INSERT INTO batch_cleanup_log
+                (cleanup_type, completed_at, items_processed, items_deleted, errors, metadata)
+                VALUES ($1, NOW(), $2, $3, $4, $5)
+                """,
+                cleanup_type,
+                items_processed,
+                items_deleted,
+                json.dumps(errors or []),
+                json.dumps(metadata or {}),
+            )
+            return True
+        except Exception as e:
+            logger.warning(f"Failed to log cleanup: {e}")
+            return False
 
     async def flush_fallback_to_postgres(self) -> int:
         """

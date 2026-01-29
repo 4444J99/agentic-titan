@@ -375,3 +375,40 @@ ALL_ASSEMBLY_TABLES_SQL = (
     + TERRITORY_AGENTS_TABLE_SQL
     + NEIGHBOR_INTERACTIONS_TABLE_SQL
 )
+
+# ============================================================================
+# Batch Cleanup Tables
+# ============================================================================
+
+BATCH_CLEANUP_LOG_TABLE_SQL = """
+CREATE TABLE IF NOT EXISTS batch_cleanup_log (
+    id SERIAL PRIMARY KEY,
+    cleanup_type VARCHAR(50) NOT NULL,
+    started_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    completed_at TIMESTAMPTZ,
+    items_processed INT DEFAULT 0,
+    items_deleted INT DEFAULT 0,
+    errors JSONB DEFAULT '[]',
+    metadata JSONB DEFAULT '{}'
+);
+
+CREATE INDEX IF NOT EXISTS idx_batch_cleanup_log_started_at
+ON batch_cleanup_log(started_at);
+
+CREATE INDEX IF NOT EXISTS idx_batch_cleanup_log_cleanup_type
+ON batch_cleanup_log(cleanup_type);
+"""
+
+# Index for efficient stalled batch queries
+BATCH_JOBS_STALLED_INDEX_SQL = """
+CREATE INDEX IF NOT EXISTS idx_batch_jobs_stalled
+ON batch_jobs (status, created_at)
+WHERE status IN ('processing', 'paused');
+"""
+
+# Index for cleanup of old batches (terminal states)
+BATCH_JOBS_CLEANUP_INDEX_SQL = """
+CREATE INDEX IF NOT EXISTS idx_batch_jobs_cleanup
+ON batch_jobs (completed_at, status)
+WHERE status IN ('completed', 'failed', 'cancelled', 'partially_completed');
+"""

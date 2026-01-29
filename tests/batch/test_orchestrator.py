@@ -551,3 +551,138 @@ class TestFactoryFunctions:
 
         # Reset
         set_batch_orchestrator(None)
+
+
+# =============================================================================
+# Stalled Batch Detection Tests
+# =============================================================================
+
+class TestStalledBatchDetection:
+    """Tests for stalled batch detection and recovery."""
+
+    @pytest.fixture
+    def stalled_batch(self, orchestrator):
+        """Create a batch with stalled sessions."""
+        from datetime import timedelta
+
+        batch = BatchJob(
+            topics=["topic1", "topic2", "topic3"],
+            status=BatchStatus.PROCESSING,
+        )
+        batch.started_at = datetime.now() - timedelta(hours=2)  # Started long ago
+
+        # Mark first session as stalled (running for a long time)
+        batch.sessions[0].status = SessionQueueStatus.RUNNING
+        batch.sessions[0].started_at = datetime.now() - timedelta(hours=1)
+        batch.sessions[0].worker_id = "worker-1"
+
+        # Second session completed but also old
+        batch.sessions[1].status = SessionQueueStatus.COMPLETED
+        batch.sessions[1].completed_at = datetime.now() - timedelta(minutes=60)
+
+        # Third session pending
+        batch.sessions[2].status = SessionQueueStatus.PENDING
+
+        orchestrator._batches[batch.id] = batch
+        return batch
+
+    @pytest.mark.asyncio
+    async def test_get_stalled_batches_finds_stalled(self, orchestrator, stalled_batch):
+        """Test that stalled batches are detected."""
+        stalled = await orchestrator.get_stalled_batches(threshold_minutes=30)
+
+        assert len(stalled) == 1
+        assert stalled[0] == stalled_batch.id
+
+    @pytest.mark.asyncio
+    async def test_get_stalled_batches_ignores_recent(self, orchestrator):
+        """Test that recent batches are not flagged as stalled."""
+        from datetime import timedelta
+
+        batch = BatchJob(topics=["topic1"], status=BatchStatus.PROCESSING)
+        batch.sessions[0].status = SessionQueueStatus.RUNNING
+        batch.sessions[0].started_at = datetime.now() - timedelta(minutes=10)
+
+        orchestrator._batches[batch.id] = batch
+
+        stalled = await orchestrator.get_stalled_batches(threshold_minutes=30)
+
+        assert len(stalled) == 0
+
+    @pytest.mark.asyncio
+    async def test_get_stalled_batches_ignores_completed(self, orchestrator):
+        """Test that completed batches are not flagged."""
+        batch = BatchJob(topics=["topic1"], status=BatchStatus.COMPLETED)
+        orchestrator._batches[batch.id] = batch
+
+        stalled = await orchestrator.get_stalled_batches()
+
+        assert len(stalled) == 0
+
+    @pytest.mark.asyncio
+    async def test_recover_stalled_batch_retry(self, orchestrator, stalled_batch):
+        """Test recovering a stalled batch with retry strategy."""
+        result = await orchestrator.recover_stalled_batch(
+            stalled_batch.id,
+            strategy="retry",
+        )
+
+        assert result is True
+
+        # Stalled session should be reset to pending or queued (after re-queue)
+        session = stalled_batch.sessions[0]
+        assert session.status in (SessionQueueStatus.PENDING, SessionQueueStatus.QUEUED)
+        assert session.retry_count == 1
+
+    @pytest.mark.asyncio
+    async def test_recover_stalled_batch_skip(self, orchestrator, stalled_batch):
+        """Test recovering a stalled batch with skip strategy."""
+        result = await orchestrator.recover_stalled_batch(
+            stalled_batch.id,
+            strategy="skip",
+        )
+
+        assert result is True
+
+        # Stalled session should be marked failed
+        session = stalled_batch.sessions[0]
+        assert session.status == SessionQueueStatus.FAILED
+
+    @pytest.mark.asyncio
+    async def test_recover_stalled_batch_fail(self, orchestrator, stalled_batch):
+        """Test recovering a stalled batch with fail strategy."""
+        result = await orchestrator.recover_stalled_batch(
+            stalled_batch.id,
+            strategy="fail",
+        )
+
+        assert result is True
+
+        # Batch should be failed
+        assert stalled_batch.status == BatchStatus.FAILED
+
+    @pytest.mark.asyncio
+    async def test_recover_nonexistent_batch(self, orchestrator):
+        """Test recovering a nonexistent batch."""
+        result = await orchestrator.recover_stalled_batch(
+            uuid4(),
+            strategy="retry",
+        )
+
+        assert result is False
+
+    @pytest.mark.asyncio
+    async def test_recover_retry_exceeds_max(self, orchestrator, stalled_batch):
+        """Test retry when session has already exceeded max retries."""
+        # Set retry count to max
+        stalled_batch.sessions[0].retry_count = orchestrator._max_retries
+
+        result = await orchestrator.recover_stalled_batch(
+            stalled_batch.id,
+            strategy="retry",
+        )
+
+        # Result can be False if no sessions were recovered (all exceeded max)
+        # but we should verify the session is now failed
+        session = stalled_batch.sessions[0]
+        assert session.status == SessionQueueStatus.FAILED

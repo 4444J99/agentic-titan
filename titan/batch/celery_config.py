@@ -149,18 +149,33 @@ CELERY_TASK_SEND_SENT_EVENT = True
 # Beat Schedule (Periodic Tasks)
 # =============================================================================
 
-CELERY_BEAT_SCHEDULE = {
-    # Clean up old results every hour
-    "cleanup-old-results": {
-        "task": "titan.batch.worker.cleanup_old_results_task",
-        "schedule": 3600.0,  # Every hour
-    },
-    # Check for stalled batches every 5 minutes
-    "check-stalled-batches": {
-        "task": "titan.batch.worker.check_stalled_batches_task",
-        "schedule": 300.0,  # Every 5 minutes
-    },
-}
+# Import crontab for more complex schedules
+try:
+    from celery.schedules import crontab
+
+    CELERY_BEAT_SCHEDULE = {
+        # Deep cleanup daily at 3am - removes old artifacts and batch records
+        "daily-deep-cleanup": {
+            "task": "titan.batch.worker.cleanup_old_results_task",
+            "schedule": crontab(hour=3, minute=0),
+            "kwargs": {"retention_days": 30},
+        },
+        # Light cleanup every 6 hours - just Celery results
+        "periodic-cleanup": {
+            "task": "titan.batch.worker.cleanup_old_results_task",
+            "schedule": 21600.0,  # Every 6 hours
+            "kwargs": {"retention_days": 7},  # Shorter retention for light cleanup
+        },
+        # Check for stalled batches every 5 minutes
+        "check-stalled-batches": {
+            "task": "titan.batch.worker.check_stalled_batches_task",
+            "schedule": 300.0,  # Every 5 minutes
+            "kwargs": {"stall_threshold_minutes": 30},
+        },
+    }
+except ImportError:
+    # Celery not installed, use empty schedule
+    CELERY_BEAT_SCHEDULE = {}
 
 
 # =============================================================================
