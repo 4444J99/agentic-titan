@@ -16,7 +16,13 @@ from pydantic import ValidationError
 logger = logging.getLogger("titan.auth.jwt")
 
 # Configuration from environment
-JWT_SECRET_KEY = os.getenv("TITAN_JWT_SECRET", "titan-dev-secret-change-in-production")  # allow-secret
+JWT_SECRET_KEY = os.getenv("TITAN_JWT_SECRET")
+if not JWT_SECRET_KEY:
+    if os.getenv("TITAN_ENV") == "production":
+        raise ValueError("TITAN_JWT_SECRET must be set in production")
+    logger.warning("Using insecure default JWT secret!")
+    JWT_SECRET_KEY = "titan-dev-secret-change-in-production"
+
 JWT_ALGORITHM = os.getenv("TITAN_JWT_ALGORITHM", "HS256")
 ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("TITAN_ACCESS_TOKEN_EXPIRE_MINUTES", "30"))
 REFRESH_TOKEN_EXPIRE_DAYS = int(os.getenv("TITAN_REFRESH_TOKEN_EXPIRE_DAYS", "7"))

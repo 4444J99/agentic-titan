@@ -1129,11 +1129,15 @@ class InquiryEngine:
         """
         previous_context = ""
         if session.workflow.context_accumulation and session.results:
-            previous_context = session.get_previous_context(
-                token_optimizer=self._token_optimizer,
-                max_tokens=self._max_context_tokens,
-                use_summarization=True,
-            )
+            # Check if using DAG-aware context
+            if session.metadata.get("dag_info", {}).get("execution_mode") in ["staged", "parallel"]:
+                previous_context = self.get_dag_context_for_stage(session, len(session.results))
+            else:
+                previous_context = session.get_previous_context(
+                    token_optimizer=self._token_optimizer,
+                    max_tokens=self._max_context_tokens,
+                    use_summarization=True,
+                )
 
         # Use budget-aware prompt selection if budget info available
         if budget_remaining is not None and budget_total is not None:

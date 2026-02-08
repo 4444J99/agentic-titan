@@ -14,6 +14,7 @@ import asyncio
 import json
 import logging
 import os
+import tempfile
 from datetime import datetime
 from typing import Any
 
@@ -393,10 +394,11 @@ class DockerRuntime(Runtime):
         image_name = f"{self.AGENT_IMAGE_PREFIX}-{agent_name}:latest"
 
         # Use default Dockerfile if not provided
-        dockerfile = dockerfile or self.config.dockerfile
+        dockerfile_path = dockerfile or self.config.dockerfile
         context = context or self.config.build_context or "."
+        temp_dockerfile = None
 
-        if not dockerfile:
+        if not dockerfile_path:
             # Create a basic Dockerfile inline
             dockerfile_content = f"""
 FROM {self.DEFAULT_IMAGE}
@@ -410,23 +412,35 @@ RUN pip install -e .
 # Default command
 CMD ["python", "-m", "titan.cli", "run"]
 """
-            dockerfile = "/tmp/Dockerfile.titan"
-            with open(dockerfile, "w") as f:
-                f.write(dockerfile_content)
+            # Secure temp file creation
+            temp_dockerfile = tempfile.NamedTemporaryFile(mode="w", delete=False)
+            try:
+                temp_dockerfile.write(dockerfile_content)
+                temp_dockerfile.close()
+                dockerfile_path = temp_dockerfile.name
+            except Exception as e:
+                if temp_dockerfile:
+                    os.unlink(temp_dockerfile.name)
+                raise e
 
-        # Build image (using exec, safe from shell injection)
-        cmd = ["docker", "build", "-t", image_name, "-f", dockerfile, context]
-        logger.info(f"Building image: {image_name}")
+        try:
+            # Build image (using exec, safe from shell injection)
+            cmd = ["docker", "build", "-t", image_name, "-f", dockerfile_path, context]
+            logger.info(f"Building image: {image_name}")
 
-        proc = await asyncio.create_subprocess_exec(
-            *cmd,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.STDOUT,
-        )
-        stdout, _ = await proc.communicate()
+            proc = await asyncio.create_subprocess_exec(
+                *cmd,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.STDOUT,
+            )
+            stdout, _ = await proc.communicate()
 
-        if proc.returncode != 0:
-            raise RuntimeError(f"Failed to build image: {stdout.decode()}")
+            if proc.returncode != 0:
+                raise RuntimeError(f"Failed to build image: {stdout.decode()}")
 
-        logger.info(f"Built image: {image_name}")
-        return image_name
+            logger.info(f"Built image: {image_name}")
+            return image_name
+        finally:
+            # Cleanup temp file if we created one
+            if temp_dockerfile and os.path.exists(temp_dockerfile.name):
+                os.unlink(temp_dockerfile.name)

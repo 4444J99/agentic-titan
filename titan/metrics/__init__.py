@@ -64,6 +64,25 @@ def start_metrics_server(port: int = 9100, host: str = "0.0.0.0"):
         _prometheus_module = _get_prometheus_metrics()
     return _prometheus_module.start_metrics_server(port, host)
 
+# Direct exports for specific metrics
+MEMORY_MGET_TOTAL = None
+EMBEDDING_WAIT_TIME = None
+
+def _init_metrics():
+    global MEMORY_MGET_TOTAL, EMBEDDING_WAIT_TIME, _prometheus_module
+    if _prometheus_module is None:
+        _prometheus_module = _get_prometheus_metrics()
+    if hasattr(_prometheus_module, "MEMORY_MGET_TOTAL"):
+        MEMORY_MGET_TOTAL = _prometheus_module.MEMORY_MGET_TOTAL
+    if hasattr(_prometheus_module, "EMBEDDING_WAIT_TIME"):
+        EMBEDDING_WAIT_TIME = _prometheus_module.EMBEDDING_WAIT_TIME
+
+# Initialize immediately
+try:
+    _init_metrics()
+except Exception:
+    pass
+
 __all__ = [
     "AssemblyMetrics",
     "AssemblyPath",
@@ -73,4 +92,6 @@ __all__ = [
     "get_metrics",
     "get_metrics_text",
     "start_metrics_server",
+    "MEMORY_MGET_TOTAL",
+    "EMBEDDING_WAIT_TIME",
 ]

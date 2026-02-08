@@ -23,6 +23,7 @@ from typing import TYPE_CHECKING, Any
 
 from agents.framework.errors import InvalidTopologyError, TopologyError
 from titan.metrics import get_metrics
+from hive.criticality import CriticalityMonitor, CriticalityState, PhaseTransition
 
 if TYPE_CHECKING:
     from hive.memory import HiveMind
@@ -921,6 +922,28 @@ class TopologyEngine:
         self._topology_history: list[dict[str, Any]] = []
         self._current_task: str | None = None
         self._transition_lock = False
+
+        # Initialize criticality monitor
+        self._criticality_monitor = CriticalityMonitor(
+            event_bus=event_bus
+        )
+        self._criticality_monitor.on_transition(self._handle_phase_transition)
+
+    def _handle_phase_transition(self, transition: PhaseTransition) -> None:
+        """Handle automated topology intervention based on phase transition."""
+        if self._current_task and not self._transition_lock:
+            # Plan transition in background
+            asyncio.create_task(self._apply_criticality_intervention())
+
+    async def _apply_criticality_intervention(self) -> None:
+        """Apply recommended topology switch from criticality monitor."""
+        recommendation = await self._criticality_monitor.recommend_intervention()
+        if recommendation:
+            logger.info(f"Criticality intervention: Switching to {recommendation}")
+            try:
+                await self.switch_topology(recommendation, reason="criticality_intervention")
+            except Exception as e:
+                logger.error(f"Failed to apply criticality intervention: {e}")
 
     @property
     def current_topology(self) -> BaseTopology | None:

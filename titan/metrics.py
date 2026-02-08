@@ -234,10 +234,23 @@ if PROMETHEUS_AVAILABLE:
         registry=REGISTRY,
     )
 
+    MEMORY_MGET_TOTAL = Counter(
+        "titan_memory_mget_total",
+        "Total Redis MGET operations",
+        registry=REGISTRY,
+    )
+
     MEMORY_LATENCY = Histogram(
         "titan_memory_latency_seconds",
         "Memory operation latency",
         ["operation"],
+        buckets=(0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0),
+        registry=REGISTRY,
+    )
+
+    EMBEDDING_WAIT_TIME = Histogram(
+        "titan_embedding_executor_wait_seconds",
+        "Time spent waiting for embedding executor",
         buckets=(0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0),
         registry=REGISTRY,
     )
@@ -764,6 +777,18 @@ class MetricsCollector:
         finally:
             duration = time.time() - start
             AGENT_DURATION.labels(archetype=archetype).observe(duration)
+
+    def memory_mget(self) -> None:
+        """Record Redis MGET operation."""
+        if not self._enabled:
+            return
+        MEMORY_MGET_TOTAL.inc()
+
+    def embedding_wait(self, duration_seconds: float) -> None:
+        """Record time spent waiting for embedding executor."""
+        if not self._enabled:
+            return
+        EMBEDDING_WAIT_TIME.observe(duration_seconds)
 
     # ========================================================================
     # Batch Metrics

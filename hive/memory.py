@@ -268,7 +268,16 @@ class HiveMind:
         await self._ensure_initialized()
 
         memory_id = f"mem-{uuid.uuid4().hex[:12]}"
-        embedding = hash_embedding(content)
+        loop = asyncio.get_running_loop()
+        
+        # Track executor wait time
+        start_wait = time.time()
+        embedding = await loop.run_in_executor(None, hash_embedding, content)
+        wait_duration = time.time() - start_wait
+        
+        if self._initialized:
+            from titan.metrics import get_metrics
+            get_metrics().embedding_wait(wait_duration)
 
         memory = Memory(
             id=memory_id,
@@ -327,7 +336,8 @@ class HiveMind:
         """
         await self._ensure_initialized()
 
-        query_embedding = hash_embedding(query)
+        loop = asyncio.get_running_loop()
+        query_embedding = await loop.run_in_executor(None, hash_embedding, query)
 
         # Query ChromaDB if available
         if self._chroma_collection is not None:
@@ -667,10 +677,13 @@ class HiveMind:
         if self._redis:
             pattern = f"{self.config.redis_prefix}agent:*"
             keys = await self._redis.keys(pattern)
-            for key in keys:
-                data = await self._redis.get(key)
-                if data:
-                    agents.append(json.loads(data))
+            if keys:
+                from titan.metrics import get_metrics
+                get_metrics().memory_mget()
+                values = await self._redis.mget(keys)
+                for data in values:
+                    if data:
+                        agents.append(json.loads(data))
         else:
             agents = list(self._agent_registry.values())
 
