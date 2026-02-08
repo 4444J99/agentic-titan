@@ -661,6 +661,52 @@ if PROMETHEUS_AVAILABLE:
     )
 
     # ========================================================================
+    # Inquiry & Epistemic Metrics (Phase 17)
+    # ========================================================================
+
+    INQUIRY_LOGIC_DENSITY = Gauge(
+        "titan_inquiry_logic_density",
+        "Density of logical reasoning in inquiry (0-1)",
+        ["session_id"],
+        registry=REGISTRY,
+    )
+
+    INQUIRY_MYTHIC_DEPTH = Gauge(
+        "titan_inquiry_mythic_depth",
+        "Depth of mythopoetic exploration (0-1)",
+        ["session_id"],
+        registry=REGISTRY,
+    )
+
+    INQUIRY_LATERAL_BREADTH = Gauge(
+        "titan_inquiry_lateral_breadth",
+        "Breadth of cross-domain connections (0-1)",
+        ["session_id"],
+        registry=REGISTRY,
+    )
+
+    INQUIRY_RECURSIVE_DEPTH = Gauge(
+        "titan_inquiry_recursive_depth",
+        "Depth of self-referential/meta analysis (0-1)",
+        ["session_id"],
+        registry=REGISTRY,
+    )
+
+    INQUIRY_PATTERN_STRENGTH = Gauge(
+        "titan_inquiry_pattern_strength",
+        "Strength of emergent meta-patterns detected (0-1)",
+        ["session_id"],
+        registry=REGISTRY,
+    )
+
+    DIALECTIC_FRICTION = Counter(
+        "titan_dialectic_friction_total",
+        "Total contradictions or tensions detected between perspectives",
+        ["session_id"],
+        registry=REGISTRY,
+    )
+
+    # ========================================================================
     # Firecracker Metrics (Phase 18)
     # ========================================================================
 
@@ -1292,6 +1338,46 @@ class MetricsCollector:
         if not self._enabled:
             return
         RLHF_AB_TEST_RESULTS.labels(model=model, outcome=outcome).inc()
+
+    # ========================================================================
+    # Inquiry & Epistemic Metrics
+    # ========================================================================
+
+    def set_inquiry_logic_density(self, session_id: str, value: float) -> None:
+        """Set inquiry logic density metric."""
+        if not self._enabled:
+            return
+        INQUIRY_LOGIC_DENSITY.labels(session_id=session_id).set(value)
+
+    def set_inquiry_mythic_depth(self, session_id: str, value: float) -> None:
+        """Set inquiry mythic depth metric."""
+        if not self._enabled:
+            return
+        INQUIRY_MYTHIC_DEPTH.labels(session_id=session_id).set(value)
+
+    def set_inquiry_lateral_breadth(self, session_id: str, value: float) -> None:
+        """Set inquiry lateral breadth metric."""
+        if not self._enabled:
+            return
+        INQUIRY_LATERAL_BREADTH.labels(session_id=session_id).set(value)
+
+    def set_inquiry_recursive_depth(self, session_id: str, value: float) -> None:
+        """Set inquiry recursive depth metric."""
+        if not self._enabled:
+            return
+        INQUIRY_RECURSIVE_DEPTH.labels(session_id=session_id).set(value)
+
+    def set_inquiry_pattern_strength(self, session_id: str, value: float) -> None:
+        """Set inquiry pattern strength metric."""
+        if not self._enabled:
+            return
+        INQUIRY_PATTERN_STRENGTH.labels(session_id=session_id).set(value)
+
+    def record_dialectic_friction(self, session_id: str) -> None:
+        """Record a dialectic friction event."""
+        if not self._enabled:
+            return
+        DIALECTIC_FRICTION.labels(session_id=session_id).inc()
 
     # ========================================================================
     # Firecracker Metrics (Phase 18)

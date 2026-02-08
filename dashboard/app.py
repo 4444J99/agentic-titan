@@ -375,6 +375,105 @@ class TitanDashboard:
                     duration_ms=duration_ms,
                 )
 
+        @self.app.get("/api/inquiry/{session_id}/epistemic_signature")
+        async def get_epistemic_signature(session_id: str) -> dict[str, Any]:
+            """
+            Get epistemic signature for an inquiry session.
+            Calculates metrics based on stage results and content.
+            """
+            try:
+                from titan.workflows.inquiry_engine import get_inquiry_engine
+                from titan.workflows.inquiry_config import CognitiveStyle
+                
+                engine = get_inquiry_engine()
+                session = engine.get_session(session_id)
+                
+                if not session or not session.results:
+                    # Return default/empty data
+                    return {
+                        "labels": ['Logic', 'Mythos', 'Lateral', 'Recursive', 'Pattern'],
+                        "datasets": [{
+                            "label": "Epistemic Signature",
+                            "data": [0, 0, 0, 0, 0],
+                            "fill": True,
+                            "backgroundColor": "rgba(54, 162, 235, 0.2)",
+                            "borderColor": "rgb(54, 162, 235)",
+                            "pointBackgroundColor": "rgb(54, 162, 235)",
+                            "pointBorderColor": "#fff",
+                            "pointHoverBackgroundColor": "#fff",
+                            "pointHoverBorderColor": "rgb(54, 162, 235)"
+                        }]
+                    }
+
+                # Calculate metrics from session results
+                metrics = {
+                    CognitiveStyle.STRUCTURED_REASONING.value: 0.0,
+                    CognitiveStyle.CREATIVE_SYNTHESIS.value: 0.0,
+                    CognitiveStyle.CROSS_DOMAIN.value: 0.0,
+                    CognitiveStyle.META_ANALYSIS.value: 0.0,
+                    CognitiveStyle.PATTERN_RECOGNITION.value: 0.0,
+                }
+                
+                # Count occurrences and sum intensity
+                counts = {k: 0 for k in metrics.keys()}
+                
+                for result in session.results:
+                    # Infer style from role if metadata missing
+                    style = result.metadata.get("cognitive_style")
+                    if not style:
+                        # Fallback mapping
+                        role_map = {
+                            "Logic AI": CognitiveStyle.STRUCTURED_REASONING.value,
+                            "Mythos AI": CognitiveStyle.CREATIVE_SYNTHESIS.value,
+                            "Bridge AI": CognitiveStyle.CROSS_DOMAIN.value,
+                            "Meta AI": CognitiveStyle.META_ANALYSIS.value,
+                            "Pattern AI": CognitiveStyle.PATTERN_RECOGNITION.value,
+                            "Scope AI": CognitiveStyle.STRUCTURED_REASONING.value
+                        }
+                        style = role_map.get(result.role, CognitiveStyle.STRUCTURED_REASONING.value)
+                    
+                    if style in metrics:
+                        # Basic intensity calc: presence + length factor
+                        intensity = min(len(result.content.split()) / 500.0, 1.0)
+                        metrics[style] += intensity
+                        counts[style] += 1
+                
+                # Normalize (average intensity per style present, or cumulative?)
+                # Radar charts usually show "strength" of dimension. 
+                # Let's use max observed intensity for each dimension to show peak capability
+                
+                data_values = [
+                    metrics[CognitiveStyle.STRUCTURED_REASONING.value],
+                    metrics[CognitiveStyle.CREATIVE_SYNTHESIS.value],
+                    metrics[CognitiveStyle.CROSS_DOMAIN.value],
+                    metrics[CognitiveStyle.META_ANALYSIS.value],
+                    metrics[CognitiveStyle.PATTERN_RECOGNITION.value],
+                ]
+                
+                # Normalize to 0-1 range for chart
+                max_val = max(data_values) if data_values else 1.0
+                if max_val > 0:
+                    data_values = [v / max_val for v in data_values]
+
+                return {
+                    "labels": ['Logic', 'Mythos', 'Lateral', 'Recursive', 'Pattern'],
+                    "datasets": [{
+                        "label": "Epistemic Signature",
+                        "data": data_values,
+                        "fill": True,
+                        "backgroundColor": "rgba(54, 162, 235, 0.2)",
+                        "borderColor": "rgb(54, 162, 235)",
+                        "pointBackgroundColor": "rgb(54, 162, 235)",
+                        "pointBorderColor": "#fff",
+                        "pointHoverBackgroundColor": "#fff",
+                        "pointHoverBorderColor": "rgb(54, 162, 235)"
+                    }]
+                }
+
+            except Exception as e:
+                logger.error(f"Error calculating epistemic signature: {e}")
+                raise HTTPException(status_code=500, detail=str(e))
+
         @self.app.get("/api/events")
         async def get_events(limit: int = 50) -> list[dict[str, Any]]:
             """Get recent events."""

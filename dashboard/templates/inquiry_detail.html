@@ -1,378 +1,57 @@
 {% extends "base.html" %}
 
 {% block content %}
-<nav aria-label="breadcrumb">
-    <ul>
-        <li><a href="/inquiry">Inquiry Sessions</a></li>
-        <li>{{ session.id[:12] }}...</li>
-    </ul>
-</nav>
-
-<header>
-    <h1>{{ session.topic[:60] }}{% if session.topic|length > 60 %}...{% endif %}</h1>
-    <p>
-        <span class="status-badge status-{{ session.status }}">{{ session.status }}</span>
-        Workflow: <strong>{{ session.workflow_name }}</strong> |
-        Progress: <strong>{{ session.progress|int }}%</strong>
-    </p>
-</header>
-
-<div class="grid">
-    <!-- Session Info -->
-    <div>
-        <article>
-            <header><h3>Session Details</h3></header>
-            <dl>
-                <dt>Session ID</dt>
-                <dd><code>{{ session.id }}</code></dd>
-
-                <dt>Created</dt>
-                <dd>{{ session.created_at }}</dd>
-
-                {% if session.started_at %}
-                <dt>Started</dt>
-                <dd>{{ session.started_at }}</dd>
-                {% endif %}
-
-                {% if session.completed_at %}
-                <dt>Completed</dt>
-                <dd>{{ session.completed_at }}</dd>
-                {% endif %}
-
-                {% if session.error %}
-                <dt>Error</dt>
-                <dd class="error">{{ session.error }}</dd>
-                {% endif %}
-            </dl>
-
-            <div class="button-group">
-                {% if session.status == 'running' %}
-                <button onclick="pauseSession()">Pause</button>
-                {% elif session.status == 'paused' %}
-                <button onclick="resumeSession()">Resume</button>
-                {% endif %}
-
-                {% if session.status in ['paused', 'running'] %}
-                <button class="secondary" onclick="cancelSession()">Cancel</button>
-                {% endif %}
-
-                {% if session.status == 'completed' %}
-                <button onclick="exportSession('markdown')">Export Markdown</button>
-                <button class="outline" onclick="exportSession('json')">Export JSON</button>
-                {% endif %}
-            </div>
-        </article>
-
-        <!-- User Interjection -->
-        {% if session.status in ['paused', 'running'] %}
-        <article>
-            <header><h3>Add Input</h3></header>
-            <form id="interjection-form">
-                <textarea id="interjection-content" placeholder="Add clarification, context, or redirect the inquiry..." rows="3"></textarea>
-                <select id="influence-mode">
-                    <option value="context">Add Context</option>
-                    <option value="redirect">Redirect Focus</option>
-                    <option value="clarify">Clarify Previous</option>
-                </select>
-                <button type="submit">Inject Input</button>
-            </form>
-        </article>
-        {% endif %}
+<div class="container mx-auto px-4 py-8">
+    <div class="flex justify-between items-center mb-6">
+        <h1 class="text-3xl font-bold">{{ session.topic }}</h1>
+        <span class="px-3 py-1 rounded-full text-sm font-semibold
+            {% if session.status == 'completed' %}bg-green-100 text-green-800
+            {% elif session.status == 'running' %}bg-blue-100 text-blue-800
+            {% else %}bg-gray-100 text-gray-800{% endif %}">
+            {{ session.status }}
+        </span>
     </div>
 
-    <!-- Progress Visualization -->
-    <div>
-        <article>
-            <header><h3>Stage Progress</h3></header>
-            <div id="progress-chart-container">
-                <canvas id="progress-chart"></canvas>
+    <!-- Epistemic Signature -->
+    <div class="bg-white rounded-lg shadow p-6 mb-8">
+        <h2 class="text-xl font-semibold mb-4">Epistemic Signature</h2>
+        <div class="w-full max-w-md mx-auto">
+            <canvas id="epistemicRadar" data-session-id="{{ session.id }}"></canvas>
+        </div>
+    </div>
+
+    <!-- Stages Timeline -->
+    <div class="space-y-6">
+        {% for stage in stages %}
+        <div class="bg-white rounded-lg shadow overflow-hidden">
+            <div class="px-6 py-4 border-b border-gray-200 bg-gray-50 flex justify-between items-center">
+                <div class="flex items-center">
+                    <span class="text-2xl mr-3">{{ stage.emoji }}</span>
+                    <div>
+                        <h3 class="text-lg font-medium text-gray-900">{{ stage.name }}</h3>
+                        <p class="text-sm text-gray-500">{{ stage.role }}</p>
+                    </div>
+                </div>
+                {% if stage.result %}
+                <span class="text-xs text-gray-400">{{ stage.result.duration_ms }}ms</span>
+                {% else %}
+                <span class="text-xs text-gray-400">Pending</span>
+                {% endif %}
             </div>
-        </article>
+            <div class="px-6 py-4">
+                {% if stage.result %}
+                <div class="prose max-w-none">
+                    <pre class="whitespace-pre-wrap text-sm text-gray-700 bg-gray-50 p-4 rounded">{{ stage.result.content }}</pre>
+                </div>
+                {% else %}
+                <p class="text-gray-400 italic">Waiting for execution...</p>
+                {% endif %}
+            </div>
+        </div>
+        {% endfor %}
     </div>
 </div>
 
-<!-- Stage Timeline -->
-<article>
-    <header><h3>Stage Results</h3></header>
-    <div class="stage-timeline" id="stage-timeline">
-        {% for stage in stages %}
-        <details class="stage-item {% if stage.result %}completed{% else %}pending{% endif %}" {% if loop.last and stage.result %}open{% endif %}>
-            <summary>
-                <span class="stage-emoji">{{ stage.emoji }}</span>
-                <span class="stage-name">{{ stage.name }}</span>
-                <span class="stage-role">({{ stage.role }})</span>
-                {% if stage.result %}
-                <span class="stage-model">{{ stage.result.model_used }}</span>
-                <span class="stage-duration">{{ stage.result.duration_ms }}ms</span>
-                {% else %}
-                <span class="stage-pending">Pending</span>
-                {% endif %}
-            </summary>
-
-            {% if stage.result %}
-            <div class="stage-content">
-                <div class="stage-meta">
-                    <small>Model: {{ stage.result.model_used }} | Tokens: {{ stage.result.tokens_used }} | Duration: {{ stage.result.duration_ms }}ms</small>
-                </div>
-                <div class="stage-output">
-                    {{ stage.result.content | safe }}
-                </div>
-            </div>
-            {% else %}
-            <div class="stage-content">
-                <p class="stage-description">{{ stage.description }}</p>
-            </div>
-            {% endif %}
-        </details>
-        {% endfor %}
-    </div>
-</article>
-
-<!-- Interjections Log -->
-{% if session.interjections %}
-<article>
-    <header><h3>User Interjections</h3></header>
-    <ul class="interjection-list">
-        {% for interjection in session.interjections %}
-        <li>
-            <span class="interjection-mode">{{ interjection.influence_mode }}</span>
-            <span class="interjection-stage">After stage {{ interjection.injected_at_stage }}</span>
-            <p>{{ interjection.content }}</p>
-            <small>{{ interjection.timestamp }}</small>
-        </li>
-        {% endfor %}
-    </ul>
-</article>
-{% endif %}
-
-<style>
-    .status-badge {
-        padding: 0.25rem 0.5rem;
-        border-radius: 4px;
-        font-size: 0.8rem;
-        font-weight: bold;
-    }
-    .status-pending { background: var(--secondary); color: white; }
-    .status-running { background: var(--primary); color: white; }
-    .status-paused { background: var(--warning); color: black; }
-    .status-completed { background: var(--success); color: white; }
-    .status-failed { background: var(--error); color: white; }
-
-    .button-group {
-        display: flex;
-        gap: 0.5rem;
-        flex-wrap: wrap;
-    }
-
-    .stage-timeline {
-        display: flex;
-        flex-direction: column;
-        gap: 1rem;
-    }
-
-    .stage-item {
-        background: var(--card-background-color);
-        border-radius: 8px;
-        border-left: 4px solid var(--muted-color);
-    }
-
-    .stage-item.completed {
-        border-left-color: var(--success);
-    }
-
-    .stage-item summary {
-        padding: 1rem;
-        cursor: pointer;
-        display: flex;
-        align-items: center;
-        gap: 0.5rem;
-    }
-
-    .stage-emoji {
-        font-size: 1.5rem;
-    }
-
-    .stage-name {
-        font-weight: bold;
-    }
-
-    .stage-role {
-        color: var(--muted-color);
-    }
-
-    .stage-model {
-        margin-left: auto;
-        font-family: monospace;
-        font-size: 0.8rem;
-        color: var(--primary);
-    }
-
-    .stage-duration {
-        font-size: 0.8rem;
-        color: var(--muted-color);
-    }
-
-    .stage-pending {
-        margin-left: auto;
-        color: var(--warning);
-    }
-
-    .stage-content {
-        padding: 0 1rem 1rem;
-        border-top: 1px solid var(--muted-border-color);
-    }
-
-    .stage-meta {
-        margin-bottom: 0.5rem;
-        color: var(--muted-color);
-    }
-
-    .stage-output {
-        white-space: pre-wrap;
-        font-family: inherit;
-        line-height: 1.6;
-    }
-
-    .interjection-list {
-        list-style: none;
-        padding: 0;
-    }
-
-    .interjection-list li {
-        padding: 1rem;
-        background: var(--card-background-color);
-        border-radius: 8px;
-        margin-bottom: 0.5rem;
-        border-left: 4px solid var(--primary);
-    }
-
-    .interjection-mode {
-        display: inline-block;
-        padding: 0.2rem 0.4rem;
-        background: var(--primary);
-        color: white;
-        border-radius: 4px;
-        font-size: 0.75rem;
-        text-transform: uppercase;
-    }
-
-    .interjection-stage {
-        margin-left: 0.5rem;
-        color: var(--muted-color);
-        font-size: 0.8rem;
-    }
-
-    #progress-chart-container {
-        height: 300px;
-    }
-
-    .error {
-        color: var(--error);
-    }
-</style>
-{% endblock %}
-
-{% block scripts %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<script>
-    const sessionId = '{{ session.id }}';
-
-    // Progress chart
-    const ctx = document.getElementById('progress-chart').getContext('2d');
-    const stages = {{ stages_json | safe }};
-
-    new Chart(ctx, {
-        type: 'bar',
-        data: {
-            labels: stages.map(s => s.name),
-            datasets: [{
-                label: 'Duration (ms)',
-                data: stages.map(s => s.result ? s.result.duration_ms : 0),
-                backgroundColor: stages.map(s => s.result ? 'rgba(0, 212, 170, 0.8)' : 'rgba(100, 100, 100, 0.3)'),
-                borderColor: stages.map(s => s.result ? 'rgba(0, 212, 170, 1)' : 'rgba(100, 100, 100, 0.5)'),
-                borderWidth: 1
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                legend: { display: false }
-            },
-            scales: {
-                y: {
-                    beginAtZero: true,
-                    title: { display: true, text: 'Duration (ms)' }
-                }
-            }
-        }
-    });
-
-    // Interjection form
-    const interjectionForm = document.getElementById('interjection-form');
-    if (interjectionForm) {
-        interjectionForm.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const content = document.getElementById('interjection-content').value;
-            const mode = document.getElementById('influence-mode').value;
-
-            try {
-                const response = await fetch(`/api/inquiry/sessions/${sessionId}/inject`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ content, mode })
-                });
-
-                if (response.ok) {
-                    document.getElementById('interjection-content').value = '';
-                    location.reload();
-                } else {
-                    alert('Failed to inject input');
-                }
-            } catch (error) {
-                console.error('Error:', error);
-            }
-        });
-    }
-
-    async function pauseSession() {
-        try {
-            await fetch(`/api/inquiry/sessions/${sessionId}/pause`, { method: 'POST' });
-            location.reload();
-        } catch (error) {
-            console.error('Error:', error);
-        }
-    }
-
-    async function resumeSession() {
-        try {
-            await fetch(`/api/inquiry/sessions/${sessionId}/resume`, { method: 'POST' });
-            location.reload();
-        } catch (error) {
-            console.error('Error:', error);
-        }
-    }
-
-    async function cancelSession() {
-        if (confirm('Are you sure you want to cancel this inquiry?')) {
-            try {
-                await fetch(`/api/inquiry/sessions/${sessionId}/cancel`, { method: 'POST' });
-                location.reload();
-            } catch (error) {
-                console.error('Error:', error);
-            }
-        }
-    }
-
-    function exportSession(format) {
-        window.open(`/api/inquiry/sessions/${sessionId}/export?format=${format}`, '_blank');
-    }
-
-    // Real-time updates
-    function onWebSocketMessage(data) {
-        if (data.session_id === sessionId) {
-            location.reload();
-        }
-    }
-</script>
+<script src="/static/js/inquiry_charts.js"></script>
 {% endblock %}

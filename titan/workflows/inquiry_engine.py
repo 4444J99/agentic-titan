@@ -252,6 +252,7 @@ class InquiryEngine:
         prompt_tracker: "PromptTracker | None" = None,
         budget_tracker: "BudgetTracker | None" = None,
         max_context_tokens: int = 4000,
+        quality_gates: list[Any] | None = None,
     ) -> None:
         """
         Initialize the inquiry engine.
@@ -265,6 +266,7 @@ class InquiryEngine:
             prompt_tracker: Tracker for prompt effectiveness metrics
             budget_tracker: Tracker for budget management
             max_context_tokens: Maximum tokens for accumulated context
+            quality_gates: List of quality gates to run after stages
         """
         self._cognitive_router = cognitive_router or get_cognitive_router()
         self._hive_mind = hive_mind
@@ -276,6 +278,7 @@ class InquiryEngine:
         self._prompt_tracker = prompt_tracker
         self._budget_tracker = budget_tracker
         self._max_context_tokens = max_context_tokens
+        self._quality_gates = quality_gates or []
 
         # Active sessions
         self._sessions: dict[str, InquirySession] = {}
@@ -452,6 +455,21 @@ class InquiryEngine:
                     "prompt_tokens": prompt_tokens,
                 },
             )
+
+            # Record epistemic signature metrics
+            self._record_epistemic_metrics(session.id, stage.cognitive_style, content)
+
+            # Run quality gates
+            for gate in self._quality_gates:
+                try:
+                    # Avoid circular import by checking type name or just duck typing
+                    if type(gate).__name__ == "DialecticGate":
+                        gate_result = await gate.evaluate(session)
+                        session.metadata["quality_check"] = gate_result.metadata
+                        if not gate_result.passed:
+                            logger.warning(f"Quality gate failed: {gate_result.issues}")
+                except Exception as e:
+                    logger.error(f"Quality gate execution failed: {e}")
 
             # Track prompt effectiveness if tracker available
             if self._prompt_tracker:
@@ -1164,6 +1182,30 @@ class InquiryEngine:
         )
         return prompt, False
 
+    def _record_epistemic_metrics(
+        self,
+        session_id: str,
+        style: CognitiveStyle,
+        content: str,
+    ) -> None:
+        """Record epistemic signature metrics based on stage content and style."""
+        from titan.metrics import get_metrics
+        metrics = get_metrics()
+        
+        # Estimate "intensity" based on response length and style
+        intensity = min(len(content.split()) / 500.0, 1.0)
+        
+        if style == CognitiveStyle.STRUCTURED_REASONING:
+            metrics.set_inquiry_logic_density(session_id, intensity)
+        elif style == CognitiveStyle.CREATIVE_SYNTHESIS:
+            metrics.set_inquiry_mythic_depth(session_id, intensity)
+        elif style == CognitiveStyle.CROSS_DOMAIN:
+            metrics.set_inquiry_lateral_breadth(session_id, intensity)
+        elif style == CognitiveStyle.META_ANALYSIS:
+            metrics.set_inquiry_recursive_depth(session_id, intensity)
+        elif style == CognitiveStyle.PATTERN_RECOGNITION:
+            metrics.set_inquiry_pattern_strength(session_id, intensity)
+
     def _style_to_cognitive_type(
         self,
         style: CognitiveStyle,
@@ -1217,7 +1259,12 @@ def get_inquiry_engine() -> InquiryEngine:
     """Get the default inquiry engine instance."""
     global _default_engine
     if _default_engine is None:
-        _default_engine = InquiryEngine()
+        # Import here to avoid circular dependency
+        from titan.workflows.quality_gates import DialecticGate
+        
+        _default_engine = InquiryEngine(
+            quality_gates=[DialecticGate()]
+        )
     return _default_engine
 
 

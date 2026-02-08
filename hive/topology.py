@@ -40,6 +40,9 @@ class TopologyType(Enum):
     MESH = "mesh"           # Resilient grid
     RING = "ring"           # Token passing
     STAR = "star"           # Hub and spoke
+    RHIZOMATIC = "rhizomatic"  # Lateral, non-hierarchical
+    FISSION_FUSION = "fission_fusion"  # Dynamic clustering
+    STIGMERGIC = "stigmergic"  # Environment-mediated
 
 
 @dataclass
@@ -77,6 +80,9 @@ class TaskProfile:
     needs_fault_tolerance: bool = False
     has_clear_leader: bool = False
     is_voting_based: bool = False
+    is_lateral: bool = False
+    is_modular: bool = False
+    is_environment_mediated: bool = False
     parallel_subtasks: int = 0
     complexity: str = "medium"  # low, medium, high
     estimated_agents: int = 2
@@ -88,15 +94,14 @@ class TaskProfile:
 
         description_lower = task_description.lower()
 
-        # Extract agent count from description
-        estimated_agents = 2  # default
-        # Look for patterns like "20 agents", "team of 10", "5 workers"
+        # ... (agent extraction logic kept same)
+        estimated_agents = 2
         agent_patterns = [
             r"(\d+)\s*agents?",
             r"team\s+of\s+(\d+)",
             r"(\d+)\s*workers?",
             r"(\d+)\s*members?",
-            r"large\s+team",  # implies > 5
+            r"large\s+team",
         ]
         for pattern in agent_patterns:
             match = re.search(pattern, description_lower)
@@ -107,7 +112,6 @@ class TaskProfile:
                     estimated_agents = int(match.group(1))
                 break
 
-        # Detect complexity
         complexity = "medium"
         if any(kw in description_lower for kw in ["simple", "basic", "easy", "trivial"]):
             complexity = "low"
@@ -133,6 +137,18 @@ class TaskProfile:
             ),
             is_voting_based=any(
                 kw in description_lower for kw in ["vote", "poll", "election", "rank"]
+            ),
+            is_lateral=any(
+                kw in description_lower
+                for kw in ["rhizomatic", "lateral", "grassroots", "decentralized", "peer-to-peer", "p2p"]
+            ),
+            is_modular=any(
+                kw in description_lower
+                for kw in ["modular", "cluster", "fission", "fusion", "sub-group", "split"]
+            ),
+            is_environment_mediated=any(
+                kw in description_lower
+                for kw in ["stigmergic", "environment", "pheromone", "blackboard", "indirect"]
             ),
             estimated_agents=estimated_agents,
             complexity=complexity,
@@ -880,6 +896,293 @@ class StarTopology(BaseTopology):
             return [source_agent_id, self.hub_id, target_agent_id] if self.hub_id else []
 
 
+class RhizomaticTopology(BaseTopology):
+    """
+    Rhizomatic topology - Decentralized, lateral connections.
+    
+    Any node can connect to any other node. No central root or hub.
+    Resilient to disconnection and highly adaptive.
+    """
+
+    topology_type = TopologyType.RHIZOMATIC
+
+    def add_agent(
+        self,
+        agent_id: str,
+        name: str,
+        capabilities: list[str],
+        **kwargs: Any,
+    ) -> AgentNode:
+        node = AgentNode(
+            agent_id=agent_id,
+            name=name,
+            capabilities=capabilities,
+            role="node",
+            metadata=kwargs,
+        )
+
+        # Connect to a random subset of existing nodes (lateral growth)
+        import random
+        existing = list(self.nodes.keys())
+        if existing:
+            # Connect to 1-3 random neighbors
+            num_links = min(len(existing), random.randint(1, 3))
+            neighbors = random.sample(existing, num_links)
+            node.neighbors = neighbors
+            for neighbor_id in neighbors:
+                self.nodes[neighbor_id].neighbors.append(agent_id)
+
+        self.nodes[agent_id] = node
+        logger.debug(f"Added agent {agent_id} to rhizome with {len(node.neighbors)} links")
+        return node
+
+    def remove_agent(self, agent_id: str) -> bool:
+        if agent_id not in self.nodes:
+            return False
+
+        # Remove from neighbors' lists
+        for node in self.nodes.values():
+            if agent_id in node.neighbors:
+                node.neighbors.remove(agent_id)
+
+        del self.nodes[agent_id]
+        return True
+
+    def get_message_targets(
+        self,
+        source_agent_id: str,
+        message_type: str = "broadcast",
+    ) -> list[str]:
+        node = self.nodes.get(source_agent_id)
+        if not node:
+            return []
+
+        if message_type == "lateral":
+            return node.neighbors.copy()
+        else:
+            # Broadcast reaches everyone via the network
+            return [aid for aid in self.nodes.keys() if aid != source_agent_id]
+
+    def get_routing_path(
+        self,
+        source_agent_id: str,
+        target_agent_id: str,
+    ) -> list[str]:
+        # Shortest path in the graph
+        if source_agent_id not in self.nodes or target_agent_id not in self.nodes:
+            return []
+
+        visited = {source_agent_id}
+        queue = [(source_agent_id, [source_agent_id])]
+
+        while queue:
+            current, path = queue.pop(0)
+            if current == target_agent_id:
+                return path
+
+            for neighbor in self.nodes[current].neighbors:
+                if neighbor not in visited:
+                    visited.add(neighbor)
+                    queue.append((neighbor, path + [neighbor]))
+
+        return []
+
+
+class FissionFusionTopology(BaseTopology):
+    """
+    Fission-Fusion topology - Dynamic clustering and splitting.
+    
+    Agents form temporary groups (fusion) for sub-tasks and split (fission)
+    when tasks complete or requirements change.
+    """
+
+    topology_type = TopologyType.FISSION_FUSION
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.clusters: dict[str, list[str]] = {}  # cluster_id -> list of agent_ids
+
+    def add_agent(
+        self,
+        agent_id: str,
+        name: str,
+        capabilities: list[str],
+        cluster_id: str = "main",
+        **kwargs: Any,
+    ) -> AgentNode:
+        node = AgentNode(
+            agent_id=agent_id,
+            name=name,
+            capabilities=capabilities,
+            role="member",
+            metadata={"cluster_id": cluster_id, **kwargs},
+        )
+
+        if cluster_id not in self.clusters:
+            self.clusters[cluster_id] = []
+        
+        self.clusters[cluster_id].append(agent_id)
+        
+        # Neighbors are others in the same cluster
+        node.neighbors = [aid for aid in self.clusters[cluster_id] if aid != agent_id]
+        for peer_id in node.neighbors:
+            self.nodes[peer_id].neighbors.append(agent_id)
+
+        self.nodes[agent_id] = node
+        logger.debug(f"Added agent {agent_id} to cluster {cluster_id}")
+        return node
+
+    def fission(self, cluster_id: str, new_cluster_id: str, agent_ids: list[str]) -> None:
+        """Split a group of agents into a new cluster."""
+        if cluster_id not in self.clusters:
+            return
+
+        for aid in agent_ids:
+            if aid in self.clusters[cluster_id]:
+                self.clusters[cluster_id].remove(aid)
+                if new_cluster_id not in self.clusters:
+                    self.clusters[new_cluster_id] = []
+                self.clusters[new_cluster_id].append(aid)
+                
+                # Update node metadata
+                node = self.nodes[aid]
+                node.metadata["cluster_id"] = new_cluster_id
+                
+                # Rebuild neighbors for this node and its old/new peers
+                self._rebuild_neighbors(aid)
+
+    def fusion(self, source_cluster_id: str, target_cluster_id: str) -> None:
+        """Merge one cluster into another."""
+        if source_cluster_id not in self.clusters:
+            return
+        
+        agents = self.clusters.pop(source_cluster_id)
+        for aid in agents:
+            if target_cluster_id not in self.clusters:
+                self.clusters[target_cluster_id] = []
+            self.clusters[target_cluster_id].append(aid)
+            self.nodes[aid].metadata["cluster_id"] = target_cluster_id
+            self._rebuild_neighbors(aid)
+
+    def _rebuild_neighbors(self, agent_id: str) -> None:
+        """Update neighbor lists after fission/fusion."""
+        node = self.nodes[agent_id]
+        cluster_id = node.metadata["cluster_id"]
+        
+        # Remove from old neighbors
+        for other in self.nodes.values():
+            if agent_id in other.neighbors:
+                other.neighbors.remove(agent_id)
+        
+        # Connect to new peers
+        node.neighbors = [aid for aid in self.clusters[cluster_id] if aid != agent_id]
+        for peer_id in node.neighbors:
+            self.nodes[peer_id].neighbors.append(agent_id)
+
+    def remove_agent(self, agent_id: str) -> bool:
+        node = self.nodes.get(agent_id)
+        if not node:
+            return False
+        
+        cluster_id = node.metadata.get("cluster_id")
+        if cluster_id in self.clusters:
+            self.clusters[cluster_id].remove(agent_id)
+        
+        for peer_id in node.neighbors:
+            if agent_id in self.nodes[peer_id].neighbors:
+                self.nodes[peer_id].neighbors.remove(agent_id)
+        
+        del self.nodes[agent_id]
+        return True
+
+    def get_message_targets(
+        self,
+        source_agent_id: str,
+        message_type: str = "cluster",
+    ) -> list[str]:
+        node = self.nodes.get(source_agent_id)
+        if not node:
+            return []
+        
+        if message_type == "cluster":
+            return node.neighbors.copy()
+        else:
+            # Global broadcast
+            return [aid for aid in self.nodes.keys() if aid != source_agent_id]
+
+    def get_routing_path(
+        self,
+        source_agent_id: str,
+        target_agent_id: str,
+    ) -> list[str]:
+        source = self.nodes.get(source_agent_id)
+        target = self.nodes.get(target_agent_id)
+        if not source or not target:
+            return []
+        
+        if source.metadata["cluster_id"] == target.metadata["cluster_id"]:
+            return [source_agent_id, target_agent_id]
+        else:
+            # Path between clusters (direct for now as they share same space)
+            return [source_agent_id, target_agent_id]
+
+
+class StigmergicTopology(BaseTopology):
+    """
+    Stigmergic topology - Environment-mediated coordination.
+    
+    Agents do not communicate directly. Instead, they read and write to
+    the shared "environment" (Hive Mind memory). Changes in the environment
+    stimulate further actions from other agents.
+    """
+
+    topology_type = TopologyType.STIGMERGIC
+
+    def add_agent(
+        self,
+        agent_id: str,
+        name: str,
+        capabilities: list[str],
+        **kwargs: Any,
+    ) -> AgentNode:
+        node = AgentNode(
+            agent_id=agent_id,
+            name=name,
+            capabilities=capabilities,
+            role="builder",
+            metadata=kwargs,
+        )
+        
+        # No direct neighbors in pure stigmergy
+        node.neighbors = []
+        self.nodes[agent_id] = node
+        logger.debug(f"Added agent {agent_id} to stigmergic field")
+        return node
+
+    def remove_agent(self, agent_id: str) -> bool:
+        if agent_id in self.nodes:
+            del self.nodes[agent_id]
+            return True
+        return False
+
+    def get_message_targets(
+        self,
+        source_agent_id: str,
+        message_type: str = "environment",
+    ) -> list[str]:
+        # In stigmergy, we don't message agents, we notify them of env changes
+        # But for compatibility, we can return all others as potential reactors
+        return [aid for aid in self.nodes.keys() if aid != source_agent_id]
+
+    def get_routing_path(
+        self,
+        source_agent_id: str,
+        target_agent_id: str,
+    ) -> list[str]:
+        # Path is through the blackboard (Environment)
+        return [source_agent_id, "BLACKBOARD", target_agent_id]
+
+
 # ============================================================================
 # Topology Engine
 # ============================================================================
@@ -905,6 +1208,9 @@ class TopologyEngine:
         TopologyType.MESH: MeshTopology,
         TopologyType.RING: RingTopology,
         TopologyType.STAR: StarTopology,
+        TopologyType.RHIZOMATIC: RhizomaticTopology,
+        TopologyType.FISSION_FUSION: FissionFusionTopology,
+        TopologyType.STIGMERGIC: StigmergicTopology,
     }
 
     def __init__(
@@ -1013,6 +1319,12 @@ class TopologyEngine:
         # Rule-based selection
         if profile.is_voting_based:
             return TopologyType.RING
+        if profile.is_environment_mediated:
+            return TopologyType.STIGMERGIC
+        if profile.is_lateral:
+            return TopologyType.RHIZOMATIC
+        if profile.is_modular:
+            return TopologyType.FISSION_FUSION
         if profile.requires_consensus:
             return TopologyType.SWARM
         if profile.has_sequential_stages:
