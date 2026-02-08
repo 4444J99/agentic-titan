@@ -38,6 +38,7 @@ from titan.workflows.cognitive_router import (
     CognitiveTaskType,
     get_cognitive_router,
 )
+from titan.core.config import get_config
 from titan.workflows.inquiry_dag import (
     InquiryDependencyGraph,
     ExecutionMode,
@@ -247,11 +248,11 @@ class InquiryEngine:
         cognitive_router: CognitiveRouter | None = None,
         hive_mind: HiveMind | None = None,
         llm_caller: Callable[[str, str], Any] | None = None,
-        default_model: str = "claude-3-5-sonnet-20241022",
+        default_model: str = get_config().llm.default_model,
         token_optimizer: "TokenOptimizer | None" = None,
         prompt_tracker: "PromptTracker | None" = None,
         budget_tracker: "BudgetTracker | None" = None,
-        max_context_tokens: int = 4000,
+        max_context_tokens: int = get_config().max_context_tokens,
         quality_gates: list[Any] | None = None,
     ) -> None:
         """

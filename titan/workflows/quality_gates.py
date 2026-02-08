@@ -11,6 +11,7 @@ import logging
 from dataclasses import dataclass
 from typing import Any, List
 
+from titan.core.config import get_config
 from titan.workflows.inquiry_engine import InquirySession, StageResult
 from titan.metrics import get_metrics
 
@@ -94,7 +95,7 @@ Return a JSON object with:
                 get_metrics().record_dialectic_friction(session.id)
                 
             return QualityGateResult(
-                passed=friction_score < 0.8, # Fail if too chaotic
+                passed=friction_score < get_config().dialectic_friction_threshold, # Fail if too chaotic
                 score=1.0 - friction_score,
                 issues=data.get("contradictions", []) + data.get("tensions", []),
                 metadata=data
