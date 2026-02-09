@@ -209,6 +209,25 @@ jobs:
         run: |
           pytest tests/ -q
 
+      - name: Run warning-hardening checks
+        env:
+          REDIS_URL: redis://localhost:6379/0
+        run: |
+          set -o pipefail
+          pytest tests/ -q \
+            -W error::RuntimeWarning \
+            -W "error:.*on_event.*:DeprecationWarning" \
+            | tee warning-hardening.log
+
+      - name: Upload warning-hardening report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: warning-hardening-report
+          path: warning-hardening.log
+          if-no-files-found: warn
+          retention-days: 14
+
   test:
     name: Test (Python ${{ matrix.python-version }})
     runs-on: ubuntu-latest

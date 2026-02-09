@@ -8,23 +8,32 @@ from __future__ import annotations
 
 import json
 import logging
-from datetime import datetime, timezone
-from typing import Any
+from datetime import UTC, datetime
+from typing import Any, Protocol, cast
 from uuid import UUID
 
 logger = logging.getLogger("titan.auth.storage")
 
 
-def _get_passlib():
+class PasswordContextLike(Protocol):
+    """Subset of passlib CryptContext used by auth storage."""
+
+    def hash(self, secret: str) -> str: ...  # allow-secret
+
+    def verify(self, secret: str, hash: str) -> bool: ...  # allow-secret
+
+
+def _get_passlib() -> PasswordContextLike:
     """Lazy import of passlib."""
     try:
         from passlib.context import CryptContext
-        return CryptContext(schemes=["bcrypt"], deprecated="auto")
-    except ImportError:
+
+        return cast(PasswordContextLike, CryptContext(schemes=["bcrypt"], deprecated="auto"))
+    except ImportError as exc:
         raise ImportError(
             "passlib is required for password hashing. "
             "Install with: pip install 'agentic-titan[auth]'"
-        )
+        ) from exc
 
 
 class AuthStorage:
@@ -46,7 +55,7 @@ class AuthStorage:
 
     async def initialize(self) -> None:
         """Initialize database tables."""
-        from titan.auth.models import USERS_TABLE_SQL, API_KEYS_TABLE_SQL
+        from titan.auth.models import API_KEYS_TABLE_SQL, USERS_TABLE_SQL
 
         if not self._db.is_connected:
             await self._db.connect()
@@ -183,7 +192,7 @@ class AuthStorage:
         target = UUID(user_id) if isinstance(user_id, str) else user_id
 
         # Always update updated_at
-        updates["updated_at"] = datetime.now(timezone.utc)
+        updates["updated_at"] = datetime.now(UTC)
 
         # Build dynamic update query
         set_clauses = []
@@ -213,7 +222,7 @@ class AuthStorage:
 
     async def update_last_login(self, user_id: UUID | str) -> bool:
         """Update user's last login timestamp."""
-        return await self.update_user(user_id, {"last_login": datetime.now(timezone.utc)})
+        return await self.update_user(user_id, {"last_login": datetime.now(UTC)})
 
     async def delete_user(self, user_id: UUID | str) -> bool:
         """Delete a user and their API keys (cascade)."""
@@ -410,7 +419,7 @@ class AuthStorage:
         try:
             await self._db.execute(
                 "UPDATE api_keys SET last_used_at = $1 WHERE id = $2",
-                datetime.now(timezone.utc),
+                datetime.now(UTC),
                 target,
             )
             return True

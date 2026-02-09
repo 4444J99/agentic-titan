@@ -413,6 +413,11 @@ async def update_user(user_id: str, request: UserUpdateRequest) -> UserResponse:
 
     # Fetch updated user
     user_data = await storage.get_user(user_id)
+    if user_data is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found after update",
+        )
 
     logger.info(f"Admin updated user: {user_id}")
 

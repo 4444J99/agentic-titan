@@ -8,20 +8,23 @@ from __future__ import annotations
 
 import logging
 import os
-from datetime import datetime, timedelta, timezone
-from typing import Any
-
-from pydantic import ValidationError
+from datetime import UTC, datetime, timedelta
+from typing import Any, Protocol
 
 logger = logging.getLogger("titan.auth.jwt")
 
-# Configuration from environment
-JWT_SECRET_KEY = os.getenv("TITAN_JWT_SECRET")
-if not JWT_SECRET_KEY:
+def _resolve_jwt_secret() -> str:
+    secret = os.getenv("TITAN_JWT_SECRET")  # allow-secret
+    if secret:
+        return secret
     if os.getenv("TITAN_ENV") == "production":
         raise ValueError("TITAN_JWT_SECRET must be set in production")
     logger.warning("Using insecure default JWT secret!")
-    JWT_SECRET_KEY = "titan-dev-secret-change-in-production"
+    return "titan-dev-secret-change-in-production"
+
+
+# Configuration from environment
+JWT_SECRET_KEY: str = _resolve_jwt_secret()
 
 JWT_ALGORITHM = os.getenv("TITAN_JWT_ALGORITHM", "HS256")
 ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("TITAN_ACCESS_TOKEN_EXPIRE_MINUTES", "30"))
@@ -34,16 +37,26 @@ class JWTError(Exception):
     pass
 
 
-def _get_jose():
+class JoseJWTModule(Protocol):
+    """Subset of python-jose JWT interface used by this module."""
+
+    def encode(self, payload: dict[str, Any], key: str, algorithm: str) -> str: ...
+
+    def decode(self, token: str, key: str, algorithms: list[str]) -> dict[str, Any]: ...  # allow-secret
+
+
+def _get_jose() -> tuple[JoseJWTModule, type[Exception]]:
     """Lazy import of python-jose."""
     try:
-        from jose import jwt, JWTError as JoseJWTError
-        return jwt, JoseJWTError
-    except ImportError:
+        from jose import JWTError as JoseJwtError
+        from jose import jwt
+
+        return jwt, JoseJwtError
+    except ImportError as exc:
         raise ImportError(
             "python-jose is required for JWT authentication. "
             "Install with: pip install 'agentic-titan[auth]'"
-        )
+        ) from exc
 
 
 def create_access_token(
@@ -71,7 +84,7 @@ def create_access_token(
     if expires_delta is None:
         expires_delta = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     expire = now + expires_delta
 
     payload = {
@@ -112,7 +125,7 @@ def create_refresh_token(
     if expires_delta is None:
         expires_delta = timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     expire = now + expires_delta
 
     payload = {
@@ -140,7 +153,7 @@ def decode_token(token: str) -> dict[str, Any]:  # allow-secret
     Raises:
         JWTError: If token is invalid or expired
     """
-    jwt_module, JoseJWTError = _get_jose()
+    jwt_module, jose_jwt_error = _get_jose()
 
     try:
         payload = jwt_module.decode(
@@ -148,8 +161,10 @@ def decode_token(token: str) -> dict[str, Any]:  # allow-secret
             JWT_SECRET_KEY,
             algorithms=[JWT_ALGORITHM],
         )
+        if not isinstance(payload, dict):
+            raise JWTError("Invalid token payload shape")
         return payload
-    except JoseJWTError as e:
+    except jose_jwt_error as e:
         logger.warning(f"JWT decode error: {e}")
         raise JWTError(f"Invalid token: {e}")  # allow-secret
 
@@ -171,6 +186,8 @@ def verify_token(token: str, expected_type: str = "access") -> dict[str, Any]:  
     payload = decode_token(token)  # allow-secret
 
     token_type = payload.get("token_type", "access")  # allow-secret
+    if not isinstance(token_type, str):
+        raise JWTError("Invalid token type claim")
     if token_type != expected_type:
         raise JWTError(f"Invalid token type: expected {expected_type}, got {token_type}")
 
@@ -218,8 +235,7 @@ def refresh_access_token(refresh_token: str) -> tuple[str, int]:
     user_id = payload.get("sub")
     username = payload.get("username")
     role = payload.get("role")
-
-    if not all([user_id, username, role]):
+    if not isinstance(user_id, str) or not isinstance(username, str) or not isinstance(role, str):
         raise JWTError("Invalid refresh token payload")
 
     access_token = create_access_token(user_id, username, role)
