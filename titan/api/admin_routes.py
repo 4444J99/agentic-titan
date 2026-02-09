@@ -23,15 +23,15 @@ from __future__ import annotations
 
 import logging
 import os
-from datetime import datetime, timezone, timedelta
-from typing import Any
-from uuid import UUID, uuid4
+from datetime import UTC, datetime
+from typing import Any, cast
+from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
 
-from titan.auth.models import User, UserCreate, UserUpdate, UserRole
 from titan.auth.middleware import require_admin
+from titan.auth.models import UserRole
 
 logger = logging.getLogger("titan.api.admin")
 
@@ -47,7 +47,7 @@ admin_router = APIRouter(
 # =============================================================================
 
 
-class DetailedHealthResponse(BaseModel):
+class DetailedHealthResponse(BaseModel):  # type: ignore[misc]
     """Detailed system health response."""
 
     status: str
@@ -56,7 +56,7 @@ class DetailedHealthResponse(BaseModel):
     components: dict[str, dict[str, Any]]
 
 
-class MetricsSummaryResponse(BaseModel):
+class MetricsSummaryResponse(BaseModel):  # type: ignore[misc]
     """Summary of system metrics."""
 
     total_users: int
@@ -69,7 +69,7 @@ class MetricsSummaryResponse(BaseModel):
     postgres_connected: bool
 
 
-class UserCreateRequest(BaseModel):
+class UserCreateRequest(BaseModel):  # type: ignore[misc]
     """Request to create a new user."""
 
     username: str = Field(..., min_length=3, max_length=100)
@@ -79,7 +79,7 @@ class UserCreateRequest(BaseModel):
     metadata: dict[str, Any] = Field(default_factory=dict)
 
 
-class UserUpdateRequest(BaseModel):
+class UserUpdateRequest(BaseModel):  # type: ignore[misc]
     """Request to update a user."""
 
     email: str | None = None
@@ -89,7 +89,7 @@ class UserUpdateRequest(BaseModel):
     metadata: dict[str, Any] | None = None
 
 
-class UserResponse(BaseModel):
+class UserResponse(BaseModel):  # type: ignore[misc]
     """User response for admin views."""
 
     id: str
@@ -101,7 +101,7 @@ class UserResponse(BaseModel):
     last_login: str | None
 
 
-class ConfigResponse(BaseModel):
+class ConfigResponse(BaseModel):  # type: ignore[misc]
     """Configuration response."""
 
     key: str
@@ -110,13 +110,13 @@ class ConfigResponse(BaseModel):
     editable: bool
 
 
-class ConfigUpdateRequest(BaseModel):
+class ConfigUpdateRequest(BaseModel):  # type: ignore[misc]
     """Request to update configuration."""
 
     value: Any
 
 
-class StalledBatchResponse(BaseModel):
+class StalledBatchResponse(BaseModel):  # type: ignore[misc]
     """Stalled batch information."""
 
     batch_id: str
@@ -126,7 +126,7 @@ class StalledBatchResponse(BaseModel):
     recommended_action: str
 
 
-class RecoveryRequest(BaseModel):
+class RecoveryRequest(BaseModel):  # type: ignore[misc]
     """Batch recovery request."""
 
     strategy: str = Field(
@@ -135,7 +135,7 @@ class RecoveryRequest(BaseModel):
     )
 
 
-class AuditEventResponse(BaseModel):
+class AuditEventResponse(BaseModel):  # type: ignore[misc]
     """Audit event response."""
 
     id: str
@@ -152,7 +152,7 @@ class AuditEventResponse(BaseModel):
 # =============================================================================
 
 
-@admin_router.get("/health/detailed", response_model=DetailedHealthResponse)
+@admin_router.get("/health/detailed", response_model=DetailedHealthResponse)  # type: ignore[untyped-decorator]
 async def detailed_health() -> DetailedHealthResponse:
     """
     Get detailed system health including all components.
@@ -169,6 +169,7 @@ async def detailed_health() -> DetailedHealthResponse:
     # Check Redis
     try:
         import redis
+
         r = redis.from_url(os.getenv("TITAN_REDIS_URL", "redis://localhost:6379"))
         r.ping()
         components["redis"] = {"status": "healthy", "connected": True}
@@ -178,6 +179,7 @@ async def detailed_health() -> DetailedHealthResponse:
     # Check PostgreSQL
     try:
         from titan.persistence.postgres import get_postgres_client
+
         client = get_postgres_client()
         health = await client.health_check()
         components["postgres"] = health
@@ -186,8 +188,7 @@ async def detailed_health() -> DetailedHealthResponse:
 
     # Determine overall status
     all_healthy = all(
-        c.get("status") == "healthy" or c.get("healthy", False)
-        for c in components.values()
+        c.get("status") == "healthy" or c.get("healthy", False) for c in components.values()
     )
 
     return DetailedHealthResponse(
@@ -198,13 +199,14 @@ async def detailed_health() -> DetailedHealthResponse:
     )
 
 
-@admin_router.get("/metrics/summary", response_model=MetricsSummaryResponse)
+@admin_router.get("/metrics/summary", response_model=MetricsSummaryResponse)  # type: ignore[untyped-decorator]
 async def metrics_summary() -> MetricsSummaryResponse:
     """
     Get summary of system metrics.
     """
     try:
         from titan.auth.storage import get_auth_storage
+
         storage = await get_auth_storage()
         total_users = await storage.count_users()
         # Note: These would need proper implementations
@@ -215,16 +217,20 @@ async def metrics_summary() -> MetricsSummaryResponse:
 
     try:
         from titan.batch.orchestrator import get_batch_orchestrator
+
         orchestrator = get_batch_orchestrator()
         all_batches = orchestrator.list_batches()
         total_batches = len(all_batches)
-        active_batches = len([b for b in all_batches if b.status.value in ("processing", "pending")])
+        active_batches = len(
+            [b for b in all_batches if b.status.value in ("processing", "pending")]
+        )
     except Exception:
         total_batches = 0
         active_batches = 0
 
     try:
         from titan.workflows.inquiry_engine import get_inquiry_engine
+
         engine = get_inquiry_engine()
         total_inquiries = len(engine.list_sessions())
     except Exception:
@@ -234,6 +240,7 @@ async def metrics_summary() -> MetricsSummaryResponse:
     redis_connected = False
     try:
         import redis
+
         r = redis.from_url(os.getenv("TITAN_REDIS_URL", "redis://localhost:6379"))
         redis_connected = r.ping()
     except Exception:
@@ -242,6 +249,7 @@ async def metrics_summary() -> MetricsSummaryResponse:
     postgres_connected = False
     try:
         from titan.persistence.postgres import get_postgres_client
+
         client = get_postgres_client()
         postgres_connected = client.is_connected
     except Exception:
@@ -264,7 +272,7 @@ async def metrics_summary() -> MetricsSummaryResponse:
 # =============================================================================
 
 
-@admin_router.get("/users", response_model=list[UserResponse])
+@admin_router.get("/users", response_model=list[UserResponse])  # type: ignore[untyped-decorator]
 async def list_users(
     role: str | None = Query(None, description="Filter by role"),
     is_active: bool | None = Query(None, description="Filter by active status"),
@@ -289,14 +297,24 @@ async def list_users(
             email=u.get("email"),
             role=u["role"],
             is_active=u.get("is_active", True),
-            created_at=u["created_at"].isoformat() if isinstance(u["created_at"], datetime) else u["created_at"],
-            last_login=u["last_login"].isoformat() if u.get("last_login") and isinstance(u["last_login"], datetime) else u.get("last_login"),
+            created_at=(
+                u["created_at"].isoformat()
+                if isinstance(u["created_at"], datetime)
+                else u["created_at"]
+            ),
+            last_login=(
+                u["last_login"].isoformat()
+                if u.get("last_login") and isinstance(u["last_login"], datetime)
+                else u.get("last_login")
+            ),
         )
         for u in users
     ]
 
 
-@admin_router.post("/users", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
+@admin_router.post(  # type: ignore[untyped-decorator]
+    "/users", response_model=UserResponse, status_code=status.HTTP_201_CREATED
+)
 async def create_user(request: UserCreateRequest) -> UserResponse:
     """Create a new user."""
     from titan.auth.storage import get_auth_storage
@@ -323,7 +341,7 @@ async def create_user(request: UserCreateRequest) -> UserResponse:
     # Create user
     user_id = uuid4()
     hashed_password = storage.hash_password(request.password)  # allow-secret
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
 
     success = await storage.create_user(
         user_id=user_id,
@@ -353,7 +371,7 @@ async def create_user(request: UserCreateRequest) -> UserResponse:
     )
 
 
-@admin_router.put("/users/{user_id}", response_model=UserResponse)
+@admin_router.put("/users/{user_id}", response_model=UserResponse)  # type: ignore[untyped-decorator]
 async def update_user(user_id: str, request: UserUpdateRequest) -> UserResponse:
     """Update a user."""
     from titan.auth.storage import get_auth_storage
@@ -400,12 +418,20 @@ async def update_user(user_id: str, request: UserUpdateRequest) -> UserResponse:
         email=user_data.get("email"),
         role=user_data["role"],
         is_active=user_data.get("is_active", True),
-        created_at=user_data["created_at"].isoformat() if isinstance(user_data["created_at"], datetime) else user_data["created_at"],
-        last_login=user_data["last_login"].isoformat() if user_data.get("last_login") and isinstance(user_data["last_login"], datetime) else user_data.get("last_login"),
+        created_at=(
+            user_data["created_at"].isoformat()
+            if isinstance(user_data["created_at"], datetime)
+            else user_data["created_at"]
+        ),
+        last_login=(
+            user_data["last_login"].isoformat()
+            if user_data.get("last_login") and isinstance(user_data["last_login"], datetime)
+            else user_data.get("last_login")
+        ),
     )
 
 
-@admin_router.delete("/users/{user_id}")
+@admin_router.delete("/users/{user_id}")  # type: ignore[untyped-decorator]
 async def delete_user(user_id: str) -> dict[str, str]:
     """Delete a user."""
     from titan.auth.storage import get_auth_storage
@@ -462,7 +488,7 @@ _config_store: dict[str, dict[str, Any]] = {
 }
 
 
-@admin_router.get("/config", response_model=list[ConfigResponse])
+@admin_router.get("/config", response_model=list[ConfigResponse])  # type: ignore[untyped-decorator]
 async def get_config() -> list[ConfigResponse]:
     """Get all configuration values."""
     return [
@@ -476,7 +502,7 @@ async def get_config() -> list[ConfigResponse]:
     ]
 
 
-@admin_router.put("/config/{key}", response_model=ConfigResponse)
+@admin_router.put("/config/{key}", response_model=ConfigResponse)  # type: ignore[untyped-decorator]
 async def update_config(key: str, request: ConfigUpdateRequest) -> ConfigResponse:
     """Update a configuration value."""
     if key not in _config_store:
@@ -508,7 +534,9 @@ async def update_config(key: str, request: ConfigUpdateRequest) -> ConfigRespons
 # =============================================================================
 
 
-@admin_router.get("/batches/stalled", response_model=list[StalledBatchResponse])
+@admin_router.get(  # type: ignore[untyped-decorator]
+    "/batches/stalled", response_model=list[StalledBatchResponse]
+)
 async def get_stalled_batches(
     threshold_minutes: int = Query(30, description="Minutes without progress"),
 ) -> list[StalledBatchResponse]:
@@ -517,16 +545,16 @@ async def get_stalled_batches(
         from titan.batch.orchestrator import get_batch_orchestrator
 
         orchestrator = get_batch_orchestrator()
-        stalled = await orchestrator.get_stalled_batches(
-            threshold_minutes=threshold_minutes
-        )
+        stalled = await orchestrator.get_stalled_batches(threshold_minutes=threshold_minutes)
 
         return [
             StalledBatchResponse(
                 batch_id=str(b.id),
                 status=b.status.value,
                 topics=b.topics[:5],  # Limit for response size
-                stalled_since=b.started_at.isoformat() if b.started_at else b.created_at.isoformat(),
+                stalled_since=(
+                    b.started_at.isoformat() if b.started_at else b.created_at.isoformat()
+                ),
                 recommended_action="retry",
             )
             for b in stalled
@@ -536,7 +564,7 @@ async def get_stalled_batches(
         return []
 
 
-@admin_router.post("/batches/{batch_id}/recover")
+@admin_router.post("/batches/{batch_id}/recover")  # type: ignore[untyped-decorator]
 async def recover_batch(batch_id: str, request: RecoveryRequest) -> dict[str, Any]:
     """Recover a stalled batch."""
     try:
@@ -571,7 +599,7 @@ async def recover_batch(batch_id: str, request: RecoveryRequest) -> dict[str, An
         )
 
 
-@admin_router.delete("/batches/cleanup")
+@admin_router.delete("/batches/cleanup")  # type: ignore[untyped-decorator]
 async def cleanup_batches(
     retention_days: int = Query(30, description="Keep batches newer than this"),
 ) -> dict[str, Any]:
@@ -579,7 +607,7 @@ async def cleanup_batches(
     try:
         from titan.batch.cleanup import full_cleanup
 
-        result = await full_cleanup(retention_days=retention_days)
+        result = cast(dict[str, Any], await full_cleanup(retention_days=retention_days))
 
         logger.info(f"Admin triggered batch cleanup: {result}")
 
@@ -597,7 +625,7 @@ async def cleanup_batches(
 # =============================================================================
 
 
-@admin_router.post("/cache/flush")
+@admin_router.post("/cache/flush")  # type: ignore[untyped-decorator]
 async def flush_cache(
     pattern: str = Query("*", description="Key pattern to flush"),
 ) -> dict[str, Any]:
@@ -607,6 +635,7 @@ async def flush_cache(
 
         r = redis.from_url(os.getenv("TITAN_REDIS_URL", "redis://localhost:6379"))
 
+        keys_deleted: str | int
         if pattern == "*":
             # Full flush - dangerous!
             r.flushdb()
@@ -631,7 +660,9 @@ async def flush_cache(
         )
 
 
-@admin_router.get("/audit/events", response_model=list[AuditEventResponse])
+@admin_router.get(  # type: ignore[untyped-decorator]
+    "/audit/events", response_model=list[AuditEventResponse]
+)
 async def get_audit_events(
     event_type: str | None = Query(None, description="Filter by event type"),
     agent_id: str | None = Query(None, description="Filter by agent ID"),
@@ -655,7 +686,11 @@ async def get_audit_events(
         return [
             AuditEventResponse(
                 id=str(e["id"]),
-                timestamp=e["timestamp"].isoformat() if isinstance(e["timestamp"], datetime) else e["timestamp"],
+                timestamp=(
+                    e["timestamp"].isoformat()
+                    if isinstance(e["timestamp"], datetime)
+                    else e["timestamp"]
+                ),
                 event_type=e["event_type"],
                 action=e["action"],
                 agent_id=e.get("agent_id"),

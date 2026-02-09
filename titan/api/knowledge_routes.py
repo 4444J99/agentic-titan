@@ -22,7 +22,7 @@ router = APIRouter(prefix="/knowledge", tags=["knowledge"])
 # =============================================================================
 
 
-class SearchResult(BaseModel):
+class SearchResult(BaseModel):  # type: ignore[misc]
     """A knowledge search result."""
 
     key: str = Field(..., description="The item key/identifier")
@@ -33,7 +33,7 @@ class SearchResult(BaseModel):
     metadata: dict[str, Any] = Field(default_factory=dict, description="Additional metadata")
 
 
-class SearchResponse(BaseModel):
+class SearchResponse(BaseModel):  # type: ignore[misc]
     """Response from knowledge search."""
 
     query: str = Field(..., description="The search query")
@@ -42,7 +42,7 @@ class SearchResponse(BaseModel):
     processing_time_ms: int = Field(..., description="Search processing time")
 
 
-class GraphNode(BaseModel):
+class GraphNode(BaseModel):  # type: ignore[misc]
     """A node in the knowledge graph."""
 
     id: str = Field(..., description="Node identifier")
@@ -51,7 +51,7 @@ class GraphNode(BaseModel):
     properties: dict[str, Any] = Field(default_factory=dict, description="Node properties")
 
 
-class GraphEdge(BaseModel):
+class GraphEdge(BaseModel):  # type: ignore[misc]
     """An edge in the knowledge graph."""
 
     source: str = Field(..., description="Source node ID")
@@ -60,7 +60,7 @@ class GraphEdge(BaseModel):
     weight: float = Field(default=1.0, description="Edge weight")
 
 
-class GraphResponse(BaseModel):
+class GraphResponse(BaseModel):  # type: ignore[misc]
     """Response containing a knowledge subgraph."""
 
     nodes: list[GraphNode] = Field(..., description="Graph nodes")
@@ -69,7 +69,7 @@ class GraphResponse(BaseModel):
     depth: int = Field(..., description="Graph traversal depth")
 
 
-class KnowledgeStatsResponse(BaseModel):
+class KnowledgeStatsResponse(BaseModel):  # type: ignore[misc]
     """Knowledge base statistics."""
 
     total_entries: int = Field(..., description="Total knowledge entries")
@@ -85,7 +85,7 @@ class KnowledgeStatsResponse(BaseModel):
 # =============================================================================
 
 
-@router.get("/search", response_model=SearchResponse)
+@router.get("/search", response_model=SearchResponse)  # type: ignore[untyped-decorator]
 async def search_knowledge(
     query: str = Query(..., min_length=1, description="Search query"),
     limit: int = Query(default=10, ge=1, le=100, description="Maximum results"),
@@ -113,7 +113,7 @@ async def search_knowledge(
             raw_results = await hive.search(query, limit=limit * 2)  # Get extra for filtering
 
             # Filter and format results
-            results = []
+            results: list[SearchResult] = []
             for r in raw_results:
                 # Apply filters
                 if source and r.get("source") != source:
@@ -160,7 +160,7 @@ async def search_knowledge(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/graph", response_model=GraphResponse)
+@router.get("/graph", response_model=GraphResponse)  # type: ignore[untyped-decorator]
 async def get_knowledge_graph(
     center: str | None = Query(default=None, description="Center node ID"),
     depth: int = Query(default=2, ge=1, le=5, description="Traversal depth"),
@@ -224,7 +224,7 @@ async def get_knowledge_graph(
 
                         # Link sequential stages
                         if i > 0:
-                            prev_stage_id = f"{session.id}_stage_{i-1}"
+                            prev_stage_id = f"{session.id}_stage_{i - 1}"
                             edges.append(
                                 GraphEdge(
                                     source=prev_stage_id,
@@ -243,7 +243,8 @@ async def get_knowledge_graph(
             topo_engine = get_topology_engine()
             if hasattr(topo_engine, "_active_topology") and topo_engine._active_topology:
                 topo = topo_engine._active_topology
-                topo_node_id = f"topology_{topo.topology_type.value if hasattr(topo, 'topology_type') else 'custom'}"
+                topo_type = topo.topology_type.value if hasattr(topo, "topology_type") else "custom"
+                topo_node_id = f"topology_{topo_type}"
 
                 nodes.append(
                     GraphNode(
@@ -251,7 +252,11 @@ async def get_knowledge_graph(
                         label="Active Topology",
                         type="topology",
                         properties={
-                            "type": topo.topology_type.value if hasattr(topo, "topology_type") else "unknown",
+                            "type": (
+                                topo.topology_type.value
+                                if hasattr(topo, "topology_type")
+                                else "unknown"
+                            ),
                         },
                     )
                 )
@@ -293,7 +298,7 @@ async def get_knowledge_graph(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/stats", response_model=KnowledgeStatsResponse)
+@router.get("/stats", response_model=KnowledgeStatsResponse)  # type: ignore[untyped-decorator]
 async def get_knowledge_stats() -> KnowledgeStatsResponse:
     """
     Get knowledge base statistics.

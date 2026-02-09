@@ -16,23 +16,21 @@ Endpoints:
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
-from uuid import UUID, uuid4
+from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
-from titan.auth.models import (
-    User,
-    UserRole,
-    TokenPair,
-    APIKeyCreate,
-)
 from titan.auth.middleware import (
     get_current_user,
-    AuthenticationError,
+)
+from titan.auth.models import (
+    APIKeyCreate,
+    User,
+    UserRole,
 )
 
 logger = logging.getLogger("titan.api.auth")
@@ -45,7 +43,7 @@ auth_router = APIRouter(prefix="/auth", tags=["auth"])
 # =============================================================================
 
 
-class LoginResponse(BaseModel):
+class LoginResponse(BaseModel):  # type: ignore[misc]
     """Response for successful login."""
 
     access_token: str
@@ -55,13 +53,13 @@ class LoginResponse(BaseModel):
     user: dict[str, Any]
 
 
-class RefreshRequest(BaseModel):
+class RefreshRequest(BaseModel):  # type: ignore[misc]
     """Request to refresh access token."""
 
     refresh_token: str
 
 
-class RefreshResponse(BaseModel):
+class RefreshResponse(BaseModel):  # type: ignore[misc]
     """Response for token refresh."""
 
     access_token: str
@@ -69,7 +67,7 @@ class RefreshResponse(BaseModel):
     expires_in: int
 
 
-class APIKeyResponse(BaseModel):
+class APIKeyResponse(BaseModel):  # type: ignore[misc]
     """Response for API key creation (includes the key only once)."""
 
     id: str
@@ -81,7 +79,7 @@ class APIKeyResponse(BaseModel):
     created_at: str
 
 
-class APIKeyListResponse(BaseModel):
+class APIKeyListResponse(BaseModel):  # type: ignore[misc]
     """Response for API key listing (no full key)."""
 
     id: str
@@ -94,7 +92,7 @@ class APIKeyListResponse(BaseModel):
     last_used_at: str | None
 
 
-class UserResponse(BaseModel):
+class UserResponse(BaseModel):  # type: ignore[misc]
     """Response for user info."""
 
     id: str
@@ -111,7 +109,7 @@ class UserResponse(BaseModel):
 # =============================================================================
 
 
-@auth_router.post("/login", response_model=LoginResponse)
+@auth_router.post("/login", response_model=LoginResponse)  # type: ignore[untyped-decorator]
 async def login(
     form_data: OAuth2PasswordRequestForm = Depends(),
 ) -> LoginResponse:
@@ -120,8 +118,8 @@ async def login(
 
     Returns JWT access and refresh tokens.
     """
-    from titan.auth.storage import get_auth_storage
     from titan.auth.jwt import create_token_pair
+    from titan.auth.storage import get_auth_storage
 
     storage = await get_auth_storage()
 
@@ -135,7 +133,10 @@ async def login(
         )
 
     # Verify password
-    if not storage.verify_password(form_data.password, user_data["hashed_password"]):  # allow-secret
+    if not storage.verify_password(
+        form_data.password,
+        user_data["hashed_password"],  # allow-secret
+    ):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid username or password",
@@ -174,12 +175,12 @@ async def login(
     )
 
 
-@auth_router.post("/refresh", response_model=RefreshResponse)
+@auth_router.post("/refresh", response_model=RefreshResponse)  # type: ignore[untyped-decorator]
 async def refresh_token(request: RefreshRequest) -> RefreshResponse:
     """
     Refresh an access token using a refresh token.
     """
-    from titan.auth.jwt import refresh_access_token, JWTError
+    from titan.auth.jwt import JWTError, refresh_access_token
 
     try:
         access_token, expires_in = refresh_access_token(request.refresh_token)  # allow-secret
@@ -197,7 +198,7 @@ async def refresh_token(request: RefreshRequest) -> RefreshResponse:
     )
 
 
-@auth_router.post("/logout")
+@auth_router.post("/logout")  # type: ignore[untyped-decorator]
 async def logout(user: User = Depends(get_current_user)) -> dict[str, str]:
     """
     Logout the current user.
@@ -209,7 +210,7 @@ async def logout(user: User = Depends(get_current_user)) -> dict[str, str]:
     return {"message": "Logged out successfully"}
 
 
-@auth_router.get("/me", response_model=UserResponse)
+@auth_router.get("/me", response_model=UserResponse)  # type: ignore[untyped-decorator]
 async def get_me(user: User = Depends(get_current_user)) -> UserResponse:
     """
     Get the current authenticated user's information.
@@ -225,7 +226,7 @@ async def get_me(user: User = Depends(get_current_user)) -> UserResponse:
     )
 
 
-@auth_router.post("/api-keys", response_model=APIKeyResponse)
+@auth_router.post("/api-keys", response_model=APIKeyResponse)  # type: ignore[untyped-decorator]
 async def create_api_key(
     request: APIKeyCreate,
     user: User = Depends(get_current_user),
@@ -235,7 +236,7 @@ async def create_api_key(
 
     The full key is only returned once - store it securely!
     """
-    from titan.auth.api_keys import generate_api_key, calculate_expiry
+    from titan.auth.api_keys import calculate_expiry, generate_api_key
     from titan.auth.storage import get_auth_storage
 
     # Generate the key
@@ -271,11 +272,13 @@ async def create_api_key(
         name=request.name,
         scopes=request.scopes,
         expires_at=expires_at.isoformat() if expires_at else None,
-        created_at=datetime.now(timezone.utc).isoformat(),
+        created_at=datetime.now(UTC).isoformat(),
     )
 
 
-@auth_router.get("/api-keys", response_model=list[APIKeyListResponse])
+@auth_router.get(  # type: ignore[untyped-decorator]
+    "/api-keys", response_model=list[APIKeyListResponse]
+)
 async def list_api_keys(
     user: User = Depends(get_current_user),
     include_inactive: bool = False,
@@ -298,14 +301,18 @@ async def list_api_keys(
             scopes=k.get("scopes", []),
             expires_at=k["expires_at"].isoformat() if k.get("expires_at") else None,
             is_active=k.get("is_active", True),
-            created_at=k["created_at"].isoformat() if isinstance(k["created_at"], datetime) else k["created_at"],
+            created_at=(
+                k["created_at"].isoformat()
+                if isinstance(k["created_at"], datetime)
+                else k["created_at"]
+            ),
             last_used_at=k["last_used_at"].isoformat() if k.get("last_used_at") else None,
         )
         for k in keys
     ]
 
 
-@auth_router.delete("/api-keys/{key_id}")
+@auth_router.delete("/api-keys/{key_id}")  # type: ignore[untyped-decorator]
 async def revoke_api_key(
     key_id: str,
     user: User = Depends(get_current_user),

@@ -23,7 +23,7 @@ router = APIRouter(prefix="/analysis", tags=["analysis"])
 # =============================================================================
 
 
-class ContradictionDetectRequest(BaseModel):
+class ContradictionDetectRequest(BaseModel):  # type: ignore[misc]
     """Request to detect contradictions in content."""
 
     content_pairs: list[dict[str, str]] = Field(
@@ -55,7 +55,7 @@ class ContradictionDetectRequest(BaseModel):
     }
 
 
-class ContradictionResult(BaseModel):
+class ContradictionResult(BaseModel):  # type: ignore[misc]
     """A detected contradiction."""
 
     pair_index: int = Field(..., description="Index of the content pair")
@@ -67,24 +67,25 @@ class ContradictionResult(BaseModel):
     text_b_excerpt: str = Field(..., description="Relevant excerpt from text_b")
 
 
-class ContradictionDetectResponse(BaseModel):
+class ContradictionDetectResponse(BaseModel):  # type: ignore[misc]
     """Response from contradiction detection."""
 
-    contradictions: list[ContradictionResult] = Field(
-        ..., description="Detected contradictions"
-    )
+    contradictions: list[ContradictionResult] = Field(..., description="Detected contradictions")
     total_pairs_analyzed: int = Field(..., description="Number of pairs analyzed")
     processing_method: str = Field(..., description="heuristic or llm")
 
 
-class DialecticSynthesizeRequest(BaseModel):
+class DialecticSynthesizeRequest(BaseModel):  # type: ignore[misc]
     """Request to synthesize dialectically."""
 
     thesis: str = Field(..., description="The thesis statement or content")
     antithesis: str = Field(..., description="The antithesis statement or content")
     strategy: str = Field(
         default="auto",
-        description="Synthesis strategy: auto, higher_order, integration, contextual, complementary, temporal, perspectival",
+        description=(
+            "Synthesis strategy: auto, higher_order, integration, contextual, "
+            "complementary, temporal, perspectival"
+        ),
     )
     use_llm: bool = Field(
         default=False,
@@ -103,7 +104,7 @@ class DialecticSynthesizeRequest(BaseModel):
     }
 
 
-class DialecticSynthesisResult(BaseModel):
+class DialecticSynthesisResult(BaseModel):  # type: ignore[misc]
     """Result of dialectic synthesis."""
 
     synthesis: str = Field(..., description="The synthesized resolution")
@@ -112,14 +113,12 @@ class DialecticSynthesisResult(BaseModel):
     reasoning: str = Field(..., description="Explanation of the synthesis approach")
 
 
-class SessionContradictionsResponse(BaseModel):
+class SessionContradictionsResponse(BaseModel):  # type: ignore[misc]
     """Response for session contradiction analysis."""
 
     session_id: str = Field(..., description="The inquiry session ID")
     stage_pairs_analyzed: int = Field(..., description="Number of stage pairs analyzed")
-    contradictions: list[dict[str, Any]] = Field(
-        ..., description="Contradictions between stages"
-    )
+    contradictions: list[dict[str, Any]] = Field(..., description="Contradictions between stages")
     dialectic_suggestions: list[dict[str, Any]] = Field(
         ..., description="Suggested dialectic resolutions"
     )
@@ -130,7 +129,9 @@ class SessionContradictionsResponse(BaseModel):
 # =============================================================================
 
 
-@router.post("/contradictions/detect", response_model=ContradictionDetectResponse)
+@router.post(  # type: ignore[untyped-decorator]
+    "/contradictions/detect", response_model=ContradictionDetectResponse
+)
 async def detect_contradictions(request: ContradictionDetectRequest) -> ContradictionDetectResponse:
     """
     Detect contradictions in content pairs.
@@ -139,8 +140,8 @@ async def detect_contradictions(request: ContradictionDetectRequest) -> Contradi
     quantitative, epistemic, and contextual contradictions.
     """
     try:
-        from titan.analysis.detector import ContradictionDetector, DetectorConfig
         from titan.analysis.contradictions import ContradictionPair
+        from titan.analysis.detector import ContradictionDetector, DetectorConfig
 
         # Create detector with config
         config = DetectorConfig(
@@ -198,7 +199,9 @@ async def detect_contradictions(request: ContradictionDetectRequest) -> Contradi
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.post("/dialectic/synthesize", response_model=DialecticSynthesisResult)
+@router.post(  # type: ignore[untyped-decorator]
+    "/dialectic/synthesize", response_model=DialecticSynthesisResult
+)
 async def synthesize_dialectic(request: DialecticSynthesizeRequest) -> DialecticSynthesisResult:
     """
     Synthesize a resolution from thesis and antithesis.
@@ -207,8 +210,12 @@ async def synthesize_dialectic(request: DialecticSynthesizeRequest) -> Dialectic
     or complementary perspectives.
     """
     try:
+        from titan.analysis.contradictions import (
+            Contradiction,
+            ContradictionSeverity,
+            ContradictionType,
+        )
         from titan.analysis.dialectic import DialecticSynthesizer, SynthesisStrategy
-        from titan.analysis.contradictions import Contradiction, ContradictionType, ContradictionSeverity
 
         synthesizer = DialecticSynthesizer(use_llm=request.use_llm)
 
@@ -251,7 +258,11 @@ async def synthesize_dialectic(request: DialecticSynthesizeRequest) -> Dialectic
         # Dialectic module not available, return heuristic response
         logger.warning("Dialectic synthesis module not available")
         return DialecticSynthesisResult(
-            synthesis=f"While '{request.thesis[:50]}...' and '{request.antithesis[:50]}...' appear contradictory, they may represent complementary perspectives on a complex issue.",
+            synthesis=(
+                f"While '{request.thesis[:50]}...' and '{request.antithesis[:50]}...' "
+                "appear contradictory, they may represent complementary perspectives "
+                "on a complex issue."
+            ),
             strategy_used="heuristic_fallback",
             confidence=0.3,
             reasoning="Dialectic synthesis module not available; using basic heuristic response",
@@ -264,7 +275,7 @@ async def synthesize_dialectic(request: DialecticSynthesizeRequest) -> Dialectic
 @router.get(
     "/inquiry/{session_id}/contradictions",
     response_model=SessionContradictionsResponse,
-)
+)  # type: ignore[untyped-decorator]
 async def get_inquiry_contradictions(session_id: str) -> SessionContradictionsResponse:
     """
     Analyze an inquiry session for contradictions between stages.
@@ -295,8 +306,8 @@ async def get_inquiry_contradictions(session_id: str) -> SessionContradictionsRe
         pairs_analyzed = 0
 
         try:
-            from titan.analysis.detector import ContradictionDetector, DetectorConfig
             from titan.analysis.contradictions import ContradictionPair
+            from titan.analysis.detector import ContradictionDetector, DetectorConfig
             from titan.analysis.dialectic import DialecticSynthesizer
 
             detector = ContradictionDetector(DetectorConfig(sensitivity="medium"))
@@ -319,13 +330,15 @@ async def get_inquiry_contradictions(session_id: str) -> SessionContradictionsRe
                     report = await detector.analyze([pair])
 
                     for c in report.contradictions:
-                        contradictions.append({
-                            "stage_a": result_a.stage_name,
-                            "stage_b": result_b.stage_name,
-                            "type": c.contradiction_type.value,
-                            "severity": c.severity.value,
-                            "description": c.description,
-                        })
+                        contradictions.append(
+                            {
+                                "stage_a": result_a.stage_name,
+                                "stage_b": result_b.stage_name,
+                                "type": c.contradiction_type.value,
+                                "severity": c.severity.value,
+                                "description": c.description,
+                            }
+                        )
 
                         # Suggest resolution
                         synthesis = await synthesizer.synthesize(
@@ -333,11 +346,13 @@ async def get_inquiry_contradictions(session_id: str) -> SessionContradictionsRe
                             thesis=result_a.content[:1000],
                             antithesis=result_b.content[:1000],
                         )
-                        suggestions.append({
-                            "contradiction_index": len(contradictions) - 1,
-                            "synthesis": synthesis.synthesis,
-                            "strategy": synthesis.strategy.value,
-                        })
+                        suggestions.append(
+                            {
+                                "contradiction_index": len(contradictions) - 1,
+                                "synthesis": synthesis.synthesis,
+                                "strategy": synthesis.strategy.value,
+                            }
+                        )
 
         except ImportError:
             logger.warning("Analysis modules not available for session analysis")

@@ -14,9 +14,11 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+from collections.abc import AsyncIterator
 from typing import Any
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
+from fastapi.responses import StreamingResponse
 
 from titan.workflows.inquiry_engine import (
     InquiryEngine,
@@ -106,7 +108,7 @@ class InquiryWebSocketManager:
 ws_manager = InquiryWebSocketManager()
 
 
-@ws_router.websocket("/api/inquiry/{session_id}/stream")
+@ws_router.websocket("/api/inquiry/{session_id}/stream")  # type: ignore[untyped-decorator]
 async def inquiry_websocket(
     websocket: WebSocket,
     session_id: str,
@@ -279,28 +281,34 @@ async def handle_start_action(
 
 
 # Alternative endpoint using Server-Sent Events (SSE) for simpler clients
-@ws_router.get("/api/inquiry/{session_id}/events")
-async def inquiry_sse(session_id: str):
+@ws_router.get("/api/inquiry/{session_id}/events")  # type: ignore[untyped-decorator]
+async def inquiry_sse(
+    session_id: str,
+) -> StreamingResponse | dict[str, str]:
     """
     Server-Sent Events endpoint for inquiry progress.
 
     Alternative to WebSocket for clients that prefer SSE.
     """
-    from fastapi.responses import StreamingResponse
-
     engine = get_inquiry_engine()
     session = engine.get_session(session_id)
 
     if not session:
         return {"error": "Session not found"}
 
-    async def event_generator():
+    async def event_generator() -> AsyncIterator[str]:
         """Generate SSE events."""
         # Send initial status
-        yield f"data: {json.dumps({'type': 'connected', 'session_id': session_id})}\n\n"
+        initial_event = {"type": "connected", "session_id": session_id}
+        yield f"data: {json.dumps(initial_event)}\n\n"
 
-        if session.status in (InquiryStatus.COMPLETED, InquiryStatus.CANCELLED, InquiryStatus.FAILED):
-            yield f"data: {json.dumps({'type': 'session_status', 'status': session.status.value})}\n\n"
+        if session.status in (
+            InquiryStatus.COMPLETED,
+            InquiryStatus.CANCELLED,
+            InquiryStatus.FAILED,
+        ):
+            status_event = {"type": "session_status", "status": session.status.value}
+            yield f"data: {json.dumps(status_event)}\n\n"
             return
 
         # Stream workflow events

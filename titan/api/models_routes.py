@@ -13,9 +13,9 @@ from typing import Any
 from fastapi import APIRouter
 
 from titan.workflows.cognitive_router import (
-    CognitiveTaskType,
-    MODEL_RANKINGS,
     COGNITIVE_MODEL_MAP,
+    MODEL_RANKINGS,
+    CognitiveTaskType,
     get_cognitive_router,
 )
 
@@ -24,7 +24,7 @@ logger = logging.getLogger("titan.api.models")
 models_router = APIRouter(prefix="/models", tags=["models"])
 
 
-@models_router.get("/signatures")
+@models_router.get("/signatures")  # type: ignore[untyped-decorator]
 async def get_model_signatures() -> dict[str, Any]:
     """
     Get cognitive task signatures for all models.
@@ -38,16 +38,13 @@ async def get_model_signatures() -> dict[str, Any]:
     return {
         "dimensions": [t.value for t in CognitiveTaskType],
         "models": {
-            model_id: {
-                task_type.value: score
-                for task_type, score in scores.items()
-            }
+            model_id: {task_type.value: score for task_type, score in scores.items()}
             for model_id, scores in MODEL_RANKINGS.items()
         },
     }
 
 
-@models_router.get("/signatures/{model_id}")
+@models_router.get("/signatures/{model_id}")  # type: ignore[untyped-decorator]
 async def get_model_signature(model_id: str) -> dict[str, Any]:
     """
     Get cognitive signature for a specific model.
@@ -69,15 +66,12 @@ async def get_model_signature(model_id: str) -> dict[str, Any]:
     return {
         "model_id": model_id,
         "found": True,
-        "scores": {
-            task_type.value: score
-            for task_type, score in scores.items()
-        },
+        "scores": {task_type.value: score for task_type, score in scores.items()},
         "dimensions": [t.value for t in CognitiveTaskType],
     }
 
 
-@models_router.get("/list")
+@models_router.get("/list")  # type: ignore[untyped-decorator]
 async def list_models() -> dict[str, Any]:
     """
     List all available models with their primary strengths.
@@ -85,23 +79,24 @@ async def list_models() -> dict[str, Any]:
     Returns:
         Dictionary with model list and metadata
     """
-    models = []
+    models: list[dict[str, Any]] = []
     for model_id, scores in MODEL_RANKINGS.items():
         # Find top 3 strengths
         sorted_scores = sorted(scores.items(), key=lambda x: x[1], reverse=True)
         top_strengths = [
-            {"task": task_type.value, "score": score}
-            for task_type, score in sorted_scores[:3]
+            {"task": task_type.value, "score": score} for task_type, score in sorted_scores[:3]
         ]
 
-        models.append({
-            "model_id": model_id,
-            "top_strengths": top_strengths,
-            "average_score": sum(scores.values()) / len(scores),
-        })
+        models.append(
+            {
+                "model_id": model_id,
+                "top_strengths": top_strengths,
+                "average_score": sum(scores.values()) / len(scores),
+            }
+        )
 
     # Sort by average score
-    models.sort(key=lambda x: x["average_score"], reverse=True)
+    models.sort(key=lambda x: float(x["average_score"]), reverse=True)
 
     return {
         "models": models,
@@ -109,7 +104,7 @@ async def list_models() -> dict[str, Any]:
     }
 
 
-@models_router.get("/preferences")
+@models_router.get("/preferences")  # type: ignore[untyped-decorator]
 async def get_task_preferences() -> dict[str, Any]:
     """
     Get model preferences per cognitive task type.
@@ -127,7 +122,7 @@ async def get_task_preferences() -> dict[str, Any]:
     return preferences
 
 
-@models_router.get("/compare")
+@models_router.get("/compare")  # type: ignore[untyped-decorator]
 async def compare_models(
     model_a: str,
     model_b: str,
@@ -151,13 +146,15 @@ async def compare_models(
         score_b = scores_b.get(task_type, 0.0)
         diff = score_a - score_b
 
-        comparison.append({
-            "dimension": task_type.value,
-            "model_a_score": score_a,
-            "model_b_score": score_b,
-            "difference": diff,
-            "winner": model_a if diff > 0 else (model_b if diff < 0 else "tie"),
-        })
+        comparison.append(
+            {
+                "dimension": task_type.value,
+                "model_a_score": score_a,
+                "model_b_score": score_b,
+                "difference": diff,
+                "winner": model_a if diff > 0 else (model_b if diff < 0 else "tie"),
+            }
+        )
 
     # Determine overall winner by count
     a_wins = sum(1 for c in comparison if c["winner"] == model_a)
@@ -171,12 +168,14 @@ async def compare_models(
             "model_a_wins": a_wins,
             "model_b_wins": b_wins,
             "ties": len(comparison) - a_wins - b_wins,
-            "overall_winner": model_a if a_wins > b_wins else (model_b if b_wins > a_wins else "tie"),
+            "overall_winner": model_a
+            if a_wins > b_wins
+            else (model_b if b_wins > a_wins else "tie"),
         },
     }
 
 
-@models_router.post("/route")
+@models_router.post("/route")  # type: ignore[untyped-decorator]
 async def route_for_task(
     task_type: str,
     preferred_model: str | None = None,
