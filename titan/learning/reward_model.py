@@ -11,9 +11,9 @@ import json
 import logging
 import os
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 from uuid import uuid4
 
 if TYPE_CHECKING:
@@ -86,7 +86,7 @@ class RewardMetrics:
     mean_reward: float = 0.0
     std_reward: float = 0.0
     samples_evaluated: int = 0
-    timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    timestamp: datetime = field(default_factory=lambda: datetime.now(UTC))
 
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
@@ -108,7 +108,7 @@ class TrainingRun:
 
     run_id: str = field(default_factory=lambda: str(uuid4())[:8])
     config: RewardModelConfig = field(default_factory=RewardModelConfig)
-    started_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    started_at: datetime = field(default_factory=lambda: datetime.now(UTC))
     completed_at: datetime | None = None
     final_metrics: RewardMetrics | None = None
     training_samples: int = 0
@@ -180,9 +180,7 @@ class RewardModel:
             logger.error(f"Error predicting reward: {e}")
             return 0.0
 
-    def predict_batch(
-        self, pairs: list[tuple[str, str]]
-    ) -> list[float]:
+    def predict_batch(self, pairs: list[tuple[str, str]]) -> list[float]:
         """
         Predict rewards for multiple prompt-response pairs.
 
@@ -259,7 +257,7 @@ class RewardModelTrainer:
             model, tokenizer = self._train_transformers(dataset, eval_dataset, run)
 
             run.status = "completed"
-            run.completed_at = datetime.now(timezone.utc)
+            run.completed_at = datetime.now(UTC)
             run.model_path = self._config.output_dir
 
             return RewardModel(
@@ -277,7 +275,7 @@ class RewardModelTrainer:
         except Exception as e:
             run.status = "failed"
             run.error = str(e)
-            run.completed_at = datetime.now(timezone.utc)
+            run.completed_at = datetime.now(UTC)
             logger.error(f"Training failed: {e}")
             raise
 
@@ -291,10 +289,9 @@ class RewardModelTrainer:
         from transformers import (
             AutoModelForSequenceClassification,
             AutoTokenizer,
-            TrainingArguments,
             Trainer,
+            TrainingArguments,
         )
-        import torch
 
         # Load model and tokenizer
         tokenizer = AutoTokenizer.from_pretrained(self._config.base_model)
@@ -369,25 +366,32 @@ class RewardModelTrainer:
 
         for pair in dataset.pairs:
             # Chosen example (positive)
-            examples.append({
-                "text": f"{pair.prompt}\n{pair.chosen}",
-                "label": 1.0,
-            })
+            examples.append(
+                {
+                    "text": f"{pair.prompt}\n{pair.chosen}",
+                    "label": 1.0,
+                }
+            )
             # Rejected example (negative)
-            examples.append({
-                "text": f"{pair.prompt}\n{pair.rejected}",
-                "label": 0.0,
-            })
+            examples.append(
+                {
+                    "text": f"{pair.prompt}\n{pair.rejected}",
+                    "label": 0.0,
+                }
+            )
 
         hf_dataset = Dataset.from_list(examples)
 
         # Tokenize
-        def tokenize_function(batch):
-            return tokenizer(
-                batch["text"],
-                truncation=True,
-                max_length=self._config.max_length,
-                padding="max_length",
+        def tokenize_function(batch: dict[str, list[str]]) -> dict[str, Any]:
+            return cast(
+                dict[str, Any],
+                tokenizer(
+                    batch["text"],
+                    truncation=True,
+                    max_length=self._config.max_length,
+                    padding="max_length",
+                ),
             )
 
         tokenized = hf_dataset.map(tokenize_function, batched=True)
@@ -405,7 +409,7 @@ class RewardModelTrainer:
         logger.info(f"Mock training on {len(dataset)} preference pairs")
 
         run.status = "completed"
-        run.completed_at = datetime.now(timezone.utc)
+        run.completed_at = datetime.now(UTC)
         run.final_metrics = RewardMetrics(
             accuracy=0.5,
             loss=1.0,

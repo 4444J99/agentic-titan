@@ -335,10 +335,12 @@ class PDFTool(Tool):
                         if end < len(page.text):
                             context = context + "..."
 
-                        results.append({
-                            "page": page.page_number,
-                            "context": context,
-                        })
+                        results.append(
+                            {
+                                "page": page.page_number,
+                                "context": context,
+                            }
+                        )
 
                 return ToolResult(
                     success=True,

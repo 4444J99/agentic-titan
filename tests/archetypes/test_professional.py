@@ -5,11 +5,10 @@ from __future__ import annotations
 import pytest
 
 from agents.archetypes.cfo import CFOAgent
-from agents.archetypes.devops import DevOpsAgent
-from agents.archetypes.security_analyst import SecurityAnalystAgent
 from agents.archetypes.data_engineer import DataEngineerAgent
+from agents.archetypes.devops import DevOpsAgent
 from agents.archetypes.product_manager import ProductManagerAgent
-from agents.framework.base_agent import AgentState
+from agents.archetypes.security_analyst import SecurityAnalystAgent
 
 
 class TestCFOAgent:

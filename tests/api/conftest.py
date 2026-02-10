@@ -2,10 +2,11 @@
 Shared fixtures for API tests.
 """
 
-import pytest
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock
 from uuid import uuid4
+
+import pytest
 
 from titan.auth.models import User, UserRole
 
@@ -20,7 +21,7 @@ def admin_user():
         hashed_password="hashed",  # allow-secret
         role=UserRole.ADMIN,
         is_active=True,
-        created_at=datetime.now(timezone.utc),
+        created_at=datetime.now(UTC),
     )
 
 
@@ -34,7 +35,7 @@ def regular_user():
         hashed_password="hashed",  # allow-secret
         role=UserRole.USER,
         is_active=True,
-        created_at=datetime.now(timezone.utc),
+        created_at=datetime.now(UTC),
     )
 
 

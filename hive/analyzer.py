@@ -12,6 +12,7 @@ import logging
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
+from adapters.base import LLMMessage
 from hive.topology import TaskProfile, TopologyType
 
 if TYPE_CHECKING:
@@ -149,6 +150,9 @@ class TaskAnalyzer:
         context: dict[str, Any] | None,
     ) -> AnalysisResult:
         """Analyze task using LLM."""
+        if self._llm_router is None:
+            raise RuntimeError("LLM router is not configured")
+
         prompt = ANALYSIS_PROMPT.format(task=task)
 
         if context:
@@ -162,7 +166,7 @@ class TaskAnalyzer:
 
         # Call LLM
         response = await self._llm_router.complete(
-            prompt=prompt,
+            messages=[LLMMessage(role="user", content=prompt)],
             max_tokens=500,
             temperature=0.1,  # Low temperature for deterministic analysis
         )
@@ -227,7 +231,9 @@ class TaskAnalyzer:
             topology = TopologyType.MESH
             reasoning = "Task needs fault tolerance"
         elif profile.has_clear_leader:
-            topology = TopologyType.STAR if profile.estimated_agents <= 5 else TopologyType.HIERARCHY
+            topology = (
+                TopologyType.STAR if profile.estimated_agents <= 5 else TopologyType.HIERARCHY
+            )
             reasoning = "Task has a clear coordinator/leader"
         else:
             topology = TopologyType.SWARM
@@ -266,54 +272,70 @@ class TaskAnalyzer:
             stages = ["research", "analysis", "synthesis", "review"]
             for i, stage in enumerate(stages):
                 matching_caps = [c for c in available_capabilities if stage in c.lower()]
-                suggestions.append({
-                    "role": f"stage-{i}",
-                    "stage": i,
-                    "suggested_capabilities": matching_caps or [available_capabilities[0]] if available_capabilities else [],
-                    "description": f"{stage.capitalize()} stage",
-                })
+                suggestions.append(
+                    {
+                        "role": f"stage-{i}",
+                        "stage": i,
+                        "suggested_capabilities": matching_caps or [available_capabilities[0]]
+                        if available_capabilities
+                        else [],
+                        "description": f"{stage.capitalize()} stage",
+                    }
+                )
 
         elif analysis.recommended_topology == TopologyType.STAR:
             # Suggest hub + spokes
-            suggestions.append({
-                "role": "hub",
-                "suggested_capabilities": ["planning", "coordination"],
-                "description": "Central coordinator",
-            })
+            suggestions.append(
+                {
+                    "role": "hub",
+                    "suggested_capabilities": ["planning", "coordination"],
+                    "description": "Central coordinator",
+                }
+            )
             for i in range(min(3, len(available_capabilities))):
-                suggestions.append({
-                    "role": "spoke",
-                    "suggested_capabilities": [available_capabilities[i]],
-                    "description": f"Worker {i+1}",
-                })
+                suggestions.append(
+                    {
+                        "role": "spoke",
+                        "suggested_capabilities": [available_capabilities[i]],
+                        "description": f"Worker {i + 1}",
+                    }
+                )
 
         elif analysis.recommended_topology == TopologyType.HIERARCHY:
             # Suggest tree structure
-            suggestions.append({
-                "role": "root",
-                "suggested_capabilities": ["planning", "orchestration"],
-                "description": "Root coordinator",
-            })
-            suggestions.append({
-                "role": "manager",
-                "suggested_capabilities": ["coordination"],
-                "description": "Middle manager",
-            })
+            suggestions.append(
+                {
+                    "role": "root",
+                    "suggested_capabilities": ["planning", "orchestration"],
+                    "description": "Root coordinator",
+                }
+            )
+            suggestions.append(
+                {
+                    "role": "manager",
+                    "suggested_capabilities": ["coordination"],
+                    "description": "Middle manager",
+                }
+            )
             for cap in available_capabilities[:3]:
-                suggestions.append({
-                    "role": "worker",
-                    "suggested_capabilities": [cap],
-                    "description": f"Worker ({cap})",
-                })
+                suggestions.append(
+                    {
+                        "role": "worker",
+                        "suggested_capabilities": [cap],
+                        "description": f"Worker ({cap})",
+                    }
+                )
 
         else:
             # Default: peer agents with different capabilities
             for cap in available_capabilities[:5]:
-                suggestions.append({
-                    "role": "peer",
-                    "suggested_capabilities": [cap],
-                    "description": f"Peer agent ({cap})",
-                })
+                suggestions.append(
+                    {
+                        "role": "peer",
+                        "suggested_capabilities": [cap],
+                        "description": f"Peer agent ({cap})",
+                    }
+                )
 
         return suggestions
 

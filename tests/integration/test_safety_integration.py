@@ -7,17 +7,15 @@ End-to-end tests for the safety layer integration.
 import pytest
 
 from titan.safety import (
+    # Filters
+    HITLConfig,
     # HITL
     HITLHandler,
-    HITLConfig,
-    RiskLevel,
-    # Filters
-    FilterPipeline,
-    create_default_pipeline,
-    # RBAC
-    RBACEnforcer,
     Permission,
     PersonaRole,
+    # RBAC
+    RBACEnforcer,
+    create_default_pipeline,
     # Sanitizer
     sanitize_output,
 )
@@ -88,7 +86,11 @@ class TestFilterPipelineIntegration:
     @pytest.mark.asyncio
     async def test_clean_content_passes(self, pipeline):
         """Test that clean content passes through unmodified."""
-        content = "Here is a Python function to calculate fibonacci:\n\ndef fib(n):\n    return n if n <= 1 else fib(n-1) + fib(n-2)"
+        content = (
+            "Here is a Python function to calculate fibonacci:\n\n"
+            "def fib(n):\n"
+            "    return n if n <= 1 else fib(n-1) + fib(n-2)"
+        )
         result = await pipeline.filter(content)
         assert not result.blocked
         assert result.filtered_content == content

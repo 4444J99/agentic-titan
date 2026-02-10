@@ -10,12 +10,12 @@ import asyncio
 import json
 import logging
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
-from uuid import UUID
 
 if TYPE_CHECKING:
     from fastapi import WebSocket
+
     from titan.safety.hitl import HITLHandler
 
 logger = logging.getLogger("titan.dashboard.approval")
@@ -39,19 +39,21 @@ class ApprovalNotification:
 
     def to_json(self) -> str:
         """Convert to JSON string."""
-        return json.dumps({
-            "type": self.type,
-            "request_id": self.request_id,
-            "action": self.action,
-            "description": self.description,
-            "risk_level": self.risk_level,
-            "agent_id": self.agent_id,
-            "session_id": self.session_id,
-            "tool_name": self.tool_name,
-            "arguments": self.arguments,
-            "created_at": self.created_at,
-            "timeout_seconds": self.timeout_seconds,
-        })
+        return json.dumps(
+            {
+                "type": self.type,
+                "request_id": self.request_id,
+                "action": self.action,
+                "description": self.description,
+                "risk_level": self.risk_level,
+                "agent_id": self.agent_id,
+                "session_id": self.session_id,
+                "tool_name": self.tool_name,
+                "arguments": self.arguments,
+                "created_at": self.created_at,
+                "timeout_seconds": self.timeout_seconds,
+            }
+        )
 
 
 class ApprovalWebSocketHandler:
@@ -118,7 +120,7 @@ class ApprovalWebSocketHandler:
             session_id=session_id,
             tool_name=tool_name,
             arguments=arguments or {},
-            created_at=datetime.now(timezone.utc).isoformat(),
+            created_at=datetime.now(UTC).isoformat(),
             timeout_seconds=timeout_seconds,
         )
 
@@ -132,14 +134,16 @@ class ApprovalWebSocketHandler:
         reason: str | None = None,
     ) -> None:
         """Send an approval response notification."""
-        message = json.dumps({
-            "type": "approval_response",
-            "request_id": request_id,
-            "approved": approved,
-            "responder": responder,
-            "reason": reason,
-            "responded_at": datetime.now(timezone.utc).isoformat(),
-        })
+        message = json.dumps(
+            {
+                "type": "approval_response",
+                "request_id": request_id,
+                "approved": approved,
+                "responder": responder,
+                "reason": reason,
+                "responded_at": datetime.now(UTC).isoformat(),
+            }
+        )
 
         await self.broadcast(message)
 
@@ -339,7 +343,10 @@ class ApprovalComponent:
                 Arguments: <code>${escapeHtml(JSON.stringify(request.arguments))}</code>
             </div>
             <div class="approval-buttons">
-                <button class="btn-approve" onclick="respondApproval('${request.request_id}', true)">
+                <button
+                    class="btn-approve"
+                    onclick="respondApproval('${request.request_id}', true)"
+                >
                     Approve
                 </button>
                 <button class="btn-deny" onclick="respondApproval('${request.request_id}', false)">

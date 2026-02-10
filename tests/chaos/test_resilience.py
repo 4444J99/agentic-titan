@@ -11,9 +11,9 @@ Tests system behavior under adverse conditions:
 from __future__ import annotations
 
 import asyncio
+from unittest.mock import AsyncMock
+
 import pytest
-from unittest.mock import AsyncMock, patch, MagicMock
-from datetime import datetime
 
 # Mark all tests in this module as chaos tests
 pytestmark = [pytest.mark.chaos, pytest.mark.asyncio]
@@ -39,7 +39,7 @@ class TestNetworkPartition:
             call_count += 1
             if call_count == 2:
                 await asyncio.sleep(5)  # Simulate slow response
-                raise asyncio.TimeoutError("Network timeout")
+                raise TimeoutError("Network timeout")
             return await original_complete(*args, **kwargs)
 
         mock_llm_router.complete = flaky_complete
@@ -122,7 +122,7 @@ class TestAgentTimeout:
             max_turns=3,
         )
 
-        result = await agent.run()
+        await agent.run()
 
         assert agent._context.turn_number <= 3
 
@@ -191,8 +191,8 @@ class TestLLMAPIFailure:
         mock_hive_mind,
     ):
         """Test agent handles LLM API errors."""
+
         from agents.framework.base_agent import BaseAgent
-        from unittest.mock import patch, AsyncMock
 
         # Create a simple agent that will fail on LLM call
         class FailingAgent(BaseAgent):
@@ -316,9 +316,7 @@ class TestMessageQueueDisconnection:
         class SubscribingAgent(BaseAgent):
             async def initialize(self):
                 # Simulate subscription failure
-                self._hive_mind.subscribe = AsyncMock(
-                    side_effect=Exception("Subscription failed")
-                )
+                self._hive_mind.subscribe = AsyncMock(side_effect=Exception("Subscription failed"))
                 await self.subscribe("topic", lambda x: None)
 
             async def work(self):
@@ -426,7 +424,7 @@ class TestErrorThresholds:
             error_threshold=3,
         )
 
-        result = await agent.run()
+        await agent.run()
 
         # Should have detected error threshold
         assert agent._consecutive_errors >= 3
@@ -521,14 +519,16 @@ class TestGracefulDegradation:
         )
 
         # Add early termination condition
-        agent.add_stopping_condition(StoppingCondition(
-            reason=StoppingReason.USER_CANCELLED,
-            check=lambda a: a._context and a._context.turn_number >= 2,
-            message="Early termination",
-            priority=100,
-        ))
+        agent.add_stopping_condition(
+            StoppingCondition(
+                reason=StoppingReason.USER_CANCELLED,
+                check=lambda a: a._context and a._context.turn_number >= 2,
+                message="Early termination",
+                priority=100,
+            )
+        )
 
-        result = await agent.run()
+        await agent.run()
 
         # Workflow should have partial results
         if agent.workflow:

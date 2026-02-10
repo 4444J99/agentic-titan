@@ -8,11 +8,11 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass, field
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 
-class PatternCategory(str, Enum):
+class PatternCategory(StrEnum):
     """Categories of dangerous patterns."""
 
     PROMPT_INJECTION = "prompt_injection"
@@ -25,7 +25,7 @@ class PatternCategory(str, Enum):
     HARMFUL_CONTENT = "harmful_content"
 
 
-class PatternSeverity(str, Enum):
+class PatternSeverity(StrEnum):
     """Severity levels for pattern matches."""
 
     LOW = "low"

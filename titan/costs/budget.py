@@ -14,8 +14,7 @@ from __future__ import annotations
 import asyncio
 import logging
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta, timezone
-from enum import Enum
+from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING, Any
 from uuid import UUID, uuid4
 
@@ -71,7 +70,7 @@ class Budget:
     agent_id: str | None = None
     allocated_usd: float = 0.0
     spent_usd: float = 0.0
-    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
     expires_at: datetime | None = None
     metadata: dict[str, Any] = field(default_factory=dict)
 
@@ -97,7 +96,7 @@ class Budget:
         """Check if budget has expired."""
         if self.expires_at is None:
             return False
-        return datetime.now(timezone.utc) > self.expires_at
+        return datetime.now(UTC) > self.expires_at
 
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
@@ -139,7 +138,7 @@ class SpendRecord:
     input_tokens: int = 0
     output_tokens: int = 0
     cached_tokens: int = 0
-    timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    timestamp: datetime = field(default_factory=lambda: datetime.now(UTC))
     metadata: dict[str, Any] = field(default_factory=dict)
 
 
@@ -159,7 +158,7 @@ class BudgetTracker:
     def __init__(
         self,
         config: BudgetConfig | None = None,
-        token_optimizer: "TokenOptimizer | None" = None,
+        token_optimizer: TokenOptimizer | None = None,
     ) -> None:
         self.config = config or BudgetConfig()
         self._token_optimizer = token_optimizer
@@ -168,8 +167,8 @@ class BudgetTracker:
         self._spend_history: list[SpendRecord] = []
         self._daily_spend: float = 0.0
         self._monthly_spend: float = 0.0
-        self._daily_reset: datetime = datetime.now(timezone.utc)
-        self._monthly_reset: datetime = datetime.now(timezone.utc)
+        self._daily_reset: datetime = datetime.now(UTC)
+        self._monthly_reset: datetime = datetime.now(UTC)
         self._lock = asyncio.Lock()
         self._alert_callbacks: list[Any] = []
 
@@ -220,8 +219,9 @@ class BudgetTracker:
             budget = Budget(
                 session_id=session_id,
                 allocated_usd=limit_usd or self.config.session_limit_usd,
-                expires_at=datetime.now(timezone.utc) + timedelta(hours=duration_hours)
-                if duration_hours else None,
+                expires_at=datetime.now(UTC) + timedelta(hours=duration_hours)
+                if duration_hours
+                else None,
             )
             self._budgets[session_id] = budget
             logger.info(f"Created session budget: {session_id} = ${budget.allocated_usd}")
@@ -444,10 +444,12 @@ class BudgetTracker:
                     break
 
         # Default pricing if no match
-        if input_price is None:
+        if input_price is None or output_price is None:
             input_price = self.config.default_cost_per_1k_tokens
             output_price = self.config.default_cost_per_1k_tokens
 
+        assert input_price is not None
+        assert output_price is not None
         cost = (input_tokens / 1000 * input_price) + (output_tokens / 1000 * output_price)
         return cost
 
@@ -525,14 +527,16 @@ class BudgetTracker:
             "remaining_stages": remaining_stages,
         }
 
-    def set_token_optimizer(self, optimizer: "TokenOptimizer") -> None:
+    def set_token_optimizer(self, optimizer: TokenOptimizer) -> None:
         """Set the token optimizer for accurate estimation."""
         self._token_optimizer = optimizer
 
     def update_pricing(self, model: str, input_price: float, output_price: float) -> None:
         """Update pricing for a model."""
         self._pricing[model.lower()] = (input_price, output_price)
-        logger.info(f"Updated pricing for {model}: input=${input_price}/1K, output=${output_price}/1K")
+        logger.info(
+            f"Updated pricing for {model}: input=${input_price}/1K, output=${output_price}/1K"
+        )
 
     async def can_afford(
         self,
@@ -567,7 +571,7 @@ class BudgetTracker:
 
     async def _check_period_resets(self) -> None:
         """Check and reset daily/monthly counters if needed."""
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
 
         # Daily reset
         if now.date() > self._daily_reset.date():

@@ -17,14 +17,12 @@ Based on research on:
 
 from __future__ import annotations
 
-import asyncio
 import logging
-import statistics
 import uuid
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
-from enum import Enum
-from typing import TYPE_CHECKING, Any, Callable
+from datetime import UTC, datetime
+from enum import StrEnum
+from typing import TYPE_CHECKING, Any
 
 from titan.metrics import get_metrics
 
@@ -35,12 +33,12 @@ if TYPE_CHECKING:
 logger = logging.getLogger("titan.hive.information_center")
 
 
-class InformationCenterRole(str, Enum):
+class InformationCenterRole(StrEnum):
     """Roles an information center can have."""
 
-    AGGREGATOR = "aggregator"      # Collects solutions from agents
-    BROADCASTER = "broadcaster"    # Distributes patterns to agents
-    ARCHIVE = "archive"            # Stores multi-generational knowledge
+    AGGREGATOR = "aggregator"  # Collects solutions from agents
+    BROADCASTER = "broadcaster"  # Distributes patterns to agents
+    ARCHIVE = "archive"  # Stores multi-generational knowledge
 
 
 @dataclass
@@ -53,14 +51,14 @@ class LearnedPattern:
     """
 
     pattern_id: str
-    pattern_type: str             # Category of pattern
-    content: dict[str, Any]       # The actual pattern data
-    confidence: float = 0.5       # 0-1, how confident we are in this pattern
-    generation: int = 0           # Which generation this pattern is from
-    usage_count: int = 0          # How many times this pattern has been used
-    success_count: int = 0        # How many times usage was successful
+    pattern_type: str  # Category of pattern
+    content: dict[str, Any]  # The actual pattern data
+    confidence: float = 0.5  # 0-1, how confident we are in this pattern
+    generation: int = 0  # Which generation this pattern is from
+    usage_count: int = 0  # How many times this pattern has been used
+    success_count: int = 0  # How many times usage was successful
     contributor_ids: list[str] = field(default_factory=list)  # Agents who contributed
-    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
     last_used: datetime | None = None
     metadata: dict[str, Any] = field(default_factory=dict)
 
@@ -81,9 +79,9 @@ class LearnedPattern:
         usage_weight = min(1.0, self.usage_count / 10.0)
 
         return (
-            self.confidence * 0.3 +
-            self.success_rate * usage_weight * 0.5 +
-            (1.0 - usage_weight) * 0.5 * 0.2  # Prior for low-usage patterns
+            self.confidence * 0.3
+            + self.success_rate * usage_weight * 0.5
+            + (1.0 - usage_weight) * 0.5 * 0.2  # Prior for low-usage patterns
         )
 
     def record_usage(self, success: bool) -> None:
@@ -91,7 +89,7 @@ class LearnedPattern:
         self.usage_count += 1
         if success:
             self.success_count += 1
-        self.last_used = datetime.now(timezone.utc)
+        self.last_used = datetime.now(UTC)
 
         # Update confidence based on outcome
         if success:
@@ -129,7 +127,11 @@ class LearnedPattern:
             usage_count=data.get("usage_count", 0),
             success_count=data.get("success_count", 0),
             contributor_ids=data.get("contributor_ids", []),
-            created_at=datetime.fromisoformat(data["created_at"]) if "created_at" in data else datetime.now(timezone.utc),
+            created_at=(
+                datetime.fromisoformat(data["created_at"])
+                if "created_at" in data
+                else datetime.now(UTC)
+            ),
             last_used=datetime.fromisoformat(data["last_used"]) if data.get("last_used") else None,
             metadata=data.get("metadata", {}),
         )
@@ -146,11 +148,11 @@ class InformationCenter:
 
     center_id: str
     role: InformationCenterRole
-    agent_ids: list[str] = field(default_factory=list)      # Member agents
+    agent_ids: list[str] = field(default_factory=list)  # Member agents
     patterns: list[LearnedPattern] = field(default_factory=list)
     subscriber_ids: list[str] = field(default_factory=list)  # Agents subscribed to updates
-    generation: int = 0                                       # Current generation
-    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    generation: int = 0  # Current generation
+    created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
     metadata: dict[str, Any] = field(default_factory=dict)
 
     def add_member(self, agent_id: str) -> None:
@@ -315,6 +317,7 @@ class InformationCenterManager:
         # Emit event
         if self._event_bus:
             from hive.events import EventType
+
             await self._event_bus.emit(
                 EventType.INFO_CENTER_CREATED,
                 {
@@ -326,9 +329,9 @@ class InformationCenterManager:
             )
 
         # Record metric
-        get_metrics().set_info_centers_active(role.value, len([
-            c for c in self._centers.values() if c.role == role
-        ]))
+        get_metrics().set_info_centers_active(
+            role.value, len([c for c in self._centers.values() if c.role == role])
+        )
 
         logger.info(f"Created information center: {center_id} ({role.value})")
         return center
@@ -353,16 +356,14 @@ class InformationCenterManager:
 
         # Archive patterns before destroying
         if center.patterns:
-            self._generation_archives.setdefault(
-                center.generation, []
-            ).extend(center.patterns)
+            self._generation_archives.setdefault(center.generation, []).extend(center.patterns)
 
         del self._centers[center_id]
 
         # Update metrics
-        get_metrics().set_info_centers_active(center.role.value, len([
-            c for c in self._centers.values() if c.role == center.role
-        ]))
+        get_metrics().set_info_centers_active(
+            center.role.value, len([c for c in self._centers.values() if c.role == center.role])
+        )
 
         logger.info(f"Destroyed information center: {center_id}")
         return True
@@ -409,6 +410,7 @@ class InformationCenterManager:
         # Emit event
         if self._event_bus:
             from hive.events import EventType
+
             await self._event_bus.emit(
                 EventType.INFO_CENTER_ELECTED,
                 {
@@ -446,6 +448,7 @@ class InformationCenterManager:
         elif criteria == "random":
             # Random selection
             import random
+
             return random.random()
 
         else:
@@ -508,6 +511,7 @@ class InformationCenterManager:
         # Emit event
         if self._event_bus:
             from hive.events import EventType
+
             await self._event_bus.emit(
                 EventType.PATTERN_AGGREGATED,
                 {
@@ -546,10 +550,7 @@ class InformationCenterManager:
             # Check key overlap
             if set(pattern.content.keys()) == set(solution.keys()):
                 # Same structure, might be similar
-                matching_values = sum(
-                    1 for k, v in solution.items()
-                    if pattern.content.get(k) == v
-                )
+                matching_values = sum(1 for k, v in solution.items() if pattern.content.get(k) == v)
                 if matching_values > len(solution) * 0.7:
                     return pattern
 
@@ -612,6 +613,7 @@ class InformationCenterManager:
         # Emit event
         if self._event_bus:
             from hive.events import EventType
+
             await self._event_bus.emit(
                 EventType.PATTERN_BROADCAST,
                 {
@@ -648,9 +650,9 @@ class InformationCenterManager:
         # Archive patterns
         archived_count = len(center.patterns)
         if center.patterns:
-            self._generation_archives.setdefault(
-                self._current_generation, []
-            ).extend(center.patterns)
+            self._generation_archives.setdefault(self._current_generation, []).extend(
+                center.patterns
+            )
 
         # Increment generation
         self._current_generation += 1
@@ -666,6 +668,7 @@ class InformationCenterManager:
         # Emit event
         if self._event_bus:
             from hive.events import EventType
+
             await self._event_bus.emit(
                 EventType.GENERATION_ARCHIVED,
                 {
@@ -751,7 +754,5 @@ class InformationCenterManager:
             "current_generation": self._current_generation,
             "total_patterns": sum(c.pattern_count for c in self._centers.values()),
             "archived_generations": list(self._generation_archives.keys()),
-            "total_archived": sum(
-                len(patterns) for patterns in self._generation_archives.values()
-            ),
+            "total_archived": sum(len(patterns) for patterns in self._generation_archives.values()),
         }

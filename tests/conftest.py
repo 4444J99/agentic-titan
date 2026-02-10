@@ -12,15 +12,16 @@ Provides:
 from __future__ import annotations
 
 import asyncio
+import json
 import os
 import sys
 import time
-import json
+from collections.abc import Generator
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
-from typing import Any, AsyncGenerator, Generator
-from unittest.mock import AsyncMock, MagicMock, patch
+from typing import Any
+from unittest.mock import patch
 
 import pytest
 
@@ -32,6 +33,7 @@ sys.path.insert(0, str(PROJECT_ROOT))
 # ============================================================================
 # Configuration
 # ============================================================================
+
 
 @pytest.fixture(scope="session")
 def test_config() -> dict[str, Any]:
@@ -49,9 +51,11 @@ def test_config() -> dict[str, Any]:
 # Mock LLM Responses
 # ============================================================================
 
+
 @dataclass
 class MockLLMResponse:
     """Mock response from LLM."""
+
     content: str
     model: str = "mock-model"
     usage: dict[str, int] = field(default_factory=lambda: {"input_tokens": 10, "output_tokens": 50})
@@ -75,12 +79,18 @@ DEPENDS: st-0
 SUBTASK: Review the code
 AGENT: reviewer
 DEPENDS: st-1""",
-            "research": "Based on my research, the key findings are: 1) Important insight, 2) Another discovery, 3) Final observation.",
+            "research": (
+                "Based on my research, the key findings are: "
+                "1) Important insight, 2) Another discovery, 3) Final observation."
+            ),
             "code": """def solution():
     # Implementation
     return "result"
 """,
-            "review": "The code looks good. Minor suggestions: 1) Add type hints, 2) Improve documentation.",
+            "review": (
+                "The code looks good. Minor suggestions: "
+                "1) Add type hints, 2) Improve documentation."
+            ),
             "analyze": "Analysis complete. Found 3 items of interest.",
             "default": "Task completed successfully.",
         }
@@ -111,11 +121,13 @@ DEPENDS: st-1""",
                 prompt = last_msg.get("content", "")
 
         # Record call
-        self._call_history.append({
-            "prompt": prompt[:200],
-            "system": system[:100],
-            "timestamp": datetime.now().isoformat(),
-        })
+        self._call_history.append(
+            {
+                "prompt": prompt[:200],
+                "system": system[:100],
+                "timestamp": datetime.now().isoformat(),
+            }
+        )
 
         # Find matching response
         prompt_lower = prompt.lower()
@@ -194,6 +206,7 @@ def mock_llm_router() -> Generator[MockLLMRouter, None, None]:
 # Mock Hive Mind
 # ============================================================================
 
+
 class MockHiveMind:
     """Mock Hive Mind for testing."""
 
@@ -247,12 +260,14 @@ class MockHiveMind:
         topic: str = "general",
     ) -> None:
         """Broadcast message."""
-        self._messages.append({
-            "source": source_agent_id,
-            "topic": topic,
-            "message": message,
-            "type": "broadcast",
-        })
+        self._messages.append(
+            {
+                "source": source_agent_id,
+                "topic": topic,
+                "message": message,
+                "type": "broadcast",
+            }
+        )
 
     async def send(
         self,
@@ -261,12 +276,14 @@ class MockHiveMind:
         message: dict[str, Any],
     ) -> None:
         """Send direct message."""
-        self._messages.append({
-            "source": source_agent_id,
-            "target": target_agent_id,
-            "message": message,
-            "type": "direct",
-        })
+        self._messages.append(
+            {
+                "source": source_agent_id,
+                "target": target_agent_id,
+                "message": message,
+                "type": "direct",
+            }
+        )
 
     async def subscribe(
         self,
@@ -275,10 +292,12 @@ class MockHiveMind:
         handler: Any,
     ) -> None:
         """Subscribe to topic."""
-        self._subscriptions.setdefault(topic, []).append({
-            "agent_id": agent_id,
-            "handler": handler,
-        })
+        self._subscriptions.setdefault(topic, []).append(
+            {
+                "agent_id": agent_id,
+                "handler": handler,
+            }
+        )
 
     async def set(self, key: str, value: Any, ttl: int | None = None) -> None:
         """Set key-value."""
@@ -323,6 +342,7 @@ def mock_hive_mind() -> MockHiveMind:
 # ============================================================================
 # Agent Fixtures
 # ============================================================================
+
 
 @pytest.fixture
 async def base_agent(mock_hive_mind: MockHiveMind, mock_llm_router: MockLLMRouter):
@@ -375,10 +395,11 @@ async def researcher_agent(mock_hive_mind: MockHiveMind, mock_llm_router: MockLL
 # Topology Fixtures
 # ============================================================================
 
+
 @pytest.fixture
 def topology_engine():
     """Create a topology engine for testing."""
-    from hive.topology import TopologyEngine, TopologyType
+    from hive.topology import TopologyEngine
 
     engine = TopologyEngine()
     return engine
@@ -425,9 +446,11 @@ def pipeline_topology(topology_engine):
 # Performance Tracking
 # ============================================================================
 
+
 @dataclass
 class PerformanceBaseline:
     """Performance baseline for comparison."""
+
     metric_name: str
     baseline_value: float
     unit: str
@@ -464,13 +487,15 @@ class PerformanceTracker:
         metadata: dict[str, Any] | None = None,
     ) -> None:
         """Record a measurement."""
-        self._measurements.append({
-            "metric": metric_name,
-            "value": value,
-            "unit": unit,
-            "timestamp": datetime.now().isoformat(),
-            "metadata": metadata or {},
-        })
+        self._measurements.append(
+            {
+                "metric": metric_name,
+                "value": value,
+                "unit": unit,
+                "timestamp": datetime.now().isoformat(),
+                "metadata": metadata or {},
+            }
+        )
 
     def check_baseline(self, metric_name: str, value: float) -> tuple[bool, str]:
         """
@@ -545,6 +570,7 @@ def perf_tracker() -> PerformanceTracker:
 # Test Utilities
 # ============================================================================
 
+
 @pytest.fixture
 def temp_dir(tmp_path: Path) -> Path:
     """Create a temporary directory for tests."""
@@ -561,7 +587,7 @@ class TimingContext:
         self.end_time: float = 0
         self.duration_ms: float = 0
 
-    def __enter__(self) -> "TimingContext":
+    def __enter__(self) -> TimingContext:
         self.start_time = time.perf_counter()
         return self
 
@@ -591,6 +617,7 @@ def async_with_timeout():
 # Event Loop Configuration
 # ============================================================================
 
+
 @pytest.fixture(scope="session")
 def event_loop():
     """Create event loop for async tests."""
@@ -603,9 +630,13 @@ def event_loop():
 # Markers
 # ============================================================================
 
+
 def pytest_configure(config):
     """Configure pytest markers."""
-    config.addinivalue_line("markers", "slow: marks tests as slow (deselect with '-m \"not slow\"')")
+    config.addinivalue_line(
+        "markers",
+        "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+    )
     config.addinivalue_line("markers", "integration: marks integration tests")
     config.addinivalue_line("markers", "e2e: marks end-to-end tests")
     config.addinivalue_line("markers", "chaos: marks chaos/resilience tests")

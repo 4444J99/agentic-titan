@@ -17,15 +17,16 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any
 
-from agents.framework.base_agent import BaseAgent, AgentState
 from adapters.base import LLMMessage
 from adapters.router import get_router
+from agents.framework.base_agent import BaseAgent
 
 logger = logging.getLogger("titan.agents.security_analyst")
 
 
 class Severity(Enum):
     """Vulnerability severity levels."""
+
     CRITICAL = "critical"
     HIGH = "high"
     MEDIUM = "medium"
@@ -35,6 +36,7 @@ class Severity(Enum):
 
 class VulnerabilityCategory(Enum):
     """Categories of security vulnerabilities."""
+
     INJECTION = "injection"  # SQL, Command, LDAP injection
     BROKEN_AUTH = "broken_authentication"
     SENSITIVE_DATA = "sensitive_data_exposure"
@@ -51,6 +53,7 @@ class VulnerabilityCategory(Enum):
 
 class ComplianceFramework(Enum):
     """Compliance frameworks."""
+
     OWASP_TOP_10 = "owasp_top_10"
     CIS = "cis_benchmarks"
     NIST = "nist_csf"
@@ -63,6 +66,7 @@ class ComplianceFramework(Enum):
 @dataclass
 class Vulnerability:
     """A detected security vulnerability."""
+
     id: str
     category: VulnerabilityCategory
     severity: Severity
@@ -79,6 +83,7 @@ class Vulnerability:
 @dataclass
 class DependencyAudit:
     """Dependency security audit result."""
+
     package_name: str
     version: str
     vulnerabilities: list[dict[str, Any]] = field(default_factory=list)
@@ -91,6 +96,7 @@ class DependencyAudit:
 @dataclass
 class ComplianceCheck:
     """Compliance check result."""
+
     framework: ComplianceFramework
     control_id: str
     control_name: str
@@ -102,6 +108,7 @@ class ComplianceCheck:
 @dataclass
 class SecurityReport:
     """Complete security analysis report."""
+
     scan_id: str
     vulnerabilities: list[Vulnerability] = field(default_factory=list)
     dependency_audits: list[DependencyAudit] = field(default_factory=list)
@@ -124,10 +131,19 @@ class SecurityAnalystAgent(BaseAgent):
 
     # Patterns for common vulnerabilities
     SECRET_PATTERNS = {
-        "aws_key": r"(?:AWS|aws)[_\-]?(?:ACCESS|access)[_\-]?(?:KEY|key)[_\-]?(?:ID|id)?\s*[:=]\s*['\"]?([A-Z0-9]{20})['\"]?",
-        "aws_secret": r"(?:AWS|aws)[_\-]?(?:SECRET|secret)[_\-]?(?:ACCESS|access)?[_\-]?(?:KEY|key)?\s*[:=]\s*['\"]?([A-Za-z0-9/+=]{40})['\"]?",
+        "aws_key": (
+            r"(?:AWS|aws)[_\-]?(?:ACCESS|access)[_\-]?"
+            r"(?:KEY|key)[_\-]?(?:ID|id)?\s*[:=]\s*['\"]?([A-Z0-9]{20})['\"]?"
+        ),
+        "aws_secret": (
+            r"(?:AWS|aws)[_\-]?(?:SECRET|secret)[_\-]?(?:ACCESS|access)?"
+            r"[_\-]?(?:KEY|key)?\s*[:=]\s*['\"]?([A-Za-z0-9/+=]{40})['\"]?"
+        ),
         "github_token": r"(?:gh[ps]_[A-Za-z0-9]{36}|github_pat_[A-Za-z0-9]{22}_[A-Za-z0-9]{59})",
-        "generic_api_key": r"(?:api[_\-]?key|apikey|secret[_\-]?key)\s*[:=]\s*['\"]?([A-Za-z0-9\-_]{16,})['\"]?",
+        "generic_api_key": (
+            r"(?:api[_\-]?key|apikey|secret[_\-]?key)\s*[:=]\s*['\"]?"
+            r"([A-Za-z0-9\-_]{16,})['\"]?"
+        ),
         "password": r"(?:password|passwd|pwd)\s*[:=]\s*['\"]([^'\"]{8,})['\"]",
         "jwt": r"eyJ[A-Za-z0-9\-_]+\.eyJ[A-Za-z0-9\-_]+\.[A-Za-z0-9\-_]+",
         "private_key": r"-----BEGIN (?:RSA |EC |DSA )?PRIVATE KEY-----",
@@ -164,13 +180,16 @@ class SecurityAnalystAgent(BaseAgent):
         **kwargs: Any,
     ) -> None:
         kwargs.setdefault("name", "security_analyst")
-        kwargs.setdefault("capabilities", [
-            "vulnerability_scanning",
-            "dependency_audit",
-            "compliance_checking",
-            "secret_detection",
-            "remediation_guidance",
-        ])
+        kwargs.setdefault(
+            "capabilities",
+            [
+                "vulnerability_scanning",
+                "dependency_audit",
+                "compliance_checking",
+                "secret_detection",
+                "remediation_guidance",
+            ],
+        )
         super().__init__(**kwargs)
 
         self.scan_depth = scan_depth  # quick, standard, deep
@@ -271,69 +290,79 @@ class SecurityAnalystAgent(BaseAgent):
         for secret_type, pattern in self.SECRET_PATTERNS.items():
             for line_num, line in enumerate(lines, 1):
                 if re.search(pattern, line, re.IGNORECASE):
-                    vulnerabilities.append(Vulnerability(
-                        id=f"SEC-{secret_type.upper()}-{line_num}",
-                        category=VulnerabilityCategory.SECRETS,
-                        severity=Severity.CRITICAL,
-                        title=f"Hardcoded {secret_type.replace('_', ' ').title()}",
-                        description=f"Potential hardcoded secret detected",
-                        file_path=file_path,
-                        line_number=line_num,
-                        code_snippet=line.strip()[:100],
-                        recommendation="Use environment variables or a secrets manager",
-                        cwe_id="CWE-798",
-                    ))
+                    vulnerabilities.append(
+                        Vulnerability(
+                            id=f"SEC-{secret_type.upper()}-{line_num}",
+                            category=VulnerabilityCategory.SECRETS,
+                            severity=Severity.CRITICAL,
+                            title=f"Hardcoded {secret_type.replace('_', ' ').title()}",
+                            description="Potential hardcoded secret detected",
+                            file_path=file_path,
+                            line_number=line_num,
+                            code_snippet=line.strip()[:100],
+                            recommendation="Use environment variables or a secrets manager",
+                            cwe_id="CWE-798",
+                        )
+                    )
 
         # Check for SQL injection
         for pattern in self.SQL_INJECTION_PATTERNS:
             for line_num, line in enumerate(lines, 1):
                 if re.search(pattern, line, re.IGNORECASE):
-                    vulnerabilities.append(Vulnerability(
-                        id=f"SEC-SQLI-{line_num}",
-                        category=VulnerabilityCategory.INJECTION,
-                        severity=Severity.HIGH,
-                        title="Potential SQL Injection",
-                        description="SQL query constructed with string formatting/concatenation",
-                        file_path=file_path,
-                        line_number=line_num,
-                        code_snippet=line.strip()[:100],
-                        recommendation="Use parameterized queries or an ORM",
-                        cwe_id="CWE-89",
-                    ))
+                    vulnerabilities.append(
+                        Vulnerability(
+                            id=f"SEC-SQLI-{line_num}",
+                            category=VulnerabilityCategory.INJECTION,
+                            severity=Severity.HIGH,
+                            title="Potential SQL Injection",
+                            description=(
+                                "SQL query constructed with string formatting/concatenation"
+                            ),
+                            file_path=file_path,
+                            line_number=line_num,
+                            code_snippet=line.strip()[:100],
+                            recommendation="Use parameterized queries or an ORM",
+                            cwe_id="CWE-89",
+                        )
+                    )
 
         # Check for XSS
         for pattern in self.XSS_PATTERNS:
             for line_num, line in enumerate(lines, 1):
                 if re.search(pattern, line, re.IGNORECASE):
-                    vulnerabilities.append(Vulnerability(
-                        id=f"SEC-XSS-{line_num}",
-                        category=VulnerabilityCategory.XSS,
-                        severity=Severity.MEDIUM,
-                        title="Potential Cross-Site Scripting (XSS)",
-                        description="Unsafe HTML manipulation detected",
-                        file_path=file_path,
-                        line_number=line_num,
-                        code_snippet=line.strip()[:100],
-                        recommendation="Sanitize user input and use safe DOM APIs",
-                        cwe_id="CWE-79",
-                    ))
+                    vulnerabilities.append(
+                        Vulnerability(
+                            id=f"SEC-XSS-{line_num}",
+                            category=VulnerabilityCategory.XSS,
+                            severity=Severity.MEDIUM,
+                            title="Potential Cross-Site Scripting (XSS)",
+                            description="Unsafe HTML manipulation detected",
+                            file_path=file_path,
+                            line_number=line_num,
+                            code_snippet=line.strip()[:100],
+                            recommendation="Sanitize user input and use safe DOM APIs",
+                            cwe_id="CWE-79",
+                        )
+                    )
 
         # Check for command injection
         for pattern in self.COMMAND_INJECTION_PATTERNS:
             for line_num, line in enumerate(lines, 1):
                 if re.search(pattern, line, re.IGNORECASE):
-                    vulnerabilities.append(Vulnerability(
-                        id=f"SEC-CMDI-{line_num}",
-                        category=VulnerabilityCategory.INJECTION,
-                        severity=Severity.CRITICAL,
-                        title="Potential Command Injection",
-                        description="Shell command constructed with user input",
-                        file_path=file_path,
-                        line_number=line_num,
-                        code_snippet=line.strip()[:100],
-                        recommendation="Use subprocess with shell=False and validate inputs",
-                        cwe_id="CWE-78",
-                    ))
+                    vulnerabilities.append(
+                        Vulnerability(
+                            id=f"SEC-CMDI-{line_num}",
+                            category=VulnerabilityCategory.INJECTION,
+                            severity=Severity.CRITICAL,
+                            title="Potential Command Injection",
+                            description="Shell command constructed with user input",
+                            file_path=file_path,
+                            line_number=line_num,
+                            code_snippet=line.strip()[:100],
+                            recommendation="Use subprocess with shell=False and validate inputs",
+                            cwe_id="CWE-78",
+                        )
+                    )
 
         return vulnerabilities
 
@@ -382,7 +411,8 @@ Severities: critical, high, medium, low""",
                 current_vuln = {"vuln": line.replace("VULN:", "").strip()}
             elif line.startswith("LINE:") and current_vuln:
                 try:
-                    current_vuln["line"] = int(re.search(r"\d+", line).group())
+                    match = re.search(r"\d+", line)
+                    current_vuln["line"] = int(match.group()) if match else 0
                 except (AttributeError, ValueError):
                     current_vuln["line"] = 0
             elif line.startswith("DESC:") and current_vuln:
@@ -400,18 +430,22 @@ Severities: critical, high, medium, low""",
     def _parse_vuln(self, vuln_data: dict[str, Any], file_path: str) -> Vulnerability:
         """Parse vulnerability data from LLM response."""
         vuln_line = vuln_data.get("vuln", "")
+        vuln_line_lower = vuln_line.lower()
 
         # Parse category
         category = VulnerabilityCategory.SECURITY_MISCONFIG
         for cat in VulnerabilityCategory:
-            if cat.value.replace("_", " ") in vuln_line.lower() or cat.name.lower() in vuln_line.lower():
+            if (
+                cat.value.replace("_", " ") in vuln_line_lower
+                or cat.name.lower() in vuln_line_lower
+            ):
                 category = cat
                 break
 
         # Parse severity
         severity = Severity.MEDIUM
         for sev in Severity:
-            if sev.value in vuln_line.lower():
+            if sev.value in vuln_line_lower:
                 severity = sev
                 break
 
@@ -456,7 +490,7 @@ Severities: critical, high, medium, low""",
                 role="user",
                 content=f"""Analyze these {ecosystem} dependencies for security issues:
 
-{chr(10).join(f'- {pkg}: {ver}' for pkg, ver in dependencies.items())}
+{chr(10).join(f"- {pkg}: {ver}" for pkg, ver in dependencies.items())}
 
 For each package with known issues:
 PKG: package_name
@@ -500,11 +534,13 @@ LICENSE: license_type""",
         flagged = {a.package_name for a in audits}
         for pkg, ver in dependencies.items():
             if pkg not in flagged:
-                audits.append(DependencyAudit(
-                    package_name=pkg,
-                    version=ver,
-                    risk_level=Severity.LOW,
-                ))
+                audits.append(
+                    DependencyAudit(
+                        package_name=pkg,
+                        version=ver,
+                        risk_level=Severity.LOW,
+                    )
+                )
 
         return audits
 
@@ -590,7 +626,8 @@ RECOMMENDATION: How to fix""",
             elif line.startswith("FINDING:") and current:
                 current.setdefault("findings", []).append(line.replace("FINDING:", "").strip())
             elif line.startswith("RECOMMENDATION:") and current:
-                current.setdefault("recommendations", []).append(line.replace("RECOMMENDATION:", "").strip())
+                recommendation = line.replace("RECOMMENDATION:", "").strip()
+                current.setdefault("recommendations", []).append(recommendation)
 
         if current:
             checks.append(self._create_compliance_check(current, framework))
@@ -724,11 +761,12 @@ RECOMMENDATION: How to fix""",
             parts.append("LOW: Minor issues found")
 
         # Vulnerability summary
-        by_severity = {}
+        by_severity: dict[str, int] = {}
         for v in vulnerabilities:
             by_severity[v.severity.value] = by_severity.get(v.severity.value, 0) + 1
         if by_severity:
-            parts.append(f"Vulnerabilities: {', '.join(f'{k}:{v}' for k, v in by_severity.items())}")
+            severity_summary = ", ".join(f"{k}:{v}" for k, v in by_severity.items())
+            parts.append(f"Vulnerabilities: {severity_summary}")
 
         # Dependency summary
         risky_deps = [a for a in audits if a.vulnerabilities]

@@ -12,14 +12,14 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
+import json
 import logging
 import os
-import json
 import time
 from pathlib import Path
 from typing import Any
 
-from tools.base import Tool, ToolResult, ToolParameter, register_tool
+from tools.base import Tool, ToolParameter, ToolResult, register_tool
 
 logger = logging.getLogger("titan.tools.builtin")
 
@@ -27,6 +27,7 @@ logger = logging.getLogger("titan.tools.builtin")
 # ============================================================================
 # Web Search Configuration
 # ============================================================================
+
 
 class WebSearchConfig:
     """Configuration for web search providers."""
@@ -126,10 +127,7 @@ class SearchCache:
     def cleanup(self) -> int:
         """Remove expired entries. Returns number of entries removed."""
         now = time.time()
-        expired = [
-            k for k, (ts, _) in self._cache.items()
-            if now - ts >= self.ttl_seconds
-        ]
+        expired = [k for k, (ts, _) in self._cache.items() if now - ts >= self.ttl_seconds]
         for key in expired:
             del self._cache[key]
         return len(expired)
@@ -138,6 +136,7 @@ class SearchCache:
 # ============================================================================
 # File Tools
 # ============================================================================
+
 
 class ReadFileTool(Tool):
     """Read contents of a file."""
@@ -350,6 +349,7 @@ class ListDirectoryTool(Tool):
 # Web Tools
 # ============================================================================
 
+
 class WebSearchTool(Tool):
     """Search the web for information using Tavily, Serper, or Brave APIs."""
 
@@ -368,7 +368,9 @@ class WebSearchTool(Tool):
     @property
     def description(self) -> str:
         provider = self._config.provider
-        return f"Search the web for information on a topic using {provider}. Returns relevant results."
+        return (
+            f"Search the web for information on a topic using {provider}. Returns relevant results."
+        )
 
     @property
     def parameters(self) -> list[ToolParameter]:
@@ -440,7 +442,9 @@ class WebSearchTool(Tool):
         provider = self._config.provider
         try:
             if provider == WebSearchConfig.PROVIDER_TAVILY:
-                results = await self._search_tavily(query, num_results, search_depth, include_answer)
+                results = await self._search_tavily(
+                    query, num_results, search_depth, include_answer
+                )
             elif provider == WebSearchConfig.PROVIDER_SERPER:
                 results = await self._search_serper(query, num_results)
             elif provider == WebSearchConfig.PROVIDER_BRAVE:
@@ -514,12 +518,14 @@ class WebSearchTool(Tool):
         # Extract results
         results = []
         for item in data.get("results", []):
-            results.append({
-                "title": item.get("title", ""),
-                "url": item.get("url", ""),
-                "snippet": item.get("content", ""),
-                "score": item.get("score", 0.0),
-            })
+            results.append(
+                {
+                    "title": item.get("title", ""),
+                    "url": item.get("url", ""),
+                    "snippet": item.get("content", ""),
+                    "score": item.get("score", 0.0),
+                }
+            )
 
         # Include answer if requested
         if include_answer and data.get("answer"):
@@ -556,12 +562,14 @@ class WebSearchTool(Tool):
         # Extract organic results
         results = []
         for item in data.get("organic", [])[:num_results]:
-            results.append({
-                "title": item.get("title", ""),
-                "url": item.get("link", ""),
-                "snippet": item.get("snippet", ""),
-                "position": item.get("position", 0),
-            })
+            results.append(
+                {
+                    "title": item.get("title", ""),
+                    "url": item.get("link", ""),
+                    "snippet": item.get("snippet", ""),
+                    "position": item.get("position", 0),
+                }
+            )
 
         return results
 
@@ -591,12 +599,14 @@ class WebSearchTool(Tool):
         # Extract web results
         results = []
         for item in data.get("web", {}).get("results", [])[:num_results]:
-            results.append({
-                "title": item.get("title", ""),
-                "url": item.get("url", ""),
-                "snippet": item.get("description", ""),
-                "age": item.get("age", ""),
-            })
+            results.append(
+                {
+                    "title": item.get("title", ""),
+                    "url": item.get("url", ""),
+                    "snippet": item.get("description", ""),
+                    "age": item.get("age", ""),
+                }
+            )
 
         return results
 
@@ -605,10 +615,10 @@ class WebSearchTool(Tool):
         logger.warning("WebSearchTool: Using simulated response")
         return [
             {
-                "title": f"Result {i+1} for: {query}",
-                "url": f"https://example.com/result{i+1}",
+                "title": f"Result {i + 1} for: {query}",
+                "url": f"https://example.com/result{i + 1}",
                 "snippet": f"This is a simulated search result for '{query}'. "
-                          f"In production, this would be real web content.",
+                f"In production, this would be real web content.",
                 "simulated": True,
             }
             for i in range(min(num_results, 5))
@@ -625,7 +635,9 @@ class WebSearchTool(Tool):
             "provider": self._config.provider,
             "has_api_key": self._config.has_api_key,
             "cache_enabled": self._config.cache_enabled,
-            "rate_limit": f"{self._config.rate_limit_requests}/{self._config.rate_limit_window_seconds}s",
+            "rate_limit": (
+                f"{self._config.rate_limit_requests}/{self._config.rate_limit_window_seconds}s"
+            ),
         }
 
 
@@ -687,20 +699,50 @@ class WebFetchTool(Tool):
 # Shell Tools
 # ============================================================================
 
+
 class ShellCommandTool(Tool):
     """Execute a shell command."""
 
     # Commands that are allowed by default
     ALLOWED_COMMANDS = {
-        "ls", "cat", "head", "tail", "wc", "grep", "find", "echo",
-        "pwd", "date", "whoami", "uname", "env", "which",
-        "python", "pip", "npm", "node", "git", "curl",
+        "ls",
+        "cat",
+        "head",
+        "tail",
+        "wc",
+        "grep",
+        "find",
+        "echo",
+        "pwd",
+        "date",
+        "whoami",
+        "uname",
+        "env",
+        "which",
+        "python",
+        "pip",
+        "npm",
+        "node",
+        "git",
+        "curl",
     }
 
     # Commands that are never allowed
     BLOCKED_COMMANDS = {
-        "rm", "rmdir", "mv", "cp", "chmod", "chown", "sudo", "su",
-        "kill", "pkill", "shutdown", "reboot", "dd", "mkfs",
+        "rm",
+        "rmdir",
+        "mv",
+        "cp",
+        "chmod",
+        "chown",
+        "sudo",
+        "su",
+        "kill",
+        "pkill",
+        "shutdown",
+        "reboot",
+        "dd",
+        "mkfs",
     }
 
     @property
@@ -750,7 +792,7 @@ class ShellCommandTool(Tool):
                 success=False,
                 output=None,
                 error=f"Command '{base_command}' is not in allowed list. "
-                      f"Allowed: {', '.join(sorted(self.ALLOWED_COMMANDS)[:10])}...",
+                f"Allowed: {', '.join(sorted(self.ALLOWED_COMMANDS)[:10])}...",
             )
 
         try:
@@ -785,7 +827,7 @@ class ShellCommandTool(Tool):
                     error=error_output or f"Command failed with code {process.returncode}",
                 )
 
-        except asyncio.TimeoutError:
+        except TimeoutError:
             return ToolResult(
                 success=False,
                 output=None,
@@ -798,6 +840,7 @@ class ShellCommandTool(Tool):
 # ============================================================================
 # Utility Tools
 # ============================================================================
+
 
 class CalculatorTool(Tool):
     """Perform mathematical calculations using ast.literal_eval for safety."""
@@ -823,8 +866,8 @@ class CalculatorTool(Tool):
 
     async def execute(self, expression: str) -> ToolResult:
         import ast
-        import operator
         import math
+        import operator
 
         # Supported operators
         ops = {
@@ -955,6 +998,7 @@ class JsonTool(Tool):
 # ============================================================================
 # Registration
 # ============================================================================
+
 
 def register_builtin_tools() -> None:
     """Register all built-in tools."""

@@ -10,10 +10,10 @@ Reference: vendor/tools/memori/ SQL-native patterns
 """
 
 from titan.memory.backend import (
-    MemoryBackend,
-    MemoryEntry,
-    MemoryConfig,
     BackendType,
+    MemoryBackend,
+    MemoryConfig,
+    MemoryEntry,
 )
 from titan.memory.chromadb_backend import ChromaDBBackend
 from titan.memory.memori_backend import MemoriBackend

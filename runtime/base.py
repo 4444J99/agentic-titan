@@ -14,33 +14,33 @@ import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from datetime import datetime
-from enum import Enum
-from typing import Any, Callable, Coroutine
+from enum import StrEnum
+from typing import Any
 from uuid import uuid4
 
 logger = logging.getLogger("titan.runtime")
 
 
-class RuntimeType(str, Enum):
+class RuntimeType(StrEnum):
     """Types of runtimes available."""
 
-    LOCAL = "local"          # Direct Python process
-    DOCKER = "docker"        # Docker container
-    K3S = "k3s"              # Kubernetes (K3s)
-    OPENFAAS = "openfaas"    # OpenFaaS serverless
+    LOCAL = "local"  # Direct Python process
+    DOCKER = "docker"  # Docker container
+    K3S = "k3s"  # Kubernetes (K3s)
+    OPENFAAS = "openfaas"  # OpenFaaS serverless
     FIRECRACKER = "firecracker"  # Firecracker microVM (Linux only)
 
 
-class ProcessState(str, Enum):
+class ProcessState(StrEnum):
     """State of an agent process."""
 
-    PENDING = "pending"        # Waiting to start
-    STARTING = "starting"      # Initializing
-    RUNNING = "running"        # Actively executing
-    PAUSED = "paused"          # Temporarily stopped
-    COMPLETED = "completed"    # Finished successfully
-    FAILED = "failed"          # Terminated with error
-    CANCELLED = "cancelled"    # User cancelled
+    PENDING = "pending"  # Waiting to start
+    STARTING = "starting"  # Initializing
+    RUNNING = "running"  # Actively executing
+    PAUSED = "paused"  # Temporarily stopped
+    COMPLETED = "completed"  # Finished successfully
+    FAILED = "failed"  # Terminated with error
+    CANCELLED = "cancelled"  # User cancelled
 
 
 @dataclass
@@ -51,8 +51,8 @@ class RuntimeConfig:
     name: str | None = None
 
     # Resource limits
-    cpu_limit: float | None = None        # CPU cores (e.g., 0.5 = 500m)
-    memory_limit: str | None = None       # Memory limit (e.g., "512Mi")
+    cpu_limit: float | None = None  # CPU cores (e.g., 0.5 = 500m)
+    memory_limit: str | None = None  # Memory limit (e.g., "512Mi")
     gpu_required: bool = False
 
     # Networking
@@ -66,9 +66,9 @@ class RuntimeConfig:
     environment: dict[str, str] = field(default_factory=dict)
 
     # Timeouts
-    startup_timeout: float = 30.0         # Seconds to wait for startup
-    execution_timeout: float = 300.0      # Max execution time
-    shutdown_timeout: float = 10.0        # Time to wait for graceful shutdown
+    startup_timeout: float = 30.0  # Seconds to wait for startup
+    execution_timeout: float = 300.0  # Max execution time
+    shutdown_timeout: float = 10.0  # Time to wait for graceful shutdown
 
     # Docker-specific
     image: str | None = None
@@ -95,7 +95,7 @@ class RuntimeConstraints:
     auto_scale: bool = False
 
     # Execution requirements
-    max_execution_time: float = 300.0     # Seconds
+    max_execution_time: float = 300.0  # Seconds
     needs_isolation: bool = False
     needs_persistence: bool = False
 
@@ -284,10 +284,9 @@ class Runtime(ABC):
             "type": self.type.value,
             "name": self.name,
             "initialized": self._initialized,
-            "active_processes": len([
-                p for p in self._processes.values()
-                if p.state == ProcessState.RUNNING
-            ]),
+            "active_processes": len(
+                [p for p in self._processes.values() if p.state == ProcessState.RUNNING]
+            ),
         }
 
     def get_process(self, process_id: str) -> AgentProcess | None:

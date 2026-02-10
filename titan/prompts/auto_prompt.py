@@ -18,13 +18,13 @@ from __future__ import annotations
 import logging
 import re
 from dataclasses import dataclass, field
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 logger = logging.getLogger("titan.prompts.auto_prompt")
 
 
-class TaskComplexity(str, Enum):
+class TaskComplexity(StrEnum):
     """Task complexity levels for prompt adaptation."""
 
     TRIVIAL = "trivial"  # Simple lookups, basic questions
@@ -34,7 +34,7 @@ class TaskComplexity(str, Enum):
     EXPERT = "expert"  # Cutting-edge, research-level
 
 
-class ModelTier(str, Enum):
+class ModelTier(StrEnum):
     """Model capability tiers."""
 
     ECONOMY = "economy"  # GPT-4o-mini, Claude Haiku, Llama-8B
@@ -110,16 +110,35 @@ class AutoPrompter:
     # Complexity heuristics
     COMPLEXITY_KEYWORDS = {
         TaskComplexity.HIGH: [
-            "analyze", "synthesize", "evaluate", "design", "architect",
-            "compare and contrast", "meta-", "recursive", "emergent",
+            "analyze",
+            "synthesize",
+            "evaluate",
+            "design",
+            "architect",
+            "compare and contrast",
+            "meta-",
+            "recursive",
+            "emergent",
         ],
         TaskComplexity.MEDIUM: [
-            "explain", "describe", "implement", "create", "develop",
-            "identify", "classify", "organize",
+            "explain",
+            "describe",
+            "implement",
+            "create",
+            "develop",
+            "identify",
+            "classify",
+            "organize",
         ],
         TaskComplexity.LOW: [
-            "list", "define", "name", "state", "summarize",
-            "what is", "who is", "when did",
+            "list",
+            "define",
+            "name",
+            "state",
+            "summarize",
+            "what is",
+            "who is",
+            "when did",
         ],
     }
 
@@ -309,7 +328,9 @@ class AutoPrompter:
         if format_hint:
             constraints.append(f"Output format: {format_hint}")
 
-        constraints_text = "\n<constraints>\n" + "\n".join(f"- {c}" for c in constraints) + "\n</constraints>\n"
+        constraints_text = (
+            "\n<constraints>\n" + "\n".join(f"- {c}" for c in constraints) + "\n</constraints>\n"
+        )
 
         # Add before closing or at end
         if "</output_format>" in prompt:

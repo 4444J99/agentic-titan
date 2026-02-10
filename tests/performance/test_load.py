@@ -13,9 +13,7 @@ from __future__ import annotations
 import asyncio
 import gc
 import statistics
-import sys
 import time
-from typing import Any
 
 import pytest
 
@@ -65,10 +63,7 @@ class TestConcurrentAgentScaling:
         )
 
         # Calculate success rate
-        successes = sum(
-            1 for r in results
-            if not isinstance(r, Exception) and r.success
-        )
+        successes = sum(1 for r in results if not isinstance(r, Exception) and r.success)
         success_rate = successes / agent_count
 
         perf_tracker.record(
@@ -78,7 +73,7 @@ class TestConcurrentAgentScaling:
         )
 
         # Assert reasonable performance
-        assert success_rate >= 0.8, f"Only {success_rate*100:.1f}% succeeded"
+        assert success_rate >= 0.8, f"Only {success_rate * 100:.1f}% succeeded"
         # Per-agent time should be reasonable
         per_agent_ms = t.duration_ms / agent_count
         assert per_agent_ms < 1000, f"Per-agent time too high: {per_agent_ms:.1f}ms"
@@ -97,7 +92,7 @@ class TestConcurrentAgentScaling:
 
         for i in range(20):
             with timing() as t:
-                agent = ResearcherAgent(
+                ResearcherAgent(
                     name=f"test-{i}",
                     topic="Test",
                     hive_mind=mock_hive_mind,
@@ -125,7 +120,7 @@ class TestConcurrentAgentScaling:
             engine = TopologyEngine()
 
             # Create topology
-            with timing() as create_time:
+            with timing():
                 topology = engine.create_topology(TopologyType.MESH)
 
             # Add agents
@@ -137,7 +132,7 @@ class TestConcurrentAgentScaling:
             route_times = []
             for _ in range(100):
                 with timing() as route_time:
-                    path = topology.get_routing_path("agent-0", f"agent-{agent_count-1}")
+                    topology.get_routing_path("agent-0", f"agent-{agent_count - 1}")
                 route_times.append(route_time.duration_ms)
 
             perf_tracker.record(
@@ -165,8 +160,9 @@ class TestMemoryUsage:
         perf_tracker,
     ):
         """Test memory doesn't grow unbounded over time."""
-        from agents.archetypes.researcher import ResearcherAgent
         import tracemalloc
+
+        from agents.archetypes.researcher import ResearcherAgent
 
         tracemalloc.start()
 
@@ -482,7 +478,7 @@ class TestBaselineComparison:
         times = []
         for i in range(20):
             with timing() as t:
-                agent = ResearcherAgent(
+                ResearcherAgent(
                     name=f"test-{i}",
                     topic="Test",
                     hive_mind=mock_hive_mind,
@@ -553,17 +549,16 @@ class TestScalabilityLimits:
                     timeout=60.0,
                 )
 
-                success_rate = sum(
-                    1 for r in results
-                    if not isinstance(r, Exception) and r.success
-                ) / count
+                success_rate = (
+                    sum(1 for r in results if not isinstance(r, Exception) and r.success) / count
+                )
 
                 if success_rate >= 0.9:
                     max_successful = count
                 else:
                     break
 
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 break
 
         perf_tracker.record("max_concurrent_agents", float(max_successful), "agents")

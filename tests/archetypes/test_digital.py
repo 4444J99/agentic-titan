@@ -4,9 +4,8 @@ from __future__ import annotations
 
 import pytest
 
-from agents.archetypes.swarm_intelligence import SwarmIntelligenceAgent, SwarmAlgorithm
-from agents.archetypes.dao import DAOAgent, ProposalType, ProposalStatus, VoteChoice
-from agents.framework.base_agent import AgentState
+from agents.archetypes.dao import DAOAgent, ProposalStatus, ProposalType, VoteChoice
+from agents.archetypes.swarm_intelligence import SwarmAlgorithm, SwarmIntelligenceAgent
 
 
 class TestSwarmIntelligenceAgent:

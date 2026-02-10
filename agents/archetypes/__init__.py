@@ -33,37 +33,37 @@ Digital Archetypes:
 - DAOAgent: Decentralized governance with proposals and voting
 """
 
-from agents.archetypes.orchestrator import OrchestratorAgent
-from agents.archetypes.researcher import ResearcherAgent
-from agents.archetypes.coder import CoderAgent
-from agents.archetypes.reviewer import ReviewerAgent
-from agents.archetypes.paper2code import Paper2CodeAgent
-from agents.archetypes.cfo import CFOAgent
-from agents.archetypes.devops import DevOpsAgent
-from agents.archetypes.security_analyst import SecurityAnalystAgent
-from agents.archetypes.data_engineer import DataEngineerAgent
-from agents.archetypes.product_manager import ProductManagerAgent
-
-# Governance archetypes
-from agents.archetypes.jury import JuryAgent
-from agents.archetypes.government import (
-    ExecutiveAgent,
-    LegislativeAgent,
-    JudicialAgent,
-)
-from agents.archetypes.bureaucracy import BureaucracyAgent
-
-# Biological archetypes
-from agents.archetypes.eusocial import EusocialColonyAgent
-from agents.archetypes.cell import CellAgent
+from agents.archetypes.actor_network import ActorNetworkAgent
 
 # Philosophical archetypes
 from agents.archetypes.assemblage import AssemblageAgent
-from agents.archetypes.actor_network import ActorNetworkAgent
+from agents.archetypes.bureaucracy import BureaucracyAgent
+from agents.archetypes.cell import CellAgent
+from agents.archetypes.cfo import CFOAgent
+from agents.archetypes.coder import CoderAgent
+from agents.archetypes.dao import DAOAgent
+from agents.archetypes.data_engineer import DataEngineerAgent
+from agents.archetypes.devops import DevOpsAgent
+
+# Biological archetypes
+from agents.archetypes.eusocial import EusocialColonyAgent
+from agents.archetypes.government import (
+    ExecutiveAgent,
+    JudicialAgent,
+    LegislativeAgent,
+)
+
+# Governance archetypes
+from agents.archetypes.jury import JuryAgent
+from agents.archetypes.orchestrator import OrchestratorAgent
+from agents.archetypes.paper2code import Paper2CodeAgent
+from agents.archetypes.product_manager import ProductManagerAgent
+from agents.archetypes.researcher import ResearcherAgent
+from agents.archetypes.reviewer import ReviewerAgent
+from agents.archetypes.security_analyst import SecurityAnalystAgent
 
 # Digital archetypes
 from agents.archetypes.swarm_intelligence import SwarmIntelligenceAgent
-from agents.archetypes.dao import DAOAgent
 
 __all__ = [
     # Core archetypes

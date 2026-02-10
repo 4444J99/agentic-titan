@@ -13,9 +13,10 @@ from __future__ import annotations
 
 import logging
 from abc import ABC, abstractmethod
+from collections.abc import AsyncIterator
 from dataclasses import dataclass, field
-from enum import Enum
-from typing import TYPE_CHECKING, Any, AsyncIterator
+from enum import StrEnum
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from titan.safety.filters import FilterPipeline
@@ -24,7 +25,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger("titan.adapters")
 
 
-class LLMProvider(str, Enum):
+class LLMProvider(StrEnum):
     """Supported LLM providers."""
 
     OLLAMA = "ollama"
@@ -326,8 +327,7 @@ class OllamaAdapter(LLMAdapter):
             usage={
                 "prompt_tokens": data.get("prompt_eval_count", 0),
                 "completion_tokens": data.get("eval_count", 0),
-                "total_tokens": data.get("prompt_eval_count", 0)
-                + data.get("eval_count", 0),
+                "total_tokens": data.get("prompt_eval_count", 0) + data.get("eval_count", 0),
             },
             raw_response=data,
         )
@@ -341,8 +341,9 @@ class OllamaAdapter(LLMAdapter):
         temperature: float | None = None,
         max_tokens: int | None = None,
     ) -> AsyncIterator[str]:
-        import httpx
         import json
+
+        import httpx
 
         ollama_messages = []
         if system:
@@ -441,18 +442,18 @@ class AnthropicAdapter(LLMAdapter):
                     # Last user message - apply cache control
                     content = msg["content"]
                     if isinstance(content, str):
-                        modified_messages.append({
-                            "role": "user",
-                            "content": [
-                                {
-                                    "type": "text",
-                                    "text": content,
-                                    "cache_control": {
-                                        "type": self.config.cache_control_type
-                                    },
-                                }
-                            ],
-                        })
+                        modified_messages.append(
+                            {
+                                "role": "user",
+                                "content": [
+                                    {
+                                        "type": "text",
+                                        "text": content,
+                                        "cache_control": {"type": self.config.cache_control_type},
+                                    }
+                                ],
+                            }
+                        )
                     else:
                         # Already structured content
                         modified_messages.append(msg)
@@ -482,9 +483,7 @@ class AnthropicAdapter(LLMAdapter):
             anthropic_messages.append({"role": msg.role, "content": msg.content})
 
         # Apply prompt caching
-        anthropic_messages, system_content = self._apply_cache_control(
-            anthropic_messages, system
-        )
+        anthropic_messages, system_content = self._apply_cache_control(anthropic_messages, system)
 
         # Convert tools
         anthropic_tools = None
@@ -540,8 +539,7 @@ class AnthropicAdapter(LLMAdapter):
             usage={
                 "prompt_tokens": response.usage.input_tokens,
                 "completion_tokens": response.usage.output_tokens,
-                "total_tokens": response.usage.input_tokens
-                + response.usage.output_tokens,
+                "total_tokens": response.usage.input_tokens + response.usage.output_tokens,
             },
             tool_calls=tool_calls,
             raw_response=response,
@@ -660,9 +658,7 @@ class OpenAIAdapter(LLMAdapter):
             finish_reason=choice.finish_reason,
             usage={
                 "prompt_tokens": response.usage.prompt_tokens if response.usage else 0,
-                "completion_tokens": response.usage.completion_tokens
-                if response.usage
-                else 0,
+                "completion_tokens": response.usage.completion_tokens if response.usage else 0,
                 "total_tokens": response.usage.total_tokens if response.usage else 0,
             },
             tool_calls=tool_calls,
@@ -779,8 +775,9 @@ class GroqAdapter(LLMAdapter):
         temperature: float | None = None,
         max_tokens: int | None = None,
     ) -> AsyncIterator[str]:
-        import httpx
         import json
+
+        import httpx
 
         groq_messages = []
         if system:

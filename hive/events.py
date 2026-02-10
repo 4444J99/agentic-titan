@@ -11,10 +11,11 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from collections.abc import Callable, Coroutine
 from dataclasses import dataclass, field
 from datetime import datetime
-from enum import Enum
-from typing import TYPE_CHECKING, Any, Callable, Coroutine
+from enum import StrEnum
+from typing import TYPE_CHECKING, Any
 from uuid import uuid4
 
 if TYPE_CHECKING:
@@ -23,12 +24,12 @@ if TYPE_CHECKING:
 logger = logging.getLogger("titan.hive.events")
 
 
-class EventType(str, Enum):
+class EventType(StrEnum):
     """Types of events in the Hive Mind."""
 
     # Topology events
-    TOPOLOGY_CHANGING = "topology.changing"      # Before switch starts
-    TOPOLOGY_CHANGED = "topology.changed"        # After switch completes
+    TOPOLOGY_CHANGING = "topology.changing"  # Before switch starts
+    TOPOLOGY_CHANGED = "topology.changed"  # After switch completes
     TOPOLOGY_MIGRATION_START = "topology.migration.start"
     TOPOLOGY_MIGRATION_COMPLETE = "topology.migration.complete"
 
@@ -239,6 +240,10 @@ class EventBus:
 
     async def _persist_to_audit_log(self, event: Event) -> None:
         """Persist event to PostgreSQL audit log."""
+        audit_logger = self._audit_logger
+        if audit_logger is None:
+            return
+
         try:
             from titan.persistence.models import AuditEventType
 
@@ -254,7 +259,7 @@ class EventBus:
 
             audit_type = event_type_map.get(event.event_type)
             if audit_type:
-                await self._audit_logger.log_event(
+                await audit_logger.log_event(
                     event_type=audit_type,
                     action=f"Hive event: {event.event_type.value}",
                     agent_id=event.source_id,

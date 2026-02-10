@@ -133,7 +133,9 @@ class OutputSanitizer:
 
         # Apply length limit last
         if self.config.max_length and len(result.sanitized) > self.config.max_length:
-            result.sanitized = result.sanitized[: self.config.max_length - len(self.config.truncate_marker)]
+            result.sanitized = result.sanitized[
+                : self.config.max_length - len(self.config.truncate_marker)
+            ]
             result.sanitized += self.config.truncate_marker
             result.truncated = True
             result.changes_made.append(f"truncated to {self.config.max_length} chars")
@@ -172,7 +174,9 @@ class OutputSanitizer:
         """Remove script tags."""
         pattern = r"<script[^>]*>[\s\S]*?</script>|<script[^>]*/>"
         if re.search(pattern, result.sanitized, re.IGNORECASE):
-            result.sanitized = re.sub(pattern, "[script removed]", result.sanitized, flags=re.IGNORECASE)
+            result.sanitized = re.sub(
+                pattern, "[script removed]", result.sanitized, flags=re.IGNORECASE
+            )
             result.changes_made.append("removed script tags")
         return result
 
@@ -187,7 +191,10 @@ class OutputSanitizer:
     def _redact_api_keys(self, result: SanitizationResult) -> SanitizationResult:
         """Redact API keys."""
         patterns = [
-            (r"(?i)(api[_-]?key|apikey|api_secret)\s*[:=]\s*['\"]?([a-zA-Z0-9_\-]{8,})['\"]?", r"\1=[REDACTED]"),
+            (
+                r"(?i)(api[_-]?key|apikey|api_secret)\s*[:=]\s*['\"]?([a-zA-Z0-9_\-]{8,})['\"]?",
+                r"\1=[REDACTED]",
+            ),
             (r"(?i)(AKIA[0-9A-Z]{16})", "[AWS_KEY_REDACTED]"),
             (r"sk-[a-zA-Z0-9]{20,}", "[OPENAI_KEY_REDACTED]"),
             (r"ghp_[a-zA-Z0-9]{36}", "[GITHUB_TOKEN_REDACTED]"),
@@ -258,12 +265,13 @@ class OutputSanitizer:
     def _redact_credit_cards(self, result: SanitizationResult) -> SanitizationResult:
         """Redact credit card numbers."""
         # Visa, MasterCard, Amex, Discover
-        pattern = r"\b(?:4[0-9]{12}(?:[0-9]{3})?|5[1-5][0-9]{14}|3[47][0-9]{13}|6(?:011|5[0-9]{2})[0-9]{12})\b"
+        pattern = (
+            r"\b(?:4[0-9]{12}(?:[0-9]{3})?|5[1-5][0-9]{14}|"
+            r"3[47][0-9]{13}|6(?:011|5[0-9]{2})[0-9]{12})\b"
+        )
         if re.search(pattern, result.sanitized):
             result.sanitized = re.sub(
-                pattern,
-                lambda m: "**** **** **** " + m.group()[-4:],
-                result.sanitized
+                pattern, lambda m: "**** **** **** " + m.group()[-4:], result.sanitized
             )
             result.changes_made.append("redacted credit cards")
         return result

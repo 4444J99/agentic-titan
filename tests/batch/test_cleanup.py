@@ -6,13 +6,13 @@ Covers cleanup of old results, orphaned artifacts, and stale records.
 
 from __future__ import annotations
 
-import asyncio
-import pytest
 from datetime import datetime, timedelta
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import uuid4
+
+import pytest
 
 from titan.batch.cleanup import (
     cleanup_celery_results,
@@ -21,10 +21,10 @@ from titan.batch.cleanup import (
     full_cleanup,
 )
 
-
 # =============================================================================
 # Fixtures
 # =============================================================================
+
 
 @pytest.fixture
 def temp_artifact_dir():
@@ -54,6 +54,7 @@ def mock_postgres():
 # =============================================================================
 # Cleanup Celery Results Tests
 # =============================================================================
+
 
 class TestCleanupCeleryResults:
     """Tests for Celery result cleanup."""
@@ -86,6 +87,7 @@ class TestCleanupCeleryResults:
 # =============================================================================
 # Cleanup Orphaned Artifacts Tests
 # =============================================================================
+
 
 class TestCleanupOrphanedArtifacts:
     """Tests for orphaned artifact cleanup."""
@@ -180,6 +182,7 @@ class TestCleanupOrphanedArtifacts:
 # Cleanup PostgreSQL Batches Tests
 # =============================================================================
 
+
 class TestCleanupPostgresBatches:
     """Tests for PostgreSQL batch cleanup."""
 
@@ -221,6 +224,7 @@ class TestCleanupPostgresBatches:
 # =============================================================================
 # Full Cleanup Tests
 # =============================================================================
+
 
 class TestFullCleanup:
     """Tests for full cleanup orchestration."""

@@ -17,23 +17,23 @@ The Runtime Selector automatically chooses the best runtime based on:
 """
 
 from runtime.base import (
-    Runtime,
-    RuntimeType,
-    RuntimeConfig,
-    RuntimeConstraints,
     AgentProcess,
     ProcessState,
+    Runtime,
+    RuntimeConfig,
+    RuntimeConstraints,
+    RuntimeType,
 )
-from runtime.selector import RuntimeSelector, SelectionStrategy
-from runtime.local import LocalRuntime
 from runtime.docker import DockerRuntime
+from runtime.local import LocalRuntime
 from runtime.openfaas import OpenFaaSRuntime
 from runtime.sandbox import (
-    SandboxedRuntime,
     SandboxConfig,
+    SandboxedRuntime,
     SandboxType,
     create_sandboxed_runtime,
 )
+from runtime.selector import RuntimeSelector, SelectionStrategy
 
 # Firecracker imports (conditionally available on Linux)
 try:

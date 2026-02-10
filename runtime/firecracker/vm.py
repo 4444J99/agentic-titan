@@ -10,8 +10,6 @@ import asyncio
 import json
 import logging
 import os
-import shutil
-import tempfile
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any
@@ -163,7 +161,8 @@ class MicroVMManager:
             # Build command
             cmd = [
                 vm.config.firecracker_path,
-                "--api-sock", vm.socket_path,
+                "--api-sock",
+                vm.socket_path,
             ]
 
             if vm.config.log_level:
@@ -222,9 +221,7 @@ class MicroVMManager:
             if not force:
                 # Try graceful shutdown via API
                 try:
-                    await self._api_put(
-                        vm, "/actions", {"action_type": "SendCtrlAltDel"}
-                    )
+                    await self._api_put(vm, "/actions", {"action_type": "SendCtrlAltDel"})
                     await asyncio.sleep(1.0)
                 except Exception:
                     pass
@@ -234,7 +231,7 @@ class MicroVMManager:
                 vm.process.terminate()
                 try:
                     await asyncio.wait_for(vm.process.wait(), timeout=5.0)
-                except asyncio.TimeoutError:
+                except TimeoutError:
                     vm.process.kill()
                     await vm.process.wait()
 
@@ -287,12 +284,10 @@ class MicroVMManager:
             agent = GuestAgentProtocol()
             result = await agent.execute_command_via_api(vm, command, timeout)
 
-            result.duration_ms = int(
-                (datetime.now() - start_time).total_seconds() * 1000
-            )
+            result.duration_ms = int((datetime.now() - start_time).total_seconds() * 1000)
             return result
 
-        except asyncio.TimeoutError:
+        except TimeoutError:
             vm.total_errors += 1
             return ExecutionResult(
                 exit_code=-1,
@@ -464,9 +459,7 @@ class MicroVMManager:
                     async with session.put(url, json=data) as response:
                         if response.status >= 400:
                             text = await response.text()
-                            raise RuntimeError(
-                                f"API error {response.status}: {text}"
-                            )
+                            raise RuntimeError(f"API error {response.status}: {text}")
                         if response.content_length and response.content_length > 0:
                             return await response.json()
                         return {}
@@ -484,10 +477,14 @@ class MicroVMManager:
         """Make PUT request using curl (fallback)."""
         cmd = [
             "curl",
-            "--unix-socket", vm.socket_path,
-            "-X", "PUT",
-            "-H", "Content-Type: application/json",
-            "-d", json.dumps(data),
+            "--unix-socket",
+            vm.socket_path,
+            "-X",
+            "PUT",
+            "-H",
+            "Content-Type: application/json",
+            "-d",
+            json.dumps(data),
             f"http://localhost{endpoint}",
         ]
 
@@ -523,8 +520,10 @@ class MicroVMManager:
         except ImportError:
             # Fallback to curl
             cmd = [
-                "curl", "-s",
-                "--unix-socket", vm.socket_path,
+                "curl",
+                "-s",
+                "--unix-socket",
+                vm.socket_path,
                 f"http://localhost{endpoint}",
             ]
 

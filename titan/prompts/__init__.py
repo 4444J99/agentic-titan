@@ -14,13 +14,6 @@ Based on research from:
 - Best practices for multi-agent systems
 """
 
-from titan.prompts.token_optimizer import (
-    CompressionResult,
-    CompressionStrategy,
-    TokenEstimate,
-    TokenOptimizer,
-    get_token_optimizer,
-)
 from titan.prompts.auto_prompt import (
     AdaptedPrompt,
     AutoPrompter,
@@ -28,6 +21,12 @@ from titan.prompts.auto_prompt import (
     PromptConfig,
     TaskComplexity,
     get_auto_prompter,
+)
+from titan.prompts.examples import (
+    STAGE_EXAMPLES,
+    Example,
+    ExampleBank,
+    get_example_bank,
 )
 from titan.prompts.metrics import (
     AggregatedMetrics,
@@ -37,11 +36,12 @@ from titan.prompts.metrics import (
     PromptTracker,
     get_prompt_tracker,
 )
-from titan.prompts.examples import (
-    Example,
-    ExampleBank,
-    STAGE_EXAMPLES,
-    get_example_bank,
+from titan.prompts.token_optimizer import (
+    CompressionResult,
+    CompressionStrategy,
+    TokenEstimate,
+    TokenOptimizer,
+    get_token_optimizer,
 )
 
 __all__ = [

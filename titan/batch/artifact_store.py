@@ -27,6 +27,7 @@ logger = logging.getLogger("titan.batch.artifact_store")
 # Abstract Base
 # =============================================================================
 
+
 class ArtifactStore(ABC):
     """
     Abstract base for artifact storage.
@@ -131,6 +132,7 @@ class ArtifactStore(ABC):
 # Filesystem Store
 # =============================================================================
 
+
 class FilesystemArtifactStore(ArtifactStore):
     """
     Filesystem-based artifact storage.
@@ -204,6 +206,7 @@ class FilesystemArtifactStore(ArtifactStore):
         # Write metadata if provided
         if metadata:
             import json
+
             meta_path = path.with_suffix(f"{path.suffix}.meta.json")
             meta_path.write_text(json.dumps(metadata, indent=2))
 
@@ -328,6 +331,7 @@ class FilesystemArtifactStore(ArtifactStore):
 # S3/MinIO Store
 # =============================================================================
 
+
 class S3ArtifactStore(ArtifactStore):
     """
     S3/MinIO-based artifact storage.
@@ -431,6 +435,7 @@ class S3ArtifactStore(ArtifactStore):
         }
         if metadata:
             import json
+
             s3_metadata["custom"] = json.dumps(metadata)
 
         # Upload to S3

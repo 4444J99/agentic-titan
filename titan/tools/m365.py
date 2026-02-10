@@ -17,8 +17,8 @@ import logging
 import os
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
-from enum import Enum
-from typing import Any
+from enum import StrEnum
+from typing import Any, cast
 
 logger = logging.getLogger("titan.tools.m365")
 
@@ -28,8 +28,9 @@ logger = logging.getLogger("titan.tools.m365")
 # ============================================================================
 
 
-class M365Service(str, Enum):
+class M365Service(StrEnum):
     """Microsoft 365 services."""
+
     OUTLOOK = "outlook"
     CALENDAR = "calendar"
     ONEDRIVE = "onedrive"
@@ -40,6 +41,7 @@ class M365Service(str, Enum):
 @dataclass
 class M365User:
     """Microsoft 365 user."""
+
     id: str
     display_name: str
     email: str
@@ -59,6 +61,7 @@ class M365User:
 @dataclass
 class EmailMessage:
     """Email message."""
+
     id: str
     subject: str
     body: str
@@ -78,7 +81,9 @@ class EmailMessage:
             "body_preview": self.body_preview,
             "sender": self.sender.to_dict() if self.sender else None,
             "recipients": [r.to_dict() for r in self.recipients],
-            "received_datetime": self.received_datetime.isoformat() if self.received_datetime else None,
+            "received_datetime": self.received_datetime.isoformat()
+            if self.received_datetime
+            else None,
             "is_read": self.is_read,
             "has_attachments": self.has_attachments,
             "importance": self.importance,
@@ -88,6 +93,7 @@ class EmailMessage:
 @dataclass
 class CalendarEvent:
     """Calendar event."""
+
     id: str
     subject: str
     body: str = ""
@@ -119,6 +125,7 @@ class CalendarEvent:
 @dataclass
 class DriveItem:
     """OneDrive/SharePoint item."""
+
     id: str
     name: str
     path: str
@@ -137,8 +144,12 @@ class DriveItem:
             "path": self.path,
             "is_folder": self.is_folder,
             "size": self.size,
-            "created_datetime": self.created_datetime.isoformat() if self.created_datetime else None,
-            "modified_datetime": self.modified_datetime.isoformat() if self.modified_datetime else None,
+            "created_datetime": self.created_datetime.isoformat()
+            if self.created_datetime
+            else None,
+            "modified_datetime": self.modified_datetime.isoformat()
+            if self.modified_datetime
+            else None,
             "web_url": self.web_url,
             "mime_type": self.mime_type,
         }
@@ -147,6 +158,7 @@ class DriveItem:
 @dataclass
 class TeamsMessage:
     """Teams chat message."""
+
     id: str
     content: str
     sender: M365User | None = None
@@ -160,7 +172,9 @@ class TeamsMessage:
             "id": self.id,
             "content": self.content,
             "sender": self.sender.to_dict() if self.sender else None,
-            "created_datetime": self.created_datetime.isoformat() if self.created_datetime else None,
+            "created_datetime": self.created_datetime.isoformat()
+            if self.created_datetime
+            else None,
             "chat_id": self.chat_id,
             "channel_id": self.channel_id,
             "team_id": self.team_id,
@@ -269,7 +283,10 @@ class GraphClient:
             if response.status_code == 204:
                 return {"success": True}
 
-            return response.json()
+            payload = response.json()
+            if isinstance(payload, dict):
+                return cast(dict[str, Any], payload)
+            return {"data": payload}
 
     async def get(self, endpoint: str, params: dict[str, Any] | None = None) -> dict[str, Any]:
         """GET request."""
@@ -311,7 +328,10 @@ class OutlookService:
         params = {
             "$top": top,
             "$orderby": "receivedDateTime desc",
-            "$select": "id,subject,bodyPreview,from,toRecipients,ccRecipients,receivedDateTime,isRead,hasAttachments,importance",
+            "$select": (
+                "id,subject,bodyPreview,from,toRecipients,ccRecipients,"
+                "receivedDateTime,isRead,hasAttachments,importance"
+            ),
         }
         if filter_query:
             params["$filter"] = filter_query
@@ -332,17 +352,23 @@ class OutlookService:
                     email=item["from"]["emailAddress"].get("address", ""),
                 )
 
-            messages.append(EmailMessage(
-                id=item["id"],
-                subject=item.get("subject", ""),
-                body="",
-                body_preview=item.get("bodyPreview", ""),
-                sender=sender,
-                received_datetime=datetime.fromisoformat(item["receivedDateTime"].replace("Z", "+00:00")) if item.get("receivedDateTime") else None,
-                is_read=item.get("isRead", False),
-                has_attachments=item.get("hasAttachments", False),
-                importance=item.get("importance", "normal"),
-            ))
+            messages.append(
+                EmailMessage(
+                    id=item["id"],
+                    subject=item.get("subject", ""),
+                    body="",
+                    body_preview=item.get("bodyPreview", ""),
+                    sender=sender,
+                    received_datetime=datetime.fromisoformat(
+                        item["receivedDateTime"].replace("Z", "+00:00")
+                    )
+                    if item.get("receivedDateTime")
+                    else None,
+                    is_read=item.get("isRead", False),
+                    has_attachments=item.get("hasAttachments", False),
+                    importance=item.get("importance", "normal"),
+                )
+            )
 
         return messages
 
@@ -367,7 +393,11 @@ class OutlookService:
             body=response.get("body", {}).get("content", ""),
             body_preview=response.get("bodyPreview", ""),
             sender=sender,
-            received_datetime=datetime.fromisoformat(response["receivedDateTime"].replace("Z", "+00:00")) if response.get("receivedDateTime") else None,
+            received_datetime=datetime.fromisoformat(
+                response["receivedDateTime"].replace("Z", "+00:00")
+            )
+            if response.get("receivedDateTime")
+            else None,
             is_read=response.get("isRead", False),
             has_attachments=response.get("hasAttachments", False),
         )
@@ -387,17 +417,11 @@ class OutlookService:
                 "contentType": "HTML",
                 "content": body,
             },
-            "toRecipients": [
-                {"emailAddress": {"address": email}}
-                for email in to
-            ],
+            "toRecipients": [{"emailAddress": {"address": email}} for email in to],
         }
 
         if cc:
-            message["ccRecipients"] = [
-                {"emailAddress": {"address": email}}
-                for email in cc
-            ]
+            message["ccRecipients"] = [{"emailAddress": {"address": email}} for email in cc]
 
         response = await self.client.post(
             f"/users/{user_id}/sendMail",
@@ -439,17 +463,23 @@ class CalendarService:
 
         events = []
         for item in response.get("value", []):
-            events.append(CalendarEvent(
-                id=item["id"],
-                subject=item.get("subject", ""),
-                body=item.get("body", {}).get("content", ""),
-                start=datetime.fromisoformat(item["start"]["dateTime"]) if item.get("start") else None,
-                end=datetime.fromisoformat(item["end"]["dateTime"]) if item.get("end") else None,
-                location=item.get("location", {}).get("displayName", ""),
-                is_all_day=item.get("isAllDay", False),
-                is_online_meeting=item.get("isOnlineMeeting", False),
-                online_meeting_url=item.get("onlineMeeting", {}).get("joinUrl"),
-            ))
+            events.append(
+                CalendarEvent(
+                    id=item["id"],
+                    subject=item.get("subject", ""),
+                    body=item.get("body", {}).get("content", ""),
+                    start=datetime.fromisoformat(item["start"]["dateTime"])
+                    if item.get("start")
+                    else None,
+                    end=datetime.fromisoformat(item["end"]["dateTime"])
+                    if item.get("end")
+                    else None,
+                    location=item.get("location", {}).get("displayName", ""),
+                    is_all_day=item.get("isAllDay", False),
+                    is_online_meeting=item.get("isOnlineMeeting", False),
+                    online_meeting_url=item.get("onlineMeeting", {}).get("joinUrl"),
+                )
+            )
 
         return events
 
@@ -483,8 +513,7 @@ class CalendarService:
             event_data["location"] = {"displayName": location}
         if attendees:
             event_data["attendees"] = [
-                {"emailAddress": {"address": email}, "type": "required"}
-                for email in attendees
+                {"emailAddress": {"address": email}, "type": "required"} for email in attendees
             ]
         if is_online_meeting:
             event_data["isOnlineMeeting"] = True
@@ -498,8 +527,12 @@ class CalendarService:
         return CalendarEvent(
             id=response["id"],
             subject=response.get("subject", ""),
-            start=datetime.fromisoformat(response["start"]["dateTime"]) if response.get("start") else None,
-            end=datetime.fromisoformat(response["end"]["dateTime"]) if response.get("end") else None,
+            start=datetime.fromisoformat(response["start"]["dateTime"])
+            if response.get("start")
+            else None,
+            end=datetime.fromisoformat(response["end"]["dateTime"])
+            if response.get("end")
+            else None,
             is_online_meeting=response.get("isOnlineMeeting", False),
             online_meeting_url=response.get("onlineMeeting", {}).get("joinUrl"),
         )
@@ -530,17 +563,27 @@ class OneDriveService:
 
         items = []
         for item in response.get("value", []):
-            items.append(DriveItem(
-                id=item["id"],
-                name=item["name"],
-                path=item.get("parentReference", {}).get("path", "") + "/" + item["name"],
-                is_folder="folder" in item,
-                size=item.get("size", 0),
-                created_datetime=datetime.fromisoformat(item["createdDateTime"].replace("Z", "+00:00")) if item.get("createdDateTime") else None,
-                modified_datetime=datetime.fromisoformat(item["lastModifiedDateTime"].replace("Z", "+00:00")) if item.get("lastModifiedDateTime") else None,
-                web_url=item.get("webUrl"),
-                mime_type=item.get("file", {}).get("mimeType"),
-            ))
+            items.append(
+                DriveItem(
+                    id=item["id"],
+                    name=item["name"],
+                    path=item.get("parentReference", {}).get("path", "") + "/" + item["name"],
+                    is_folder="folder" in item,
+                    size=item.get("size", 0),
+                    created_datetime=datetime.fromisoformat(
+                        item["createdDateTime"].replace("Z", "+00:00")
+                    )
+                    if item.get("createdDateTime")
+                    else None,
+                    modified_datetime=datetime.fromisoformat(
+                        item["lastModifiedDateTime"].replace("Z", "+00:00")
+                    )
+                    if item.get("lastModifiedDateTime")
+                    else None,
+                    web_url=item.get("webUrl"),
+                    mime_type=item.get("file", {}).get("mimeType"),
+                )
+            )
 
         return items
 
@@ -823,6 +866,7 @@ class Microsoft365Tool:
                 content = await self.onedrive.download_item(kwargs["path"])
                 if content:
                     import base64
+
                     return {
                         "content": base64.b64encode(content).decode("utf-8"),
                         "size": len(content),
@@ -831,6 +875,7 @@ class Microsoft365Tool:
 
             elif action == "upload_file":
                 import base64
+
                 content = base64.b64decode(kwargs["content"])
                 item = await self.onedrive.upload_item(kwargs["path"], content)
                 return {"file": item.to_dict() if item else None}
@@ -845,12 +890,12 @@ class Microsoft365Tool:
                 return {"channels": channels}
 
             elif action == "send_message":
-                message = await self.teams.send_channel_message(
+                team_message = await self.teams.send_channel_message(
                     team_id=kwargs["team_id"],
                     channel_id=kwargs["channel_id"],
                     content=kwargs["content"],
                 )
-                return {"message": message.to_dict() if message else None}
+                return {"message": team_message.to_dict() if team_message else None}
 
             else:
                 return {"error": f"Unknown action: {action}"}

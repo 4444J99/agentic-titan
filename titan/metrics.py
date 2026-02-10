@@ -15,25 +15,26 @@ from __future__ import annotations
 
 import logging
 import time
+from collections.abc import Callable, Generator
 from contextlib import contextmanager
 from functools import wraps
-from typing import Any, Callable, Generator, TypeVar
+from typing import Any, TypeVar
 
 logger = logging.getLogger("titan.metrics")
 
 # Try to import prometheus_client, fall back to no-op if not available
 try:
     from prometheus_client import (
+        CONTENT_TYPE_LATEST,
+        CollectorRegistry,
         Counter,
         Gauge,
         Histogram,
         Info,
-        Summary,
-        CollectorRegistry,
-        start_http_server,
         generate_latest,
-        CONTENT_TYPE_LATEST,
+        start_http_server,
     )
+
     PROMETHEUS_AVAILABLE = True
 except ImportError:
     PROMETHEUS_AVAILABLE = False
@@ -758,6 +759,7 @@ if PROMETHEUS_AVAILABLE:
 # Instrumentation Helpers
 # ============================================================================
 
+
 class MetricsCollector:
     """
     Centralized metrics collector for Titan.
@@ -795,7 +797,9 @@ class MetricsCollector:
         AGENT_SPAWNED.labels(archetype=archetype).inc()
         AGENT_ACTIVE.labels(archetype=archetype).inc()
 
-    def agent_completed(self, archetype: str, status: str, duration_seconds: float, turns: int) -> None:
+    def agent_completed(
+        self, archetype: str, status: str, duration_seconds: float, turns: int
+    ) -> None:
         """Record agent completion."""
         if not self._enabled:
             return
@@ -898,8 +902,16 @@ class MetricsCollector:
             return
         # Clear all topology gauges (including extended types)
         all_topologies = [
-            "swarm", "hierarchy", "pipeline", "mesh", "ring", "star",
-            "rhizomatic", "arborescent", "territorialized", "deterritorialized",
+            "swarm",
+            "hierarchy",
+            "pipeline",
+            "mesh",
+            "ring",
+            "star",
+            "rhizomatic",
+            "arborescent",
+            "territorialized",
+            "deterritorialized",
         ]
         for t in all_topologies:
             TOPOLOGY_CURRENT.labels(topology_type=t).set(0)
@@ -912,7 +924,9 @@ class MetricsCollector:
         if not self._enabled:
             return
         TOPOLOGY_SWITCHES.labels(from_type=from_type, to_type=to_type).inc()
-        TOPOLOGY_SWITCH_DURATION.labels(from_type=from_type, to_type=to_type).observe(duration_seconds)
+        TOPOLOGY_SWITCH_DURATION.labels(from_type=from_type, to_type=to_type).observe(
+            duration_seconds
+        )
 
     @contextmanager
     def track_topology_switch(self, from_type: str, to_type: str) -> Generator[None, None, None]:
@@ -1078,15 +1092,11 @@ class MetricsCollector:
     # Assembly Theory Metrics
     # ========================================================================
 
-    def set_assembly_index(
-        self, session_id: str, decision_type: str, index: int
-    ) -> None:
+    def set_assembly_index(self, session_id: str, decision_type: str, index: int) -> None:
         """Set the current assembly index for a session."""
         if not self._enabled:
             return
-        ASSEMBLY_INDEX.labels(session_id=session_id, decision_type=decision_type).set(
-            index
-        )
+        ASSEMBLY_INDEX.labels(session_id=session_id, decision_type=decision_type).set(index)
 
     def set_total_assembly(self, session_id: str, value: float) -> None:
         """Set the total assembly metric A."""
@@ -1102,9 +1112,7 @@ class MetricsCollector:
         value = signal_map.get(signal.upper(), 0)
         SELECTION_SIGNAL.labels(session_id=session_id).set(value)
 
-    def assembly_path_recorded(
-        self, session_id: str, path_type: str, length: int
-    ) -> None:
+    def assembly_path_recorded(self, session_id: str, path_type: str, length: int) -> None:
         """Record an assembly path."""
         if not self._enabled:
             return
@@ -1446,6 +1454,7 @@ def get_metrics() -> MetricsCollector:
 # Server Functions
 # ============================================================================
 
+
 def start_metrics_server(port: int = 9100, host: str = "0.0.0.0") -> None:
     """
     Start Prometheus metrics HTTP server.
@@ -1486,6 +1495,7 @@ def get_content_type() -> str:
 # Decorator
 # ============================================================================
 
+
 def instrument(
     archetype: str | None = None,
     track_duration: bool = True,
@@ -1504,6 +1514,7 @@ def instrument(
         async def my_function():
             ...
     """
+
     def decorator(func: F) -> F:
         @wraps(func)
         async def async_wrapper(*args: Any, **kwargs: Any) -> Any:
@@ -1546,6 +1557,7 @@ def instrument(
                     AGENT_DURATION.labels(archetype=arch).observe(duration)
 
         import asyncio
+
         if asyncio.iscoroutinefunction(func):
             return async_wrapper  # type: ignore
         return sync_wrapper  # type: ignore

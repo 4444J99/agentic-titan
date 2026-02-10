@@ -4,8 +4,9 @@ Tests for titan.api.rate_limit module.
 Tests rate limiting configuration and behavior.
 """
 
-import pytest
 from unittest.mock import MagicMock, patch
+
+import pytest
 from fastapi import Request
 
 
@@ -70,7 +71,7 @@ class TestRateLimits:
 
     def test_get_rate_limit_known_endpoint(self):
         """Test getting rate limit for known endpoint."""
-        from titan.api.rate_limit import get_rate_limit, RATE_LIMITS
+        from titan.api.rate_limit import RATE_LIMITS, get_rate_limit
 
         result = get_rate_limit("auth_login")
 
@@ -78,7 +79,7 @@ class TestRateLimits:
 
     def test_get_rate_limit_unknown_endpoint(self):
         """Test getting rate limit for unknown endpoint."""
-        from titan.api.rate_limit import get_rate_limit, RATE_LIMITS
+        from titan.api.rate_limit import RATE_LIMITS, get_rate_limit
 
         result = get_rate_limit("unknown_endpoint")
 

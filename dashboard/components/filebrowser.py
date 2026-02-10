@@ -13,9 +13,8 @@ Reference: vendor/cli/aionui/ file tree patterns
 from __future__ import annotations
 
 import logging
-import os
 import stat
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -376,7 +375,7 @@ class FileBrowser:
         start_path = self.root_path / path if path else self.root_path
         query_lower = query.lower()
 
-        results = []
+        results: list[FileEntry] = []
 
         def search_recursive(dir_path: Path, depth: int = 0) -> None:
             if len(results) >= max_results or depth > self.max_depth:

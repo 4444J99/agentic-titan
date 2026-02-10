@@ -11,17 +11,19 @@ Provides read-only access to Titan system state including:
 
 from __future__ import annotations
 
+import importlib.util
 import json
 import logging
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
-from enum import Enum
-from typing import Any, Callable, Awaitable
+from datetime import datetime
+from enum import StrEnum
+from typing import Any
 
 logger = logging.getLogger("titan.mcp.resources")
 
 
-class ResourceType(str, Enum):
+class ResourceType(StrEnum):
     """Types of MCP resources."""
 
     LEARNING = "learning"
@@ -64,7 +66,10 @@ class MCPResourceDefinition:
 LEARNING_STATS_RESOURCE = MCPResourceDefinition(
     uri="titan://learning/stats",
     name="Learning Statistics",
-    description="Episodic learning system statistics including episode counts, topology performance, and learning rate",
+    description=(
+        "Episodic learning system statistics including episode counts, "
+        "topology performance, and learning rate"
+    ),
     resource_type=ResourceType.LEARNING,
     metadata={"refresh_interval": 30},
 )
@@ -72,7 +77,10 @@ LEARNING_STATS_RESOURCE = MCPResourceDefinition(
 RLHF_STATS_RESOURCE = MCPResourceDefinition(
     uri="titan://learning/rlhf/stats",
     name="RLHF Training Statistics",
-    description="Reinforcement Learning from Human Feedback stats including preference pairs, reward model metrics, and A/B test results",
+    description=(
+        "Reinforcement Learning from Human Feedback stats including preference "
+        "pairs, reward model metrics, and A/B test results"
+    ),
     resource_type=ResourceType.LEARNING,
     metadata={"refresh_interval": 60},
 )
@@ -80,7 +88,10 @@ RLHF_STATS_RESOURCE = MCPResourceDefinition(
 MODEL_SIGNATURES_RESOURCE = MCPResourceDefinition(
     uri="titan://models/signatures",
     name="Model Cognitive Signatures",
-    description="Cognitive dimension scores for all registered models including structured reasoning, creative synthesis, and pattern recognition",
+    description=(
+        "Cognitive dimension scores for all registered models including "
+        "structured reasoning, creative synthesis, and pattern recognition"
+    ),
     resource_type=ResourceType.MODELS,
     metadata={"visualization": "radar"},
 )
@@ -88,7 +99,9 @@ MODEL_SIGNATURES_RESOURCE = MCPResourceDefinition(
 TOPOLOGY_CURRENT_RESOURCE = MCPResourceDefinition(
     uri="titan://topology/current",
     name="Current Topology",
-    description="Active topology configuration including type, agents, connections, and performance metrics",
+    description=(
+        "Active topology configuration including type, agents, connections, and performance metrics"
+    ),
     resource_type=ResourceType.TOPOLOGY,
     metadata={"refresh_interval": 10},
 )
@@ -96,7 +109,10 @@ TOPOLOGY_CURRENT_RESOURCE = MCPResourceDefinition(
 HIVE_EVENTS_RESOURCE = MCPResourceDefinition(
     uri="titan://hive/events/recent",
     name="Recent Hive Events",
-    description="Recent events from the hive event bus including agent state changes, topology transitions, and learning feedback",
+    description=(
+        "Recent events from the hive event bus including agent state changes, "
+        "topology transitions, and learning feedback"
+    ),
     resource_type=ResourceType.HIVE,
     metadata={"max_events": 100, "refresh_interval": 5},
 )
@@ -211,20 +227,13 @@ class ResourceHandler:
                 "timestamp": datetime.now().isoformat(),
             }
 
-            try:
-                from titan.learning.preference_pairs import PreferencePairBuilder
-
-                # Would need actual storage to get real counts
-                stats["preference_pairs"]["available"] = True
-            except ImportError:
-                stats["preference_pairs"]["available"] = False
-
-            try:
-                from titan.learning.deployment import RLHFDeployment
-
-                stats["ab_tests"]["available"] = True
-            except ImportError:
-                stats["ab_tests"]["available"] = False
+            # Would need actual storage to get real counts.
+            stats["preference_pairs"]["available"] = (
+                importlib.util.find_spec("titan.learning.preference_pairs") is not None
+            )
+            stats["ab_tests"]["available"] = (
+                importlib.util.find_spec("titan.learning.deployment") is not None
+            )
 
             return stats
 
@@ -242,20 +251,22 @@ class ResourceHandler:
     async def _read_model_signatures(self) -> dict[str, Any]:
         """Read model cognitive signatures."""
         try:
-            from titan.workflows.cognitive_router import get_cognitive_router
-
-            router = get_cognitive_router()
-            model_registry = router._model_registry
+            from titan.workflows.cognitive_router import (
+                MODEL_RANKINGS,
+                CognitiveTaskType,
+            )
 
             signatures = {}
-            for model_id, traits in model_registry.items():
+            for model_id, traits in MODEL_RANKINGS.items():
                 signatures[model_id] = {
-                    "structured_reasoning": traits.get("structured_reasoning", 0.5),
-                    "creative_synthesis": traits.get("creative_synthesis", 0.5),
-                    "mathematical_analysis": traits.get("mathematical_analysis", 0.5),
-                    "cross_domain": traits.get("cross_domain", 0.5),
-                    "meta_analysis": traits.get("meta_analysis", 0.5),
-                    "pattern_recognition": traits.get("pattern_recognition", 0.5),
+                    "structured_reasoning": traits.get(CognitiveTaskType.STRUCTURED_REASONING, 0.5),
+                    "creative_synthesis": traits.get(CognitiveTaskType.CREATIVE_SYNTHESIS, 0.5),
+                    "mathematical_analysis": traits.get(
+                        CognitiveTaskType.MATHEMATICAL_ANALYSIS, 0.5
+                    ),
+                    "cross_domain": traits.get(CognitiveTaskType.CROSS_DOMAIN, 0.5),
+                    "meta_analysis": traits.get(CognitiveTaskType.META_ANALYSIS, 0.5),
+                    "pattern_recognition": traits.get(CognitiveTaskType.PATTERN_RECOGNITION, 0.5),
                 }
 
             return {
@@ -283,31 +294,30 @@ class ResourceHandler:
     async def _read_topology_current(self) -> dict[str, Any]:
         """Read current topology state."""
         try:
-            from hive.topology import get_topology_engine, TopologyType
+            from hive.topology import TopologyEngine, TopologyType
 
-            engine = get_topology_engine()
+            engine = TopologyEngine()
 
             # Get active topology info
-            topology_info = {
+            topology_info: dict[str, Any] = {
                 "type": "unknown",
                 "agents": [],
                 "connections": [],
                 "metrics": {},
             }
 
-            if hasattr(engine, "_active_topology") and engine._active_topology:
-                topo = engine._active_topology
-                topology_info["type"] = (
-                    topo.topology_type.value
-                    if hasattr(topo, "topology_type")
-                    else "custom"
-                )
-
-                if hasattr(topo, "agents"):
-                    topology_info["agents"] = [
-                        {"id": a.id, "name": getattr(a, "name", a.id)}
-                        for a in topo.agents
-                    ]
+            topo = engine.current_topology
+            if topo is not None:
+                topology_info["type"] = topo.topology_type.value
+                nodes = topo.list_agents()
+                topology_info["agents"] = [
+                    {"id": node.agent_id, "name": node.name} for node in nodes
+                ]
+                topology_info["connections"] = [
+                    {"from": node.agent_id, "to": neighbor}
+                    for node in nodes
+                    for neighbor in node.neighbors
+                ]
 
             return {
                 "topology": topology_info,

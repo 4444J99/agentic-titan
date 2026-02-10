@@ -19,11 +19,11 @@ from datetime import datetime
 from typing import Any
 
 from runtime.base import (
-    Runtime,
-    RuntimeType,
-    RuntimeConfig,
     AgentProcess,
     ProcessState,
+    Runtime,
+    RuntimeConfig,
+    RuntimeType,
 )
 
 logger = logging.getLogger("titan.runtime.docker")
@@ -73,7 +73,8 @@ class DockerRuntime(Runtime):
         """Check if Docker is available."""
         try:
             proc = await asyncio.create_subprocess_exec(
-                "docker", "info",
+                "docker",
+                "info",
                 stdout=asyncio.subprocess.DEVNULL,
                 stderr=asyncio.subprocess.DEVNULL,
             )
@@ -89,7 +90,10 @@ class DockerRuntime(Runtime):
         """Ensure the Docker network exists."""
         try:
             proc = await asyncio.create_subprocess_exec(
-                "docker", "network", "inspect", self._default_network,
+                "docker",
+                "network",
+                "inspect",
+                self._default_network,
                 stdout=asyncio.subprocess.DEVNULL,
                 stderr=asyncio.subprocess.DEVNULL,
             )
@@ -98,7 +102,10 @@ class DockerRuntime(Runtime):
             if proc.returncode != 0:
                 # Create network
                 proc = await asyncio.create_subprocess_exec(
-                    "docker", "network", "create", self._default_network,
+                    "docker",
+                    "network",
+                    "create",
+                    self._default_network,
                     stdout=asyncio.subprocess.DEVNULL,
                     stderr=asyncio.subprocess.DEVNULL,
                 )
@@ -218,10 +225,13 @@ class DockerRuntime(Runtime):
     ) -> list[str]:
         """Build the docker run command as argument list (safe from injection)."""
         cmd = [
-            "docker", "run",
+            "docker",
+            "run",
             "-d",  # Detached
-            "--name", container_name,
-            "--network", self._default_network,
+            "--name",
+            container_name,
+            "--network",
+            self._default_network,
         ]
 
         # Resource limits
@@ -254,10 +264,16 @@ class DockerRuntime(Runtime):
         cmd.append(image)
 
         # Entry command (run the agent)
-        cmd.extend([
-            "python", "-m", "titan.cli", "run",
-            "--prompt", prompt or "",
-        ])
+        cmd.extend(
+            [
+                "python",
+                "-m",
+                "titan.cli",
+                "run",
+                "--prompt",
+                prompt or "",
+            ]
+        )
 
         return cmd
 
@@ -272,8 +288,10 @@ class DockerRuntime(Runtime):
             try:
                 # Check if container is still running
                 proc = await asyncio.create_subprocess_exec(
-                    "docker", "inspect",
-                    "-f", "{{.State.Running}}",
+                    "docker",
+                    "inspect",
+                    "-f",
+                    "{{.State.Running}}",
                     process.container_id,
                     stdout=asyncio.subprocess.PIPE,
                     stderr=asyncio.subprocess.PIPE,
@@ -289,8 +307,10 @@ class DockerRuntime(Runtime):
                 if not running:
                     # Get exit code
                     proc = await asyncio.create_subprocess_exec(
-                        "docker", "inspect",
-                        "-f", "{{.State.ExitCode}}",
+                        "docker",
+                        "inspect",
+                        "-f",
+                        "{{.State.ExitCode}}",
                         process.container_id,
                         stdout=asyncio.subprocess.PIPE,
                     )
@@ -326,7 +346,9 @@ class DockerRuntime(Runtime):
         docker_cmd = "kill" if force else "stop"
         try:
             proc = await asyncio.create_subprocess_exec(
-                "docker", docker_cmd, process.container_id,
+                "docker",
+                docker_cmd,
+                process.container_id,
                 stdout=asyncio.subprocess.DEVNULL,
                 stderr=asyncio.subprocess.DEVNULL,
             )
@@ -352,8 +374,10 @@ class DockerRuntime(Runtime):
 
         try:
             proc = await asyncio.create_subprocess_exec(
-                "docker", "logs",
-                "--tail", str(tail),
+                "docker",
+                "logs",
+                "--tail",
+                str(tail),
                 process.container_id,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.STDOUT,
@@ -368,10 +392,12 @@ class DockerRuntime(Runtime):
     async def health_check(self) -> dict[str, Any]:
         """Check Docker runtime health."""
         base = await super().health_check()
-        base.update({
-            "docker_available": self._docker_available,
-            "network": self._default_network,
-        })
+        base.update(
+            {
+                "docker_available": self._docker_available,
+                "network": self._default_network,
+            }
+        )
         return base
 
     async def build_agent_image(

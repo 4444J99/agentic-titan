@@ -74,8 +74,7 @@ def main() -> int:
         )
 
     print(
-        "[core-boundary] OK: "
-        f"{len(manifest_files)} manifest entries cover all scoped directories."
+        f"[core-boundary] OK: {len(manifest_files)} manifest entries cover all scoped directories."
     )
     return 0
 

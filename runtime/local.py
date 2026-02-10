@@ -18,11 +18,11 @@ from datetime import datetime
 from typing import Any
 
 from runtime.base import (
-    Runtime,
-    RuntimeType,
-    RuntimeConfig,
     AgentProcess,
     ProcessState,
+    Runtime,
+    RuntimeConfig,
+    RuntimeType,
 )
 
 logger = logging.getLogger("titan.runtime.local")
@@ -62,7 +62,7 @@ class LocalRuntime(Runtime):
                 task.cancel()
                 try:
                     await asyncio.wait_for(task, timeout=self.config.shutdown_timeout)
-                except (asyncio.CancelledError, asyncio.TimeoutError):
+                except (TimeoutError, asyncio.CancelledError):
                     pass
 
         self._tasks.clear()
@@ -121,16 +121,16 @@ class LocalRuntime(Runtime):
             agent_spec: Agent specification
             prompt: Optional prompt
         """
-        self._log(process.process_id, f"Starting agent execution")
+        self._log(process.process_id, "Starting agent execution")
         process.mark_started()
 
         try:
             # Import agent classes
             from agents.archetypes import (
-                ResearcherAgent,
                 CoderAgent,
-                ReviewerAgent,
                 OrchestratorAgent,
+                ResearcherAgent,
+                ReviewerAgent,
             )
             from hive import HiveMind
 
@@ -170,7 +170,7 @@ class LocalRuntime(Runtime):
                 agent = agent_class(**kwargs)
 
                 # Run agent
-                self._log(process.process_id, f"Executing agent")
+                self._log(process.process_id, "Executing agent")
                 result = await asyncio.wait_for(
                     agent.run(prompt),
                     timeout=self.config.execution_timeout,
@@ -188,7 +188,7 @@ class LocalRuntime(Runtime):
             process.completed_at = datetime.now()
             raise
 
-        except asyncio.TimeoutError:
+        except TimeoutError:
             self._log(process.process_id, "Agent timed out")
             process.mark_failed("Execution timeout", exit_code=124)
 
@@ -222,7 +222,7 @@ class LocalRuntime(Runtime):
         try:
             timeout = 0 if force else self.config.shutdown_timeout
             await asyncio.wait_for(task, timeout=timeout)
-        except (asyncio.CancelledError, asyncio.TimeoutError):
+        except (TimeoutError, asyncio.CancelledError):
             pass
 
         process = self._processes.get(process_id)
@@ -272,8 +272,10 @@ class LocalRuntime(Runtime):
     async def health_check(self) -> dict[str, Any]:
         """Check local runtime health."""
         base = await super().health_check()
-        base.update({
-            "active_tasks": len([t for t in self._tasks.values() if not t.done()]),
-            "total_processes": len(self._processes),
-        })
+        base.update(
+            {
+                "active_tasks": len([t for t in self._tasks.values() if not t.done()]),
+                "total_processes": len(self._processes),
+            }
+        )
         return base

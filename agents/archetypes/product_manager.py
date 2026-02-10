@@ -13,19 +13,19 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
-from datetime import datetime
 from enum import Enum
-from typing import Any
+from typing import Any, cast
 
-from agents.framework.base_agent import BaseAgent, AgentState
 from adapters.base import LLMMessage
 from adapters.router import get_router
+from agents.framework.base_agent import BaseAgent
 
 logger = logging.getLogger("titan.agents.product_manager")
 
 
 class Priority(Enum):
     """Feature priority levels."""
+
     CRITICAL = "critical"  # P0 - Must have
     HIGH = "high"  # P1 - Should have
     MEDIUM = "medium"  # P2 - Nice to have
@@ -34,6 +34,7 @@ class Priority(Enum):
 
 class StoryType(Enum):
     """Types of user stories."""
+
     FEATURE = "feature"
     BUG = "bug"
     ENHANCEMENT = "enhancement"
@@ -43,6 +44,7 @@ class StoryType(Enum):
 
 class StoryStatus(Enum):
     """User story status."""
+
     DRAFT = "draft"
     REFINED = "refined"
     READY = "ready"
@@ -52,6 +54,7 @@ class StoryStatus(Enum):
 
 class RoadmapQuarter(Enum):
     """Roadmap time horizons."""
+
     Q1 = "Q1"
     Q2 = "Q2"
     Q3 = "Q3"
@@ -64,6 +67,7 @@ class RoadmapQuarter(Enum):
 @dataclass
 class UserStory:
     """A user story with acceptance criteria."""
+
     id: str
     title: str
     story_type: StoryType
@@ -80,6 +84,7 @@ class UserStory:
 @dataclass
 class Requirement:
     """A product requirement."""
+
     id: str
     title: str
     description: str
@@ -94,6 +99,7 @@ class Requirement:
 @dataclass
 class Feature:
     """A product feature for roadmap planning."""
+
     id: str
     name: str
     description: str
@@ -110,6 +116,7 @@ class Feature:
 @dataclass
 class Roadmap:
     """Product roadmap."""
+
     name: str
     vision: str
     features: dict[RoadmapQuarter, list[Feature]] = field(default_factory=dict)
@@ -120,6 +127,7 @@ class Roadmap:
 @dataclass
 class PRD:
     """Product Requirements Document."""
+
     title: str
     version: str = "1.0"
     overview: str = ""
@@ -152,13 +160,16 @@ class ProductManagerAgent(BaseAgent):
         **kwargs: Any,
     ) -> None:
         kwargs.setdefault("name", "product_manager")
-        kwargs.setdefault("capabilities", [
-            "requirements_analysis",
-            "user_story_generation",
-            "feature_prioritization",
-            "roadmap_planning",
-            "prd_generation",
-        ])
+        kwargs.setdefault(
+            "capabilities",
+            [
+                "requirements_analysis",
+                "user_story_generation",
+                "feature_prioritization",
+                "roadmap_planning",
+                "prd_generation",
+            ],
+        )
         super().__init__(**kwargs)
 
         self.product_name = product_name
@@ -236,7 +247,7 @@ INPUT:
 {stakeholder_input}
 
 CONTEXT:
-{context or f'Product: {self.product_name}'}
+{context or f"Product: {self.product_name}"}
 
 For each requirement, provide:
 REQ_ID: REQ-XXX
@@ -340,8 +351,10 @@ CONSTRAINTS: Any limitations""",
         """
         self.increment_turn()
 
-        req_text = requirement if isinstance(requirement, str) else (
-            f"{requirement.title}\n{requirement.description}"
+        req_text = (
+            requirement
+            if isinstance(requirement, str)
+            else (f"{requirement.title}\n{requirement.description}")
         )
 
         messages = [
@@ -420,7 +433,7 @@ Generate 2-5 user stories.""",
                     current["points"] = 3
             elif line.startswith("LABELS:") and current:
                 labels = line.replace("LABELS:", "").strip()
-                current["labels"] = [l.strip() for l in labels.split(",")]
+                current["labels"] = [label.strip() for label in labels.split(",")]
             elif line.startswith("DEPENDENCIES:") and current:
                 deps = line.replace("DEPENDENCIES:", "").strip()
                 if deps.lower() != "none":
@@ -472,20 +485,20 @@ Generate 2-5 user stories.""",
         self.increment_turn()
 
         # Convert strings to features if needed
-        feature_objs = []
+        feature_objs: list[Feature] = []
         for i, f in enumerate(features):
             if isinstance(f, str):
-                feature_objs.append(Feature(
-                    id=f"FEAT-{i+1}",
-                    name=f,
-                    description=f,
-                ))
+                feature_objs.append(
+                    Feature(
+                        id=f"FEAT-{i + 1}",
+                        name=f,
+                        description=f,
+                    )
+                )
             else:
-                feature_objs.append(f)
+                feature_objs.append(cast(Feature, f))
 
-        features_text = "\n".join(
-            f"- {f.name}: {f.description[:100]}" for f in feature_objs
-        )
+        features_text = "\n".join(f"- {f.name}: {f.description[:100]}" for f in feature_objs)
 
         messages = [
             LLMMessage(
@@ -508,7 +521,9 @@ QUARTER: now/next/Q1/Q2/Q3/Q4/later""",
 
         response = await self._router.complete(
             messages,
-            system=f"You are a product manager using {self.prioritization_framework} prioritization.",
+            system=(
+                f"You are a product manager using {self.prioritization_framework} prioritization."
+            ),
             max_tokens=1000,
         )
 
@@ -577,7 +592,12 @@ QUARTER: now/next/Q1/Q2/Q3/Q4/later""",
                 f.quarter = quarter_map.get(prio_data.get("quarter", "later"), RoadmapQuarter.LATER)
 
         # Sort by priority then business value
-        priority_order = {Priority.CRITICAL: 0, Priority.HIGH: 1, Priority.MEDIUM: 2, Priority.LOW: 3}
+        priority_order = {
+            Priority.CRITICAL: 0,
+            Priority.HIGH: 1,
+            Priority.MEDIUM: 2,
+            Priority.LOW: 3,
+        }
         features.sort(key=lambda x: (priority_order.get(x.priority, 2), -x.business_value))
 
         self._features.extend(features)
@@ -621,11 +641,11 @@ QUARTER: now/next/Q1/Q2/Q3/Q4/later""",
 
 PRODUCT: {self.product_name}
 VISION: {vision}
-THEMES: {', '.join(themes or ['growth'])}
+THEMES: {", ".join(themes or ["growth"])}
 HORIZON: {horizon}
 
 CURRENT FEATURES:
-{chr(10).join(f'- {f.name} ({f.quarter.value})' for f in self._features[:20])}
+{chr(10).join(f"- {f.name} ({f.quarter.value})" for f in self._features[:20])}
 
 Provide 3-5 milestones:
 MILESTONE: Name
@@ -765,7 +785,9 @@ RISKS:
                 elif current_section == "personas":
                     if ":" in item:
                         name, desc = item.split(":", 1)
-                        prd.user_personas.append({"name": name.strip(), "description": desc.strip()})
+                        prd.user_personas.append(
+                            {"name": name.strip(), "description": desc.strip()}
+                        )
                     else:
                         prd.user_personas.append({"name": item, "description": ""})
                 elif current_section == "metrics":
@@ -780,11 +802,11 @@ RISKS:
 
     def get_backlog_summary(self) -> dict[str, Any]:
         """Get summary of product backlog."""
-        stories_by_type = {}
+        stories_by_type: dict[str, int] = {}
         for s in self._stories:
             stories_by_type[s.story_type.value] = stories_by_type.get(s.story_type.value, 0) + 1
 
-        stories_by_status = {}
+        stories_by_status: dict[str, int] = {}
         for s in self._stories:
             stories_by_status[s.status.value] = stories_by_status.get(s.status.value, 0) + 1
 

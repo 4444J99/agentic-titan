@@ -2,16 +2,16 @@
 Tests for Reward Model Trainer (Phase 18A)
 """
 
-import pytest
-import os
 import tempfile
 from pathlib import Path
 
+import pytest
+
 from titan.learning.preference_pairs import PreferencePair, PreferencePairDataset
 from titan.learning.reward_model import (
-    RewardModelConfig,
     RewardMetrics,
     RewardModel,
+    RewardModelConfig,
     RewardModelTrainer,
     TrainingRun,
     get_reward_model_trainer,
@@ -150,11 +150,13 @@ class TestRewardModelTrainer:
         """Create sample dataset."""
         dataset = PreferencePairDataset(name="test")
         for i in range(10):
-            dataset.add(PreferencePair(
-                prompt=f"Question {i}",
-                chosen=f"Good answer {i}",
-                rejected=f"Bad answer {i}",
-            ))
+            dataset.add(
+                PreferencePair(
+                    prompt=f"Question {i}",
+                    chosen=f"Good answer {i}",
+                    rejected=f"Bad answer {i}",
+                )
+            )
         return dataset
 
     def test_create_trainer(self):

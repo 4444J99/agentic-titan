@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 from uuid import UUID, uuid4
 
@@ -17,7 +17,6 @@ from titan.safety.permissions import (
     Permission,
     PersonaRole,
     RolePermissions,
-    get_role_permissions,
 )
 
 if TYPE_CHECKING:
@@ -34,7 +33,7 @@ class ValidationResult:
     permission: Permission
     role: PersonaRole
     reason: str
-    timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    timestamp: datetime = field(default_factory=lambda: datetime.now(UTC))
     metadata: dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -61,7 +60,7 @@ class ActionValidation:
     allowed: bool = False
     missing_permissions: list[Permission] = field(default_factory=list)
     reason: str = ""
-    timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    timestamp: datetime = field(default_factory=lambda: datetime.now(UTC))
 
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
@@ -198,7 +197,9 @@ class RBACEnforcer:
             allowed=allowed,
             permission=permission,
             role=role,
-            reason="Permission granted" if allowed else f"Permission {permission.value} not in role {role.value}",
+            reason="Permission granted"
+            if allowed
+            else f"Permission {permission.value} not in role {role.value}",
             metadata={
                 "from_role": has_base_permission,
                 "from_override": has_override,
@@ -239,7 +240,9 @@ class RBACEnforcer:
             role=role,
             allowed=allowed,
             missing_permissions=missing,
-            reason="Action allowed" if allowed else f"Missing permissions: {[p.value for p in missing]}",
+            reason="Action allowed"
+            if allowed
+            else f"Missing permissions: {[p.value for p in missing]}",
         )
 
         # Store in history
@@ -293,24 +296,20 @@ class RBACEnforcer:
             "write_file": [Permission.WRITE_FILES],
             "delete_file": [Permission.DELETE_FILES],
             "list_directory": [Permission.READ_FILES],
-
             # Execution tools
             "execute_code": [Permission.EXECUTE_CODE],
             "execute_shell": [Permission.EXECUTE_SHELL],
             "run_sandbox": [Permission.EXECUTE_SANDBOXED],
             "shell": [Permission.EXECUTE_SHELL],
             "bash": [Permission.EXECUTE_SHELL],
-
             # Network tools
             "http_request": [Permission.MAKE_HTTP_REQUESTS],
             "fetch": [Permission.MAKE_HTTP_REQUESTS],
             "api_call": [Permission.CONNECT_EXTERNAL_APIS],
             "send_email": [Permission.SEND_EMAILS],
-
             # Database tools
             "query_database": [Permission.READ_DATABASE],
             "execute_sql": [Permission.WRITE_DATABASE],
-
             # Agent tools
             "spawn_agent": [Permission.SPAWN_AGENTS],
             "terminate_agent": [Permission.TERMINATE_AGENTS],

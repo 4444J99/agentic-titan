@@ -14,10 +14,10 @@ import logging
 from dataclasses import dataclass
 from typing import Any
 
-from agents.framework.base_agent import BaseAgent, AgentResult, AgentState
-from agents.personas import RESEARCHER, say, think
 from adapters.base import LLMMessage
 from adapters.router import get_router
+from agents.framework.base_agent import BaseAgent
+from agents.personas import RESEARCHER, say, think
 
 logger = logging.getLogger("titan.agents.researcher")
 
@@ -142,7 +142,8 @@ class ResearcherAgent(BaseAgent):
         messages = [
             LLMMessage(
                 role="user",
-                content=f"""Generate 3-5 key research questions to thoroughly investigate this topic:
+                content=f"""Generate 3-5 key research questions to thoroughly
+investigate this topic:
 
 Topic: {self.topic}
 

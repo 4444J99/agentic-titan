@@ -146,7 +146,10 @@ class TestAutoPrompter:
         )
 
         assert "added_cot" in result.adaptations_applied
-        assert "step-by-step" in result.adapted_prompt.lower() or "thinking" in result.adapted_prompt.lower()
+        assert (
+            "step-by-step" in result.adapted_prompt.lower()
+            or "thinking" in result.adapted_prompt.lower()
+        )
 
     def test_adapt_prompt_explicit_for_economy(self, prompter):
         """Test explicit instructions for economy models."""

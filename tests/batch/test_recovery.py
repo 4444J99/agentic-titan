@@ -6,30 +6,29 @@ Covers stalled batch detection and recovery strategies.
 
 from __future__ import annotations
 
-import asyncio
-import pytest
 from datetime import datetime, timedelta
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 from uuid import uuid4
+
+import pytest
 
 from titan.batch.models import (
     BatchJob,
     BatchStatus,
-    QueuedSession,
     SessionQueueStatus,
 )
 from titan.batch.recovery import (
-    RecoveryStrategy,
     RecoveryResult,
-    recover_batch,
+    RecoveryStrategy,
     detect_stalled_sessions,
     get_recovery_recommendation,
+    recover_batch,
 )
-
 
 # =============================================================================
 # Fixtures
 # =============================================================================
+
 
 @pytest.fixture
 def mock_orchestrator():
@@ -91,6 +90,7 @@ def partially_completed_batch():
 # RecoveryResult Tests
 # =============================================================================
 
+
 class TestRecoveryResult:
     """Tests for RecoveryResult dataclass."""
 
@@ -134,6 +134,7 @@ class TestRecoveryResult:
 # =============================================================================
 # Detect Stalled Sessions Tests
 # =============================================================================
+
 
 class TestDetectStalledSessions:
     """Tests for stalled session detection."""
@@ -182,6 +183,7 @@ class TestDetectStalledSessions:
 # =============================================================================
 # Recovery Strategy Tests
 # =============================================================================
+
 
 class TestRecoverBatch:
     """Tests for batch recovery."""
@@ -304,6 +306,7 @@ class TestRecoverBatch:
 # =============================================================================
 # Recovery Recommendation Tests
 # =============================================================================
+
 
 class TestGetRecoveryRecommendation:
     """Tests for recovery recommendation."""

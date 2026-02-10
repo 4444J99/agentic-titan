@@ -9,10 +9,11 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
+from collections.abc import Callable, Coroutine
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
-from enum import Enum
-from typing import TYPE_CHECKING, Any, Callable, Coroutine
+from datetime import UTC, datetime
+from enum import StrEnum
+from typing import TYPE_CHECKING, Any
 from uuid import UUID, uuid4
 
 from titan.orchestration.termination import (
@@ -30,7 +31,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger("titan.orchestration.watchdog")
 
 
-class AlertLevel(str, Enum):
+class AlertLevel(StrEnum):
     """Alert severity levels."""
 
     INFO = "info"
@@ -46,7 +47,7 @@ class WatchdogAlert:
     level: AlertLevel = AlertLevel.INFO
     workflow_id: str = ""
     message: str = ""
-    timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    timestamp: datetime = field(default_factory=lambda: datetime.now(UTC))
     metadata: dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -155,7 +156,7 @@ class ExecutionWatchdog:
             # Create initial state
             state = WorkflowState(
                 workflow_id=workflow_id,
-                start_time=datetime.now(timezone.utc),
+                start_time=datetime.now(UTC),
             )
             self._workflows[workflow_id] = state
 
@@ -285,34 +286,46 @@ class ExecutionWatchdog:
                 if hasattr(sub, "max_iterations"):
                     percent = (state.iteration_count / sub.max_iterations) * 100
                     if percent >= self.config.warn_at_iteration_percent:
-                        alerts.append(WatchdogAlert(
-                            level=AlertLevel.WARNING,
-                            workflow_id=workflow_id,
-                            message=f"Iteration count at {percent:.0f}% of limit",
-                            metadata={"current": state.iteration_count, "max": sub.max_iterations},
-                        ))
+                        alerts.append(
+                            WatchdogAlert(
+                                level=AlertLevel.WARNING,
+                                workflow_id=workflow_id,
+                                message=f"Iteration count at {percent:.0f}% of limit",
+                                metadata={
+                                    "current": state.iteration_count,
+                                    "max": sub.max_iterations,
+                                },
+                            )
+                        )
                         break
 
                 if hasattr(sub, "max_duration_seconds"):
                     percent = (state.duration_seconds / sub.max_duration_seconds) * 100
                     if percent >= self.config.warn_at_time_percent:
-                        alerts.append(WatchdogAlert(
-                            level=AlertLevel.WARNING,
-                            workflow_id=workflow_id,
-                            message=f"Duration at {percent:.0f}% of timeout",
-                            metadata={"current": state.duration_seconds, "max": sub.max_duration_seconds},
-                        ))
+                        alerts.append(
+                            WatchdogAlert(
+                                level=AlertLevel.WARNING,
+                                workflow_id=workflow_id,
+                                message=f"Duration at {percent:.0f}% of timeout",
+                                metadata={
+                                    "current": state.duration_seconds,
+                                    "max": sub.max_duration_seconds,
+                                },
+                            )
+                        )
                         break
 
                 if hasattr(sub, "max_cost_usd"):
                     percent = (state.total_cost_usd / sub.max_cost_usd) * 100
                     if percent >= self.config.warn_at_cost_percent:
-                        alerts.append(WatchdogAlert(
-                            level=AlertLevel.WARNING,
-                            workflow_id=workflow_id,
-                            message=f"Cost at {percent:.0f}% of budget",
-                            metadata={"current": state.total_cost_usd, "max": sub.max_cost_usd},
-                        ))
+                        alerts.append(
+                            WatchdogAlert(
+                                level=AlertLevel.WARNING,
+                                workflow_id=workflow_id,
+                                message=f"Cost at {percent:.0f}% of budget",
+                                metadata={"current": state.total_cost_usd, "max": sub.max_cost_usd},
+                            )
+                        )
                         break
 
         # Send alerts
@@ -334,15 +347,15 @@ class ExecutionWatchdog:
                 # Check termination conditions
                 result = await self._check_termination(workflow_id)
                 if result.should_terminate:
-                    logger.warning(
-                        f"Workflow {workflow_id} should terminate: {result.message}"
+                    logger.warning(f"Workflow {workflow_id} should terminate: {result.message}")
+                    await self._send_alert(
+                        WatchdogAlert(
+                            level=AlertLevel.CRITICAL,
+                            workflow_id=workflow_id,
+                            message=f"Termination triggered: {result.message}",
+                            metadata=result.to_dict(),
+                        )
                     )
-                    await self._send_alert(WatchdogAlert(
-                        level=AlertLevel.CRITICAL,
-                        workflow_id=workflow_id,
-                        message=f"Termination triggered: {result.message}",
-                        metadata=result.to_dict(),
-                    ))
 
             except asyncio.CancelledError:
                 break
@@ -355,6 +368,7 @@ class ExecutionWatchdog:
         """Check memory usage for a workflow."""
         try:
             import psutil
+
             process = psutil.Process(os.getpid())
             memory_mb = process.memory_info().rss / (1024 * 1024)
 
@@ -363,12 +377,14 @@ class ExecutionWatchdog:
                 state.memory_usage_mb = memory_mb
 
                 if memory_mb > self.config.memory_warning_threshold_mb:
-                    await self._send_alert(WatchdogAlert(
-                        level=AlertLevel.WARNING,
-                        workflow_id=workflow_id,
-                        message=f"High memory usage: {memory_mb:.1f}MB",
-                        metadata={"memory_mb": memory_mb},
-                    ))
+                    await self._send_alert(
+                        WatchdogAlert(
+                            level=AlertLevel.WARNING,
+                            workflow_id=workflow_id,
+                            message=f"High memory usage: {memory_mb:.1f}MB",
+                            metadata={"memory_mb": memory_mb},
+                        )
+                    )
         except ImportError:
             pass  # psutil not available
         except Exception as e:
@@ -378,7 +394,7 @@ class ExecutionWatchdog:
         """Send alert to all registered callbacks."""
         logger.log(
             logging.WARNING if alert.level == AlertLevel.CRITICAL else logging.INFO,
-            f"Watchdog alert [{alert.level.value}]: {alert.message}"
+            f"Watchdog alert [{alert.level.value}]: {alert.message}",
         )
 
         for callback in self._alert_callbacks:
@@ -406,11 +422,13 @@ class ExecutionWatchdog:
             if workflow_id not in self._workflows:
                 return False
 
-            await self._send_alert(WatchdogAlert(
-                level=AlertLevel.CRITICAL,
-                workflow_id=workflow_id,
-                message=f"Force terminated: {reason}",
-            ))
+            await self._send_alert(
+                WatchdogAlert(
+                    level=AlertLevel.CRITICAL,
+                    workflow_id=workflow_id,
+                    message=f"Force terminated: {reason}",
+                )
+            )
 
             # Unregister the workflow
             await self.unregister_workflow(workflow_id)

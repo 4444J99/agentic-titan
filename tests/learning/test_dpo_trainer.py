@@ -2,12 +2,11 @@
 Tests for DPO Trainer (Phase 18A)
 """
 
-import pytest
 import os
 import tempfile
-from pathlib import Path
 
-from titan.learning.preference_pairs import PreferencePair, PreferencePairDataset
+import pytest
+
 from titan.learning.dpo_trainer import (
     DPOConfig,
     DPOMetrics,
@@ -15,6 +14,7 @@ from titan.learning.dpo_trainer import (
     TrainingResult,
     get_dpo_trainer,
 )
+from titan.learning.preference_pairs import PreferencePair, PreferencePairDataset
 
 
 class TestDPOConfig:
@@ -149,11 +149,13 @@ class TestDPOTrainer:
         """Create sample dataset."""
         dataset = PreferencePairDataset(name="test")
         for i in range(10):
-            dataset.add(PreferencePair(
-                prompt=f"Question {i}",
-                chosen=f"Good answer {i}",
-                rejected=f"Bad answer {i}",
-            ))
+            dataset.add(
+                PreferencePair(
+                    prompt=f"Question {i}",
+                    chosen=f"Good answer {i}",
+                    rejected=f"Bad answer {i}",
+                )
+            )
         return dataset
 
     def test_create_trainer(self):

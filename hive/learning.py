@@ -9,6 +9,7 @@ Inspired by: iGOR's episodic learning patterns
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import math
@@ -18,7 +19,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 from uuid import uuid4
 
-from hive.topology import TopologyType, TaskProfile
+from hive.topology import TaskProfile, TopologyType
 
 if TYPE_CHECKING:
     from hive.memory import HiveMind
@@ -182,9 +183,7 @@ class TopologyPreference:
     def update(self, score: float, learning_rate: float = 0.1) -> None:
         """Update preference based on new outcome."""
         self.sample_count += 1
-        self.avg_score = (
-            self.avg_score * (1 - learning_rate) + score * learning_rate
-        )
+        self.avg_score = self.avg_score * (1 - learning_rate) + score * learning_rate
         self.weight = self._calculate_weight()
         self.last_updated = datetime.now()
 
@@ -306,9 +305,7 @@ class EpisodicLearner:
         if self._hive_mind:
             asyncio.create_task(self._store_in_hive(episode))
 
-        logger.info(
-            f"Ended episode {episode.episode_id} with score {outcome.score:.2f}"
-        )
+        logger.info(f"Ended episode {episode.episode_id} with score {outcome.score:.2f}")
 
         if self._current_episode == episode:
             self._current_episode = None
@@ -443,14 +440,15 @@ class EpisodicLearner:
     def get_statistics(self) -> dict[str, Any]:
         """Get learning statistics."""
         total_episodes = len(self._episodes)
-        completed = [e for e in self._episodes if e.outcome]
+        completed = [e for e in self._episodes if e.outcome is not None]
 
         topology_stats = {}
         for topology in TopologyType:
             episodes = [e for e in completed if e.selected_topology == topology]
             if episodes:
-                avg_score = sum(e.outcome.score for e in episodes) / len(episodes)
-                success_rate = sum(1 for e in episodes if e.outcome.success) / len(episodes)
+                outcomes = [e.outcome for e in episodes if e.outcome is not None]
+                avg_score = sum(outcome.score for outcome in outcomes) / len(outcomes)
+                success_rate = sum(1 for outcome in outcomes if outcome.success) / len(outcomes)
                 topology_stats[topology.value] = {
                     "count": len(episodes),
                     "avg_score": avg_score,
@@ -531,10 +529,6 @@ class EpisodicLearner:
             )
         except Exception as e:
             logger.warning(f"Failed to store episode in Hive Mind: {e}")
-
-
-# Import asyncio at module level for the async task
-import asyncio
 
 
 # Singleton learner

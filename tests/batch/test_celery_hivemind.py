@@ -6,10 +6,9 @@ Covers worker registration and deregistration with HiveMind.
 
 from __future__ import annotations
 
-import asyncio
-import pytest
-from datetime import datetime
 from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
 
 # Skip all tests if celery is not installed
 pytest.importorskip("celery")
@@ -18,6 +17,7 @@ pytest.importorskip("celery")
 # =============================================================================
 # Worker Signal Tests
 # =============================================================================
+
 
 class TestWorkerSignals:
     """Tests for Celery worker signal handlers."""
@@ -29,11 +29,14 @@ class TestWorkerSignals:
         mock_sender = MagicMock()
         mock_sender.hostname = "worker-1"
 
-        with patch.dict("os.environ", {
-            "CELERY_WORKER_ID": "test-worker-1",
-            "WORKER_RUNTIME_TYPE": "local",
-            "CELERY_CONCURRENCY": "4",
-        }):
+        with patch.dict(
+            "os.environ",
+            {
+                "CELERY_WORKER_ID": "test-worker-1",
+                "WORKER_RUNTIME_TYPE": "local",
+                "CELERY_CONCURRENCY": "4",
+            },
+        ):
             with patch("hive.memory.HiveMind", return_value=mock_hive):
                 mock_hive.initialize = AsyncMock()
                 mock_hive.register_agent = AsyncMock()
@@ -86,6 +89,7 @@ class TestWorkerSignals:
 # Worker Metrics Tests
 # =============================================================================
 
+
 class TestWorkerMetrics:
     """Tests for worker metrics broadcasting."""
 
@@ -136,6 +140,7 @@ class TestWorkerMetrics:
 # Async Helper Tests
 # =============================================================================
 
+
 class TestRunAsync:
     """Tests for async helper function."""
 
@@ -163,6 +168,7 @@ class TestRunAsync:
 # =============================================================================
 # Integration Tests (require full stack)
 # =============================================================================
+
 
 @pytest.mark.skip(reason="Requires running infrastructure")
 class TestCeleryHiveMindIntegration:

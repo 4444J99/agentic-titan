@@ -6,14 +6,14 @@ Ported and extended from:
 - agent--claude-smith (session management patterns)
 """
 
-from agents.framework.base_agent import BaseAgent, AgentContext, AgentState, AgentResult
+from agents.framework.base_agent import AgentContext, AgentResult, AgentState, BaseAgent
 from agents.framework.errors import (
-    TitanError,
     AgentError,
-    HiveMindError,
-    TopologyError,
-    LLMAdapterError,
     CircuitBreakerError,
+    HiveMindError,
+    LLMAdapterError,
+    TitanError,
+    TopologyError,
 )
 from agents.framework.resilience import CircuitBreaker, CircuitState
 

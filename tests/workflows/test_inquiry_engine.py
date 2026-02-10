@@ -14,18 +14,23 @@ from __future__ import annotations
 import json
 import subprocess
 import sys
+from datetime import datetime
 from pathlib import Path
 from types import SimpleNamespace
-import pytest
-from datetime import datetime
 
+import pytest
+
+from titan.workflows.cognitive_router import (
+    COGNITIVE_MODEL_MAP,
+    MODEL_RANKINGS,
+    CognitiveRouter,
+    CognitiveTaskType,
+)
 from titan.workflows.inquiry_config import (
-    InquiryStage,
-    InquiryWorkflow,
-    CognitiveStyle,
+    CREATIVE_INQUIRY_WORKFLOW,
     EXPANSIVE_INQUIRY_WORKFLOW,
     QUICK_INQUIRY_WORKFLOW,
-    CREATIVE_INQUIRY_WORKFLOW,
+    InquiryWorkflow,
     get_workflow,
     list_workflows,
 )
@@ -34,27 +39,18 @@ from titan.workflows.inquiry_engine import (
     InquirySession,
     InquiryStatus,
     StageResult,
-    get_inquiry_engine,
 )
-from titan.workflows.cognitive_router import (
-    CognitiveRouter,
-    CognitiveTaskType,
-    CognitiveRoutingDecision,
-    COGNITIVE_MODEL_MAP,
-    MODEL_RANKINGS,
+from titan.workflows.inquiry_export import (
+    export_session_to_markdown,
+    export_stage_to_markdown,
+    slugify,
 )
 from titan.workflows.inquiry_prompts import (
-    STAGE_PROMPTS,
     CONCISE_STAGE_PROMPTS,
+    STAGE_PROMPTS,
     get_prompt,
     list_templates,
 )
-from titan.workflows.inquiry_export import (
-    export_stage_to_markdown,
-    export_session_to_markdown,
-    slugify,
-)
-
 
 # =============================================================================
 # Workflow Configuration Tests
@@ -78,13 +74,23 @@ class TestInquiryConfig:
 
     def test_workflow_stage_names_are_unique(self):
         """All stage names in a workflow should be unique."""
-        for workflow in [EXPANSIVE_INQUIRY_WORKFLOW, QUICK_INQUIRY_WORKFLOW, CREATIVE_INQUIRY_WORKFLOW]:
+        workflows = (
+            EXPANSIVE_INQUIRY_WORKFLOW,
+            QUICK_INQUIRY_WORKFLOW,
+            CREATIVE_INQUIRY_WORKFLOW,
+        )
+        for workflow in workflows:
             names = [s.name for s in workflow.stages]
             assert len(names) == len(set(names))
 
     def test_workflow_stages_have_prompt_templates(self):
         """All stages should have valid prompt templates."""
-        for workflow in [EXPANSIVE_INQUIRY_WORKFLOW, QUICK_INQUIRY_WORKFLOW, CREATIVE_INQUIRY_WORKFLOW]:
+        workflows = (
+            EXPANSIVE_INQUIRY_WORKFLOW,
+            QUICK_INQUIRY_WORKFLOW,
+            CREATIVE_INQUIRY_WORKFLOW,
+        )
+        for workflow in workflows:
             for stage in workflow.stages:
                 assert stage.prompt_template in STAGE_PROMPTS
 
@@ -160,9 +166,8 @@ class TestCognitiveRouter:
         router = CognitiveRouter()
 
         for task_type in CognitiveTaskType:
-            decision = pytest.helpers.run_async(
-                router.route_for_task(task_type)
-            ) if hasattr(pytest, 'helpers') else None
+            if hasattr(pytest, "helpers"):
+                pytest.helpers.run_async(router.route_for_task(task_type))
 
     @pytest.mark.asyncio
     async def test_router_respects_preferred_model(self):
@@ -468,6 +473,7 @@ class TestInquiryEngine:
 
     def test_constructor_with_explicit_values_skips_config_lookup(self, monkeypatch):
         """Explicit constructor values should bypass config lookup."""
+
         def _boom():
             raise AssertionError("get_config should not be called")
 

@@ -16,22 +16,21 @@ import asyncio
 import logging
 import random
 import uuid
-from abc import abstractmethod
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
-from enum import Enum
+from datetime import UTC, datetime
+from enum import StrEnum
 from typing import TYPE_CHECKING, Any
 
 from hive.topology import AgentNode, BaseTopology, TopologyType
 
 if TYPE_CHECKING:
-    from hive.events import EventBus
+    pass
 
 logger = logging.getLogger("titan.hive.topology_extended")
 
 
 # Extend TopologyType with new values
-class ExtendedTopologyType(str, Enum):
+class ExtendedTopologyType(StrEnum):
     """Extended topology types including D&G-inspired patterns."""
 
     # Original types
@@ -43,19 +42,19 @@ class ExtendedTopologyType(str, Enum):
     STAR = "star"
 
     # New D&G-inspired types
-    RHIZOMATIC = "rhizomatic"        # Any-to-any, no hierarchy
-    ARBORESCENT = "arborescent"      # Strict tree, central control
+    RHIZOMATIC = "rhizomatic"  # Any-to-any, no hierarchy
+    ARBORESCENT = "arborescent"  # Strict tree, central control
     TERRITORIALIZED = "territorialized"  # Bounded domains
     DETERRITORIALIZED = "deterritorialized"  # Fluid, role-shifting
 
 
-class ConnectionType(str, Enum):
+class ConnectionType(StrEnum):
     """Types of connections in extended topologies."""
 
     PERMANENT = "permanent"  # Stable connection
     TEMPORARY = "temporary"  # Can be dissolved
     POTENTIAL = "potential"  # Not yet active
-    RUPTURED = "ruptured"    # Broken connection
+    RUPTURED = "ruptured"  # Broken connection
 
 
 @dataclass
@@ -66,7 +65,7 @@ class Connection:
     to_agent: str
     connection_type: ConnectionType = ConnectionType.PERMANENT
     strength: float = 1.0  # 0-1, how strong the connection is
-    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
     metadata: dict[str, Any] = field(default_factory=dict)
 
     def weaken(self, amount: float = 0.1) -> None:
@@ -146,7 +145,7 @@ class RhizomaticTopology(BaseTopology):
         self._decay_rate = connection_decay_rate
         self._connections: dict[str, list[Connection]] = {}
         self._entry_points: list[str] = []  # Agents that can receive external input
-        self._exit_points: list[str] = []   # Agents that can produce output
+        self._exit_points: list[str] = []  # Agents that can produce output
 
     def add_agent(
         self,
@@ -559,12 +558,10 @@ class ArborealTopology(BaseTopology):
         elif message_type == "report":
             # Upward to ancestors
             ancestors: list[str] = []
-            current = node
-            while current.parent_id:
+            current: AgentNode | None = node
+            while current and current.parent_id:
                 ancestors.append(current.parent_id)
                 current = self.nodes.get(current.parent_id)
-                if not current:
-                    break
             return ancestors
 
         elif message_type == "broadcast":
@@ -823,14 +820,14 @@ class TerritorializedTopology(BaseTopology):
             if not territory_id or territory_id not in self._territories:
                 return []
             return [
-                aid for aid in self._territories[territory_id].agent_ids
-                if aid != source_agent_id
+                aid for aid in self._territories[territory_id].agent_ids if aid != source_agent_id
             ]
 
         elif message_type == "broadcast":
             # All agents that can be communicated with
             return [
-                aid for aid in self.nodes
+                aid
+                for aid in self.nodes
                 if aid != source_agent_id and self.can_communicate(source_agent_id, aid)
             ]
 
@@ -937,8 +934,14 @@ class DeterritorializedTopology(BaseTopology):
         self._flux_interval = flux_interval
         self._role_volatility = role_volatility
         self._available_roles: list[str] = [
-            "scout", "worker", "coordinator", "synthesizer",
-            "critic", "explorer", "builder", "analyst",
+            "scout",
+            "worker",
+            "coordinator",
+            "synthesizer",
+            "critic",
+            "explorer",
+            "builder",
+            "analyst",
         ]
         self._lines_of_flight: dict[str, dict[str, Any]] = {}  # Agent -> escape data
         self._flux_task: asyncio.Task[None] | None = None
@@ -1058,7 +1061,7 @@ class DeterritorializedTopology(BaseTopology):
 
         self._lines_of_flight[agent_id] = {
             "escape_vector": escape_vector,
-            "started_at": datetime.now(timezone.utc),
+            "started_at": datetime.now(UTC),
             "duration": duration_seconds,
             "original_role": self.nodes[agent_id].role,
         }
@@ -1100,7 +1103,7 @@ class DeterritorializedTopology(BaseTopology):
         Returns:
             List of agent IDs that should be captured.
         """
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         expired: list[str] = []
 
         for agent_id, flight_data in list(self._lines_of_flight.items()):
@@ -1113,10 +1116,7 @@ class DeterritorializedTopology(BaseTopology):
 
     def get_agents_by_role(self, role: str) -> list[str]:
         """Get all agents with a specific role."""
-        return [
-            aid for aid, node in self.nodes.items()
-            if node.role == role
-        ]
+        return [aid for aid, node in self.nodes.items() if node.role == role]
 
     def get_escaped_agents(self) -> list[str]:
         """Get all agents currently on lines of flight."""
@@ -1134,7 +1134,8 @@ class DeterritorializedTopology(BaseTopology):
             if not node:
                 return []
             return [
-                aid for aid, n in self.nodes.items()
+                aid
+                for aid, n in self.nodes.items()
                 if n.role == node.role and aid != source_agent_id
             ]
 
@@ -1145,7 +1146,8 @@ class DeterritorializedTopology(BaseTopology):
         else:
             # All non-escaped agents
             return [
-                aid for aid in self.nodes
+                aid
+                for aid in self.nodes
                 if aid != source_agent_id and aid not in self._lines_of_flight
             ]
 
@@ -1178,7 +1180,10 @@ class DeterritorializedTopology(BaseTopology):
 
         for node in self.nodes.values():
             if node.role == role:
-                node.role = random.choice(self._available_roles) if self._available_roles else "worker"
+                if self._available_roles:
+                    node.role = random.choice(self._available_roles)
+                else:
+                    node.role = "worker"
                 reassigned += 1
 
         return reassigned

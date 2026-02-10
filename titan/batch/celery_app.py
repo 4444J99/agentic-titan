@@ -11,7 +11,8 @@ import asyncio
 import logging
 import os
 from datetime import datetime
-from typing import Any
+from types import TracebackType
+from typing import Any, cast
 
 from celery import Celery
 from celery.signals import (
@@ -50,8 +51,9 @@ celery_app.config_from_object(get_celery_config())
 # Signal Handlers
 # =============================================================================
 
-@celeryd_after_setup.connect
-def setup_worker_logging(sender, instance, **kwargs):
+
+@celeryd_after_setup.connect  # type: ignore[untyped-decorator]
+def setup_worker_logging(sender: Any, instance: Any, **kwargs: Any) -> None:
     """Configure logging after worker setup."""
     log_level = os.getenv("CELERY_WORKER_LOG_LEVEL", "INFO")
     logging.basicConfig(
@@ -82,16 +84,14 @@ def _run_async(coro: Any) -> Any:
             loop.close()
 
 
-@worker_ready.connect
-def on_worker_ready(sender, **kwargs):
+@worker_ready.connect  # type: ignore[untyped-decorator]
+def on_worker_ready(sender: Any, **kwargs: Any) -> None:
     """Handle worker ready event."""
     worker_id = os.getenv("CELERY_WORKER_ID", sender.hostname if sender else "unknown")
     runtime_type = os.getenv("WORKER_RUNTIME_TYPE", "local")
     concurrency = os.getenv("CELERY_CONCURRENCY", "4")
 
-    logger.info(
-        f"Worker ready: {worker_id} (runtime: {runtime_type})"
-    )
+    logger.info(f"Worker ready: {worker_id} (runtime: {runtime_type})")
 
     # Register with HiveMind for coordination
     async def register_with_hivemind() -> None:
@@ -124,8 +124,8 @@ def on_worker_ready(sender, **kwargs):
     _run_async(register_with_hivemind())
 
 
-@worker_shutdown.connect
-def on_worker_shutdown(sender, **kwargs):
+@worker_shutdown.connect  # type: ignore[untyped-decorator]
+def on_worker_shutdown(sender: Any, **kwargs: Any) -> None:
     """Handle worker shutdown event."""
     worker_id = os.getenv("CELERY_WORKER_ID", sender.hostname if sender else "unknown")
     logger.info(f"Worker shutting down: {worker_id}")
@@ -144,48 +144,63 @@ def on_worker_shutdown(sender, **kwargs):
     _run_async(deregister_from_hivemind())
 
 
-@task_prerun.connect
-def on_task_prerun(sender=None, task_id=None, task=None, args=None, kwargs=None, **kw):
+@task_prerun.connect  # type: ignore[untyped-decorator]
+def on_task_prerun(
+    sender: Any = None,
+    task_id: str | None = None,
+    task: Any = None,
+    args: tuple[Any, ...] | None = None,
+    kwargs: dict[str, Any] | None = None,
+    **kw: Any,
+) -> None:
     """Handle task start event."""
-    logger.debug(f"Task starting: {task.name}[{task_id}]")
+    task_name = getattr(task, "name", "<unknown>")
+    logger.debug(f"Task starting: {task_name}[{task_id}]")
 
 
-@task_postrun.connect
+@task_postrun.connect  # type: ignore[untyped-decorator]
 def on_task_postrun(
-    sender=None,
-    task_id=None,
-    task=None,
-    args=None,
-    kwargs=None,
-    retval=None,
-    state=None,
-    **kw,
-):
+    sender: Any = None,
+    task_id: str | None = None,
+    task: Any = None,
+    args: tuple[Any, ...] | None = None,
+    kwargs: dict[str, Any] | None = None,
+    retval: Any = None,
+    state: str | None = None,
+    **kw: Any,
+) -> None:
     """Handle task completion event."""
-    logger.debug(f"Task completed: {task.name}[{task_id}] -> {state}")
+    task_name = getattr(task, "name", "<unknown>")
+    logger.debug(f"Task completed: {task_name}[{task_id}] -> {state}")
 
 
-@task_failure.connect
+@task_failure.connect  # type: ignore[untyped-decorator]
 def on_task_failure(
-    sender=None,
-    task_id=None,
-    exception=None,
-    args=None,
-    kwargs=None,
-    traceback=None,
-    einfo=None,
-    **kw,
-):
+    sender: Any = None,
+    task_id: str | None = None,
+    exception: BaseException | None = None,
+    args: tuple[Any, ...] | None = None,
+    kwargs: dict[str, Any] | None = None,
+    traceback: Any = None,
+    einfo: Any = None,
+    **kw: Any,
+) -> None:
     """Handle task failure event."""
-    logger.error(
-        f"Task failed: {sender.name}[{task_id}] - {exception}",
-        exc_info=(type(exception), exception, traceback),
-    )
+    sender_name = getattr(sender, "name", "<unknown>")
+    message = f"Task failed: {sender_name}[{task_id}] - {exception}"
+    if exception is not None:
+        logger.error(
+            message,
+            exc_info=(type(exception), exception, cast(TracebackType | None, traceback)),
+        )
+    else:
+        logger.error(message)
 
 
 # =============================================================================
 # Celery App Configuration Methods
 # =============================================================================
+
 
 def configure_for_testing() -> None:
     """
@@ -216,7 +231,7 @@ def configure_for_production() -> None:
     logger.info("Celery configured for production")
 
 
-def get_active_workers() -> list[dict]:
+def get_active_workers() -> list[dict[str, Any]]:
     """
     Get list of active Celery workers.
 
@@ -230,12 +245,14 @@ def get_active_workers() -> list[dict]:
 
         workers = []
         for worker_name, worker_stats in stats.items():
-            workers.append({
-                "name": worker_name,
-                "concurrency": worker_stats.get("pool", {}).get("max-concurrency", 0),
-                "active_tasks": len(active.get(worker_name, [])),
-                "broker": worker_stats.get("broker", {}),
-            })
+            workers.append(
+                {
+                    "name": worker_name,
+                    "concurrency": worker_stats.get("pool", {}).get("max-concurrency", 0),
+                    "active_tasks": len(active.get(worker_name, [])),
+                    "broker": worker_stats.get("broker", {}),
+                }
+            )
 
         return workers
     except Exception as e:

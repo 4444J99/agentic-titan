@@ -11,7 +11,6 @@ Provides capabilities for:
 from __future__ import annotations
 
 import logging
-from pathlib import Path
 from typing import Any
 
 from tools.base import Tool, ToolParameter, ToolResult, register_tool
@@ -75,7 +74,9 @@ class DOCXTool(Tool):
             return ToolResult(
                 success=False,
                 output=None,
-                error="python-docx is required. Install with: pip install 'agentic-titan[documents]'",
+                error=(
+                    "python-docx is required. Install with: pip install 'agentic-titan[documents]'"
+                ),
             )
 
         action = kwargs.get("action", "")
@@ -117,18 +118,24 @@ class DOCXTool(Tool):
                 for para in doc.paragraphs:
                     if para.text.strip():
                         style = para.style.name if para.style else "Normal"
-                        structure.append({
-                            "type": "paragraph",
-                            "style": style,
-                            "text_preview": para.text[:100] + "..." if len(para.text) > 100 else para.text,
-                        })
+                        structure.append(
+                            {
+                                "type": "paragraph",
+                                "style": style,
+                                "text_preview": para.text[:100] + "..."
+                                if len(para.text) > 100
+                                else para.text,
+                            }
+                        )
 
                 for table in doc.tables:
-                    structure.append({
-                        "type": "table",
-                        "rows": len(table.rows),
-                        "cols": len(table.columns) if table.rows else 0,
-                    })
+                    structure.append(
+                        {
+                            "type": "table",
+                            "rows": len(table.rows),
+                            "cols": len(table.columns) if table.rows else 0,
+                        }
+                    )
 
                 return ToolResult(
                     success=True,
@@ -148,11 +155,13 @@ class DOCXTool(Tool):
                         cells = [cell.text.strip() for cell in row.cells]
                         rows_data.append(cells)
 
-                    tables_data.append({
-                        "table_index": i,
-                        "rows": len(table.rows),
-                        "data": rows_data[:20],  # Limit rows
-                    })
+                    tables_data.append(
+                        {
+                            "table_index": i,
+                            "rows": len(table.rows),
+                            "data": rows_data[:20],  # Limit rows
+                        }
+                    )
 
                 return ToolResult(
                     success=True,

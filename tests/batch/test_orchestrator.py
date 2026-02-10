@@ -6,11 +6,10 @@ Covers batch submission, monitoring, cancellation, and progress tracking.
 
 from __future__ import annotations
 
-import asyncio
-import pytest
 from datetime import datetime
-from unittest.mock import AsyncMock, MagicMock, patch
-from uuid import UUID, uuid4
+from uuid import uuid4
+
+import pytest
 
 from titan.batch.models import (
     BatchJob,
@@ -26,10 +25,10 @@ from titan.batch.orchestrator import (
     set_batch_orchestrator,
 )
 
-
 # =============================================================================
 # Fixtures
 # =============================================================================
+
 
 @pytest.fixture
 def orchestrator():
@@ -52,6 +51,7 @@ def sample_request():
 # =============================================================================
 # Model Tests
 # =============================================================================
+
 
 class TestBatchJob:
     """Tests for BatchJob dataclass."""
@@ -212,6 +212,7 @@ class TestBatchProgress:
 # =============================================================================
 # Orchestrator Tests
 # =============================================================================
+
 
 class TestBatchOrchestrator:
     """Tests for BatchOrchestrator."""
@@ -529,6 +530,7 @@ class TestBatchSubmitRequest:
 # Factory Function Tests
 # =============================================================================
 
+
 class TestFactoryFunctions:
     """Tests for module factory functions."""
 
@@ -556,6 +558,7 @@ class TestFactoryFunctions:
 # =============================================================================
 # Stalled Batch Detection Tests
 # =============================================================================
+
 
 class TestStalledBatchDetection:
     """Tests for stalled batch detection and recovery."""
@@ -677,7 +680,7 @@ class TestStalledBatchDetection:
         # Set retry count to max
         stalled_batch.sessions[0].retry_count = orchestrator._max_retries
 
-        result = await orchestrator.recover_stalled_batch(
+        await orchestrator.recover_stalled_batch(
             stalled_batch.id,
             strategy="retry",
         )

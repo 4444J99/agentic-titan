@@ -2,9 +2,9 @@
 Tests for Firecracker Runtime (Phase 18B)
 """
 
-import pytest
 import platform
-from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
 
 
 class TestFirecrackerImports:
@@ -33,8 +33,8 @@ class TestFirecrackerImports:
     def test_import_guest_agent(self):
         """Test importing guest agent module."""
         from runtime.firecracker.guest_agent import (
-            GuestAgentProtocol,
             CommandResult,
+            GuestAgentProtocol,
         )
 
         assert GuestAgentProtocol is not None
@@ -65,8 +65,8 @@ class TestFirecrackerRuntime:
 
     def test_create_runtime(self):
         """Test creating runtime instance."""
-        from runtime.firecracker.runtime import FirecrackerRuntime
         from runtime.firecracker.config import FirecrackerConfig
+        from runtime.firecracker.runtime import FirecrackerRuntime
 
         config = FirecrackerConfig()
         runtime = FirecrackerRuntime(firecracker_config=config)
@@ -93,8 +93,8 @@ class TestFirecrackerRuntime:
 
     def test_get_resource_limits(self):
         """Test getting resource limits."""
-        from runtime.firecracker.runtime import FirecrackerRuntime
         from runtime.firecracker.config import FirecrackerConfig
+        from runtime.firecracker.runtime import FirecrackerRuntime
 
         config = FirecrackerConfig(vcpu_count=2, mem_size_mib=512)
         runtime = FirecrackerRuntime(firecracker_config=config)
@@ -116,10 +116,7 @@ class TestFirecrackerRuntime:
         assert "binary_exists" in health
 
     @pytest.mark.asyncio
-    @pytest.mark.skipif(
-        platform.system() != "Linux",
-        reason="Firecracker only available on Linux"
-    )
+    @pytest.mark.skipif(platform.system() != "Linux", reason="Firecracker only available on Linux")
     async def test_initialize_requires_linux(self):
         """Test that initialization requires Linux."""
         from runtime.firecracker.runtime import FirecrackerRuntime
@@ -251,7 +248,7 @@ class TestRuntimeSelectorIntegration:
 
     def test_selector_scores_firecracker(self):
         """Test that selector can score Firecracker."""
-        from runtime.selector import RuntimeSelector, RuntimeConstraints
+        from runtime.selector import RuntimeConstraints, RuntimeSelector
 
         selector = RuntimeSelector()
 
@@ -262,6 +259,8 @@ class TestRuntimeSelectorIntegration:
 
         # Score should work even if Firecracker not available
         # (will just be scored lower or unavailable)
+        assert selector is not None
+        assert constraints.needs_isolation is True
 
 
 class TestFirecrackerRuntimePackage:

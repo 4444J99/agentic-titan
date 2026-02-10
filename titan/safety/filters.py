@@ -7,10 +7,9 @@ Implements content filtering for LLM outputs.
 from __future__ import annotations
 
 import logging
-import re
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 from uuid import UUID, uuid4
 
@@ -18,7 +17,6 @@ from titan.safety.patterns import (
     DangerousPattern,
     PatternCategory,
     PatternSeverity,
-    get_all_patterns,
     get_patterns_by_category,
 )
 
@@ -38,7 +36,7 @@ class FilterMatch:
     matched_text: str
     position: tuple[int, int]  # start, end
     action: str  # block, sanitize, warn
-    timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    timestamp: datetime = field(default_factory=lambda: datetime.now(UTC))
 
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
@@ -46,7 +44,9 @@ class FilterMatch:
             "pattern_name": self.pattern_name,
             "category": self.category.value,
             "severity": self.severity.value,
-            "matched_text": self.matched_text[:50] + "..." if len(self.matched_text) > 50 else self.matched_text,
+            "matched_text": self.matched_text[:50] + "..."
+            if len(self.matched_text) > 50
+            else self.matched_text,
             "position": self.position,
             "action": self.action,
             "timestamp": self.timestamp.isoformat(),
@@ -164,9 +164,7 @@ class PatternBasedFilter(ContentFilter):
                 if pattern.action == "block":
                     result.blocked = True
                 elif pattern.action == "warn":
-                    result.warnings.append(
-                        f"{pattern.name}: {pattern.description}"
-                    )
+                    result.warnings.append(f"{pattern.name}: {pattern.description}")
 
         result.matches = all_matches
 
@@ -326,8 +324,11 @@ class CompositeFilter(ContentFilter):
         """Sanitize using all child filters."""
         sanitized = content
         for child_filter in self._filters:
-            child_matches = [m for m in matches if m.pattern_name in
-                           [p.name for p in getattr(child_filter, '_patterns', [])]]
+            child_matches = [
+                m
+                for m in matches
+                if m.pattern_name in [p.name for p in getattr(child_filter, "_patterns", [])]
+            ]
             if child_matches:
                 sanitized = child_filter.sanitize(sanitized, child_matches)
         return sanitized
@@ -442,7 +443,9 @@ class FilterPipeline:
                     session_id=session_id or "unknown",
                     filter_type=match.pattern_name,
                     original_content=result.original_content[:200],
-                    filtered_content=result.filtered_content[:200] if result.filtered_content else None,
+                    filtered_content=result.filtered_content[:200]
+                    if result.filtered_content
+                    else None,
                     reason=f"{match.category.value}: {match.pattern_name}",
                 )
         except Exception as e:

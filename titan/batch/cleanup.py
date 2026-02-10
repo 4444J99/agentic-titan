@@ -30,7 +30,7 @@ async def cleanup_celery_results(
     Returns:
         Dictionary with cleanup statistics
     """
-    stats = {"cleaned": 0, "errors": []}
+    stats: dict[str, Any] = {"cleaned": 0, "errors": []}
 
     try:
         from titan.batch.celery_app import celery_app
@@ -46,9 +46,7 @@ async def cleanup_celery_results(
         # For Redis backend, we can also delete old keys
         if hasattr(backend, "client"):
             redis_client = backend.client
-            cutoff_timestamp = (
-                datetime.now() - timedelta(days=retention_days)
-            ).timestamp()
+            (datetime.now() - timedelta(days=retention_days)).timestamp()
 
             # Redis backend stores results with celery-task-meta- prefix
             pattern = "celery-task-meta-*"
@@ -96,7 +94,7 @@ async def cleanup_orphaned_artifacts(
     Returns:
         Dictionary with cleanup statistics
     """
-    stats = {"scanned": 0, "deleted": 0, "errors": []}
+    stats: dict[str, Any] = {"scanned": 0, "deleted": 0, "errors": []}
     cutoff = datetime.now() - timedelta(days=retention_days)
 
     try:
@@ -163,7 +161,7 @@ async def cleanup_postgres_batches(
     Returns:
         Dictionary with cleanup statistics
     """
-    stats = {"deleted": 0, "errors": []}
+    stats: dict[str, Any] = {"deleted": 0, "errors": []}
 
     if not postgres or not postgres.is_connected:
         return stats
@@ -197,7 +195,7 @@ async def full_cleanup(
     """
     logger.info(f"Starting full cleanup (retention: {retention_days} days)")
 
-    stats = {
+    stats: dict[str, Any] = {
         "celery_results": {},
         "artifacts": {},
         "postgres": {},
@@ -236,8 +234,11 @@ async def full_cleanup(
 
     # Count total errors
     for section in ["celery_results", "artifacts", "postgres"]:
-        if section in stats and "errors" in stats[section]:
-            stats["total_errors"] += len(stats[section]["errors"])
+        section_stats = stats.get(section)
+        if isinstance(section_stats, dict):
+            errors = section_stats.get("errors")
+            if isinstance(errors, list):
+                stats["total_errors"] += len(errors)
 
     logger.info(
         f"Full cleanup completed: "

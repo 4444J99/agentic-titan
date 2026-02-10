@@ -16,8 +16,8 @@ import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from datetime import datetime
-from enum import Enum
-from typing import Any, Protocol
+from enum import StrEnum
+from typing import Any
 
 logger = logging.getLogger("titan.memory")
 
@@ -27,24 +27,24 @@ logger = logging.getLogger("titan.memory")
 # ============================================================================
 
 
-class BackendType(str, Enum):
+class BackendType(StrEnum):
     """Supported memory backend types."""
 
-    CHROMADB = "chromadb"      # Vector store (default)
-    MEMORI = "memori"          # SQL-native
-    REDIS = "redis"            # Key-value
-    IN_MEMORY = "in_memory"    # Development/testing
+    CHROMADB = "chromadb"  # Vector store (default)
+    MEMORI = "memori"  # SQL-native
+    REDIS = "redis"  # Key-value
+    IN_MEMORY = "in_memory"  # Development/testing
 
 
-class MemoryCategory(str, Enum):
+class MemoryCategory(StrEnum):
     """Categories for memory classification."""
 
-    ESSENTIAL = "essential"        # Core facts and preferences
-    CONTEXTUAL = "contextual"      # Project/work context
+    ESSENTIAL = "essential"  # Core facts and preferences
+    CONTEXTUAL = "contextual"  # Project/work context
     CONVERSATIONAL = "conversational"  # Regular discussions
-    REFERENCE = "reference"        # Technical references
-    PERSONAL = "personal"          # Life events, relationships
-    CONSCIOUS = "conscious"        # Auto-promote to short-term
+    REFERENCE = "reference"  # Technical references
+    PERSONAL = "personal"  # Life events, relationships
+    CONSCIOUS = "conscious"  # Auto-promote to short-term
 
 
 # ============================================================================

@@ -6,24 +6,19 @@ Tests the InquiryDependencyGraph class and DAG-based workflow execution.
 
 from __future__ import annotations
 
-import asyncio
-from dataclasses import dataclass, field
-
 import pytest
 
 from titan.workflows.inquiry_config import (
     InquiryStage,
     InquiryWorkflow,
-    CognitiveStyle,
 )
 from titan.workflows.inquiry_dag import (
-    InquiryDependencyGraph,
     ExecutionMode,
+    InquiryDependencyGraph,
     StageNode,
     validate_workflow_dependencies,
 )
-from titan.workflows.inquiry_engine import InquiryEngine, InquirySession, InquiryStatus
-
+from titan.workflows.inquiry_engine import InquiryEngine, InquiryStatus
 
 # =============================================================================
 # Fixtures

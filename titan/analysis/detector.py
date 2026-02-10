@@ -7,12 +7,12 @@ LLM-based analysis and keyword matching heuristics.
 
 from __future__ import annotations
 
-import asyncio
 import json
 import logging
 import re
-from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, Callable
+from collections.abc import Callable
+from dataclasses import dataclass
+from typing import TYPE_CHECKING, Any
 
 from titan.analysis.contradictions import (
     Contradiction,
@@ -23,7 +23,7 @@ from titan.analysis.contradictions import (
 )
 
 if TYPE_CHECKING:
-    from adapters.router import LLMRouter
+    pass
 
 logger = logging.getLogger("titan.analysis.detector")
 
@@ -199,9 +199,7 @@ class ContradictionDetector:
 
         # Run heuristic analysis
         if self._config.use_heuristics:
-            heuristic_results = self._heuristic_analysis(
-                content_a, content_b, source_a, source_b
-            )
+            heuristic_results = self._heuristic_analysis(content_a, content_b, source_a, source_b)
             contradictions.extend(heuristic_results)
 
         # Run LLM analysis
@@ -215,11 +213,7 @@ class ContradictionDetector:
         merged = self._merge_contradictions(contradictions)
 
         # Filter by confidence
-        filtered = [
-            c
-            for c in merged
-            if c.confidence >= self._config.min_confidence_threshold
-        ]
+        filtered = [c for c in merged if c.confidence >= self._config.min_confidence_threshold]
 
         return filtered
 
@@ -266,7 +260,11 @@ class ContradictionDetector:
             contradictions.append(
                 Contradiction(
                     contradiction_type=ContradictionType.LOGICAL,
-                    severity=ContradictionSeverity.HIGH if negation_score > 0.6 else ContradictionSeverity.MEDIUM,
+                    severity=(
+                        ContradictionSeverity.HIGH
+                        if negation_score > 0.6
+                        else ContradictionSeverity.MEDIUM
+                    ),
                     source_a=source_a,
                     source_b=source_b,
                     content_a=content_a[:500],
@@ -317,7 +315,8 @@ Respond in JSON format:
     "summary": "Brief overall summary"
 }}
 
-If no contradictions are found, return: {{"contradictions": [], "summary": "No contradictions found"}}"""
+If no contradictions are found, return:
+{{"contradictions": [], "summary": "No contradictions found"}}"""
 
         try:
             response = await self._llm_caller(prompt, self._config.llm_model)
@@ -418,7 +417,19 @@ If no contradictions are found, return: {{"contradictions": [], "summary": "No c
 
     def _is_negation(self, sent_a: str, sent_b: str) -> bool:
         """Check if one sentence is roughly the negation of another."""
-        negation_words = ["not", "never", "no", "none", "neither", "cannot", "won't", "don't", "doesn't", "isn't", "aren't"]
+        negation_words = [
+            "not",
+            "never",
+            "no",
+            "none",
+            "neither",
+            "cannot",
+            "won't",
+            "don't",
+            "doesn't",
+            "isn't",
+            "aren't",
+        ]
 
         words_a = set(sent_a.split())
         words_b = set(sent_b.split())
@@ -438,8 +449,28 @@ If no contradictions are found, return: {{"contradictions": [], "summary": "No c
 
     def _has_opposite_sentiment(self, sent_a: str, sent_b: str) -> bool:
         """Check for opposite sentiment indicators."""
-        positive = ["good", "better", "best", "positive", "correct", "right", "true", "agree", "support"]
-        negative = ["bad", "worse", "worst", "negative", "incorrect", "wrong", "false", "disagree", "oppose"]
+        positive = [
+            "good",
+            "better",
+            "best",
+            "positive",
+            "correct",
+            "right",
+            "true",
+            "agree",
+            "support",
+        ]
+        negative = [
+            "bad",
+            "worse",
+            "worst",
+            "negative",
+            "incorrect",
+            "wrong",
+            "false",
+            "disagree",
+            "oppose",
+        ]
 
         pos_a = any(p in sent_a for p in positive)
         neg_a = any(n in sent_a for n in negative)
@@ -452,12 +483,64 @@ If no contradictions are found, return: {{"contradictions": [], "summary": "No c
     def _extract_key_terms(self, content_a: str, content_b: str) -> list[str]:
         """Extract key terms from content."""
         # Simple extraction: find common significant words
-        stop_words = {"the", "a", "an", "is", "are", "was", "were", "be", "been", "being",
-                      "have", "has", "had", "do", "does", "did", "will", "would", "could",
-                      "should", "may", "might", "must", "shall", "can", "to", "of", "in",
-                      "for", "on", "with", "at", "by", "from", "or", "and", "but", "if",
-                      "then", "than", "so", "as", "it", "its", "this", "that", "these",
-                      "those", "they", "them", "their", "we", "us", "our", "you", "your"}
+        stop_words = {
+            "the",
+            "a",
+            "an",
+            "is",
+            "are",
+            "was",
+            "were",
+            "be",
+            "been",
+            "being",
+            "have",
+            "has",
+            "had",
+            "do",
+            "does",
+            "did",
+            "will",
+            "would",
+            "could",
+            "should",
+            "may",
+            "might",
+            "must",
+            "shall",
+            "can",
+            "to",
+            "of",
+            "in",
+            "for",
+            "on",
+            "with",
+            "at",
+            "by",
+            "from",
+            "or",
+            "and",
+            "but",
+            "if",
+            "then",
+            "than",
+            "so",
+            "as",
+            "it",
+            "its",
+            "this",
+            "that",
+            "these",
+            "those",
+            "they",
+            "them",
+            "their",
+            "we",
+            "us",
+            "our",
+            "you",
+            "your",
+        }
 
         words_a = set(re.findall(r"\b\w{4,}\b", content_a.lower()))
         words_b = set(re.findall(r"\b\w{4,}\b", content_b.lower()))
@@ -509,7 +592,8 @@ If no contradictions are found, return: {{"contradictions": [], "summary": "No c
 
         avg_confidence = (
             sum(c.confidence for c in contradictions) / len(contradictions)
-            if contradictions else 0.0
+            if contradictions
+            else 0.0
         )
 
         return ContradictionReport(

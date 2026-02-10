@@ -11,7 +11,7 @@ import json
 import logging
 import os
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 from uuid import uuid4
@@ -76,7 +76,7 @@ class ExperimentRun:
     run_id: str = field(default_factory=lambda: str(uuid4())[:8])
     name: str = ""
     config: dict[str, Any] = field(default_factory=dict)
-    started_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    started_at: datetime = field(default_factory=lambda: datetime.now(UTC))
     completed_at: datetime | None = None
     status: str = "running"  # running, completed, failed, aborted
     metrics: dict[str, list[tuple[int, float]]] = field(default_factory=dict)
@@ -133,7 +133,7 @@ class ExperimentTracker:
     def __init__(self, config: ExperimentConfig | None = None) -> None:
         self._config = config or ExperimentConfig()
         self._current_run: ExperimentRun | None = None
-        self._backend = None
+        self._backend: Any = None
         self._initialized = False
 
     def initialize(self) -> bool:
@@ -159,7 +159,9 @@ class ExperimentTracker:
             return True
 
         except Exception as e:
-            logger.warning(f"Failed to initialize {self._config.backend}, falling back to local: {e}")
+            logger.warning(
+                f"Failed to initialize {self._config.backend}, falling back to local: {e}"
+            )
             self._config.backend = "local"
             self._init_local()
             self._initialized = True
@@ -402,7 +404,7 @@ class ExperimentTracker:
             return
 
         self._current_run.status = status
-        self._current_run.completed_at = datetime.now(timezone.utc)
+        self._current_run.completed_at = datetime.now(UTC)
 
         try:
             if self._config.backend == "wandb":
@@ -457,7 +459,9 @@ class ExperimentTracker:
                     run_id=run.info.run_id,
                     name=run.info.run_name or "",
                     config=dict(run.data.params),
-                    status="completed" if run.info.status == "FINISHED" else run.info.status.lower(),
+                    status="completed"
+                    if run.info.status == "FINISHED"
+                    else run.info.status.lower(),
                 )
 
             else:

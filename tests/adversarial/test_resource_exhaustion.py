@@ -4,26 +4,26 @@ Adversarial Tests - Resource Exhaustion Prevention
 Tests for termination conditions and resource limits.
 """
 
-import pytest
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
-from titan.orchestration.termination import (
-    WorkflowState,
-    TerminationCondition,
-    TimeoutCondition,
-    MaxIterationsCondition,
-    MaxCostCondition,
-    FailureThresholdCondition,
-    SuccessCondition,
-    ResourceExhaustionCondition,
-    CompositeTerminationCondition,
-    DefaultTerminationConditions,
-    TerminationReason,
-)
+import pytest
+
 from titan.costs.budget import (
-    BudgetTracker,
     BudgetConfig,
     BudgetExceededError,
+    BudgetTracker,
+)
+from titan.orchestration.termination import (
+    CompositeTerminationCondition,
+    DefaultTerminationConditions,
+    FailureThresholdCondition,
+    MaxCostCondition,
+    MaxIterationsCondition,
+    ResourceExhaustionCondition,
+    SuccessCondition,
+    TerminationReason,
+    TimeoutCondition,
+    WorkflowState,
 )
 
 
@@ -34,7 +34,7 @@ class TestTerminationConditions:
     def workflow_state(self):
         return WorkflowState(
             workflow_id="test-workflow",
-            start_time=datetime.now(timezone.utc),
+            start_time=datetime.now(UTC),
         )
 
     # Timeout tests
@@ -48,7 +48,7 @@ class TestTerminationConditions:
         """Test that timeout condition triggers when time is up."""
         condition = TimeoutCondition(max_duration_seconds=0.001)
         # Artificially set start time in the past
-        workflow_state.start_time = datetime.now(timezone.utc) - timedelta(seconds=10)
+        workflow_state.start_time = datetime.now(UTC) - timedelta(seconds=10)
         result = condition.check(workflow_state)
         assert result.should_terminate
         assert result.reason == TerminationReason.TIMEOUT
@@ -131,8 +131,7 @@ class TestTerminationConditions:
     def test_success_condition_not_met(self, workflow_state):
         """Test that success condition doesn't trigger when not met."""
         condition = SuccessCondition(
-            success_criteria=lambda s: s.success_count >= 10,
-            description="Need 10 successes"
+            success_criteria=lambda s: s.success_count >= 10, description="Need 10 successes"
         )
         workflow_state.success_count = 5
         result = condition.check(workflow_state)
@@ -141,8 +140,7 @@ class TestTerminationConditions:
     def test_success_condition_met(self, workflow_state):
         """Test that success condition triggers when met."""
         condition = SuccessCondition(
-            success_criteria=lambda s: s.success_count >= 10,
-            description="Need 10 successes"
+            success_criteria=lambda s: s.success_count >= 10, description="Need 10 successes"
         )
         workflow_state.success_count = 10
         result = condition.check(workflow_state)
@@ -157,15 +155,18 @@ class TestCompositeConditions:
     def workflow_state(self):
         return WorkflowState(
             workflow_id="test-workflow",
-            start_time=datetime.now(timezone.utc),
+            start_time=datetime.now(UTC),
         )
 
     def test_composite_any_triggers(self, workflow_state):
         """Test that composite triggers when any condition is met."""
-        composite = CompositeTerminationCondition([
-            MaxIterationsCondition(max_iterations=10),
-            TimeoutCondition(max_duration_seconds=60),
-        ], require_all=False)
+        composite = CompositeTerminationCondition(
+            [
+                MaxIterationsCondition(max_iterations=10),
+                TimeoutCondition(max_duration_seconds=60),
+            ],
+            require_all=False,
+        )
 
         workflow_state.iteration_count = 10  # Triggers first condition
         result = composite.check(workflow_state)
@@ -174,10 +175,13 @@ class TestCompositeConditions:
 
     def test_composite_all_required(self, workflow_state):
         """Test that composite with require_all only triggers when all met."""
-        composite = CompositeTerminationCondition([
-            MaxIterationsCondition(max_iterations=10),
-            MaxCostCondition(max_cost_usd=5.0),
-        ], require_all=True)
+        composite = CompositeTerminationCondition(
+            [
+                MaxIterationsCondition(max_iterations=10),
+                MaxCostCondition(max_cost_usd=5.0),
+            ],
+            require_all=True,
+        )
 
         workflow_state.iteration_count = 10
         workflow_state.total_cost_usd = 3.0  # Below cost limit
@@ -197,7 +201,7 @@ class TestDefaultTerminationConditions:
     def workflow_state(self):
         return WorkflowState(
             workflow_id="test-workflow",
-            start_time=datetime.now(timezone.utc),
+            start_time=datetime.now(UTC),
         )
 
     def test_agent_defaults_reasonable(self, workflow_state):
@@ -246,12 +250,14 @@ class TestBudgetLimits:
 
     @pytest.fixture
     def tracker(self):
-        return BudgetTracker(BudgetConfig(
-            session_limit_usd=10.0,
-            daily_limit_usd=100.0,
-            monthly_limit_usd=1000.0,
-            enforce_limits=True,
-        ))
+        return BudgetTracker(
+            BudgetConfig(
+                session_limit_usd=10.0,
+                daily_limit_usd=100.0,
+                monthly_limit_usd=1000.0,
+                enforce_limits=True,
+            )
+        )
 
     @pytest.mark.asyncio
     async def test_session_budget_created(self, tracker):

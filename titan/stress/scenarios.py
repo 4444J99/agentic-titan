@@ -10,16 +10,14 @@ Pre-built scenarios for stress testing different aspects of the system:
 
 from __future__ import annotations
 
-import asyncio
 import random
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 if TYPE_CHECKING:
     from agents.framework.base_agent import BaseAgent
-    from hive.topology import TopologyEngine, TopologyType
 
 
 class ScenarioPhase(Enum):
@@ -130,13 +128,15 @@ class SwarmBrainstormScenario(Scenario):
     broadcast_probability: float = 0.3
     direct_message_probability: float = 0.4
 
-    topics: list[str] = field(default_factory=lambda: [
-        "AI safety best practices",
-        "Sustainable energy solutions",
-        "Space exploration technologies",
-        "Healthcare automation",
-        "Education innovation",
-    ])
+    topics: list[str] = field(
+        default_factory=lambda: [
+            "AI safety best practices",
+            "Sustainable energy solutions",
+            "Space exploration technologies",
+            "Healthcare automation",
+            "Education innovation",
+        ]
+    )
 
     async def spawn_agent(self, index: int) -> BaseAgent:
         """Spawn a researcher-type agent for brainstorming."""
@@ -182,6 +182,7 @@ class PipelineWorkflowScenario(Scenario):
 
         if stage == "research":
             from agents.archetypes.researcher import ResearcherAgent
+
             return ResearcherAgent(
                 name=f"researcher-{index // len(self.stages)}",
                 max_turns=5,
@@ -189,6 +190,7 @@ class PipelineWorkflowScenario(Scenario):
             )
         elif stage == "code":
             from agents.archetypes.coder import CoderAgent
+
             return CoderAgent(
                 name=f"coder-{index // len(self.stages)}",
                 max_turns=10,
@@ -196,6 +198,7 @@ class PipelineWorkflowScenario(Scenario):
             )
         else:  # review
             from agents.archetypes.reviewer import ReviewerAgent
+
             return ReviewerAgent(
                 name=f"reviewer-{index // len(self.stages)}",
                 max_turns=5,
@@ -236,6 +239,7 @@ class HierarchyDelegationScenario(Scenario):
         if index == 0:
             # Orchestrator
             from agents.archetypes.orchestrator import OrchestratorAgent
+
             return OrchestratorAgent(
                 name="orchestrator",
                 max_turns=20,
@@ -247,6 +251,7 @@ class HierarchyDelegationScenario(Scenario):
             worker_id = (index - 1) % self.team_size
 
             from agents.archetypes.coder import CoderAgent
+
             return CoderAgent(
                 name=f"team{team_id}-worker{worker_id}",
                 max_turns=10,
@@ -288,9 +293,9 @@ class ChaosScenario(Scenario):
     broadcast_probability: float = 0.2
     direct_message_probability: float = 0.3
 
-    topologies: list[str] = field(default_factory=lambda: [
-        "swarm", "hierarchy", "pipeline", "mesh", "ring", "star"
-    ])
+    topologies: list[str] = field(
+        default_factory=lambda: ["swarm", "hierarchy", "pipeline", "mesh", "ring", "star"]
+    )
 
     async def spawn_agent(self, index: int) -> BaseAgent:
         """Spawn random agent types."""
@@ -304,10 +309,13 @@ class ChaosScenario(Scenario):
         module = __import__(module_path, fromlist=[class_name])
         agent_class = getattr(module, class_name)
 
-        return agent_class(
-            name=f"{agent_type}-{index}",
-            max_turns=random.randint(3, 10),
-            timeout_ms=random.randint(15_000, 45_000),
+        return cast(
+            "BaseAgent",
+            agent_class(
+                name=f"{agent_type}-{index}",
+                max_turns=random.randint(3, 10),
+                timeout_ms=random.randint(15_000, 45_000),
+            ),
         )
 
     async def get_task(self, agent: BaseAgent) -> str:
@@ -351,6 +359,7 @@ class ScaleTestScenario(Scenario):
     async def spawn_agent(self, index: int) -> BaseAgent:
         """Spawn lightweight agents."""
         from agents.archetypes.researcher import ResearcherAgent
+
         return ResearcherAgent(
             name=f"agent-{index}",
             max_turns=1,
@@ -391,7 +400,4 @@ def get_scenario(name: str, **kwargs: Any) -> Scenario:
 
 def list_scenarios() -> list[dict[str, str]]:
     """List available scenarios."""
-    return [
-        {"name": name, "description": cls.description}
-        for name, cls in SCENARIOS.items()
-    ]
+    return [{"name": name, "description": cls.description} for name, cls in SCENARIOS.items()]

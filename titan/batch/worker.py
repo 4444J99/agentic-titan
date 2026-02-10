@@ -11,13 +11,18 @@ import asyncio
 import logging
 import os
 import time
+from collections.abc import Callable, Coroutine
 from datetime import datetime, timedelta
-from typing import Any
+from typing import Any, ParamSpec, Protocol, TypeVar, cast
 
 from celery import shared_task
 from celery.exceptions import MaxRetriesExceededError, SoftTimeLimitExceeded
 
 logger = logging.getLogger("titan.batch.worker")
+
+P = ParamSpec("P")
+R = TypeVar("R")
+T = TypeVar("T")
 
 # Worker identification
 WORKER_ID = os.getenv("CELERY_WORKER_ID", f"worker-{os.getpid()}")
@@ -28,7 +33,88 @@ RUNTIME_TYPE = os.getenv("WORKER_RUNTIME_TYPE", "local")
 # Helper Functions
 # =============================================================================
 
-def run_async(coro):
+
+class InquiryEngineLike(Protocol):
+    """Typed surface used by worker tasks."""
+
+    async def start_inquiry(
+        self,
+        topic: str,
+        workflow: Any | None = None,
+        metadata: dict[str, Any] | None = None,
+    ) -> Any: ...
+
+    async def run_full_workflow(self, session: Any) -> Any: ...
+
+
+class BatchOrchestratorLike(Protocol):
+    """Typed surface used by worker callbacks."""
+
+    _batches: dict[Any, Any]
+
+    async def handle_session_started(
+        self,
+        batch_id: str,
+        session_id: str,
+        worker_id: str,
+    ) -> None: ...
+
+    async def handle_session_completed(
+        self,
+        batch_id: str,
+        session_id: str,
+        artifact_uri: str,
+        tokens_used: int,
+        cost_usd: float,
+        inquiry_session_id: str,
+    ) -> None: ...
+
+    async def handle_session_failed(self, batch_id: str, session_id: str, error: str) -> None: ...
+
+    async def get_stalled_batches(self, threshold_minutes: int = 30) -> list[str]: ...
+
+    async def recover_stalled_batch(self, batch_id: str) -> bool: ...
+
+
+class ArtifactStoreLike(Protocol):
+    """Typed surface for artifact persistence."""
+
+    async def save_artifact(
+        self,
+        batch_id: str,
+        session_id: str,
+        content: bytes,
+        format: str = "markdown",
+        metadata: dict[str, Any] | None = None,
+    ) -> str: ...
+
+    async def delete_artifact(self, artifact_uri: str) -> bool: ...
+
+    async def find_orphaned_artifacts(self, before: datetime) -> list[str]: ...
+
+
+class HiveMindLike(Protocol):
+    """Typed surface for HiveMind interactions."""
+
+    async def initialize(self) -> None: ...
+
+    async def set(
+        self,
+        key: str,
+        value: dict[str, Any],
+        ttl: int | None = None,
+    ) -> Any: ...
+
+
+def typed_shared_task(
+    *args: Any,
+    **kwargs: Any,
+) -> Callable[[Callable[P, R]], Callable[P, R]]:
+    """Typed wrapper over Celery shared_task decorator."""
+    return cast(Callable[[Callable[P, R]], Callable[P, R]], shared_task(*args, **kwargs))
+
+
+def run_async(coro: Coroutine[Any, Any, T]) -> T:
     """Run async function in synchronous context."""
     try:
         loop = asyncio.get_event_loop()
@@ -38,34 +124,34 @@ def run_async(coro):
     return loop.run_until_complete(coro)
 
 
-def get_inquiry_engine():
+def get_inquiry_engine() -> InquiryEngineLike:
     """Get or create InquiryEngine for this worker."""
     from titan.workflows.inquiry_engine import InquiryEngine
 
     # Create engine with worker-specific configuration
-    return InquiryEngine()
+    return cast(InquiryEngineLike, InquiryEngine())
 
 
-def get_orchestrator():
+def get_orchestrator() -> BatchOrchestratorLike:
     """Get the batch orchestrator for callbacks."""
     from titan.batch.orchestrator import get_batch_orchestrator
 
-    return get_batch_orchestrator()
+    return cast(BatchOrchestratorLike, get_batch_orchestrator())
 
 
-def get_artifact_store():
+def get_artifact_store() -> ArtifactStoreLike:
     """Get the artifact store for persisting results."""
-    from titan.batch.artifact_store import get_artifact_store
+    from titan.batch.artifact_store import get_artifact_store as get_store
 
-    return get_artifact_store()
+    return cast(ArtifactStoreLike, get_store())
 
 
-def get_hive_mind():
+def get_hive_mind() -> HiveMindLike:
     """Get or create HiveMind instance for cross-worker coordination."""
     from hive.memory import HiveMind, MemoryConfig
 
     hive = HiveMind(MemoryConfig())
-    return hive
+    return cast(HiveMindLike, hive)
 
 
 async def broadcast_worker_metrics(worker_id: str, metrics: dict[str, Any]) -> None:
@@ -90,7 +176,8 @@ async def broadcast_worker_metrics(worker_id: str, metrics: dict[str, Any]) -> N
 # Main Inquiry Task
 # =============================================================================
 
-@shared_task(
+
+@typed_shared_task(
     bind=True,
     name="titan.batch.worker.run_inquiry_session_task",
     max_retries=3,
@@ -104,7 +191,7 @@ async def broadcast_worker_metrics(worker_id: str, metrics: dict[str, Any]) -> N
     soft_time_limit=1500,
 )
 def run_inquiry_session_task(
-    self,
+    self: Any,
     session_data: dict[str, Any],
 ) -> dict[str, Any]:
     """
@@ -130,10 +217,7 @@ def run_inquiry_session_task(
     topic = session_data["topic"]
     workflow_name = session_data.get("workflow_name", "expansive")
 
-    logger.info(
-        f"Worker {WORKER_ID} starting session {session_id} "
-        f"for topic: {topic[:50]}..."
-    )
+    logger.info(f"Worker {WORKER_ID} starting session {session_id} for topic: {topic[:50]}...")
 
     start_time = time.time()
 
@@ -249,7 +333,8 @@ def run_inquiry_session_task(
 # Synthesis Task
 # =============================================================================
 
-@shared_task(
+
+@typed_shared_task(
     bind=True,
     name="titan.batch.worker.synthesize_batch_task",
     max_retries=2,
@@ -257,7 +342,7 @@ def run_inquiry_session_task(
     time_limit=600,
 )
 def synthesize_batch_task(
-    self,
+    self: Any,
     batch_id: str,
 ) -> dict[str, Any]:
     """
@@ -297,7 +382,8 @@ def synthesize_batch_task(
 # Artifact Storage Task
 # =============================================================================
 
-@shared_task(
+
+@typed_shared_task(
     name="titan.batch.worker.store_artifact_task",
     max_retries=3,
     acks_late=True,
@@ -349,7 +435,8 @@ def store_artifact_task(
 # Maintenance Tasks
 # =============================================================================
 
-@shared_task(name="titan.batch.worker.cleanup_old_results_task")
+
+@typed_shared_task(name="titan.batch.worker.cleanup_old_results_task")
 def cleanup_old_results_task(
     retention_days: int = 30,
 ) -> dict[str, Any]:
@@ -458,7 +545,7 @@ def cleanup_old_results_task(
     }
 
 
-@shared_task(name="titan.batch.worker.check_stalled_batches_task")
+@typed_shared_task(name="titan.batch.worker.check_stalled_batches_task")
 def check_stalled_batches_task(
     stall_threshold_minutes: int = 30,
 ) -> dict[str, Any]:
@@ -558,6 +645,7 @@ def check_stalled_batches_task(
 # Internal Helpers
 # =============================================================================
 
+
 async def _notify_session_started(
     batch_id: str,
     session_id: str,
@@ -610,7 +698,7 @@ async def _notify_session_failed(
 async def _store_session_artifact(
     batch_id: str,
     session_id: str,
-    inquiry_session,
+    inquiry_session: Any,
 ) -> str:
     """Store completed session as artifact."""
     from titan.workflows.inquiry_export import export_session_to_markdown
@@ -634,7 +722,7 @@ async def _store_session_artifact(
     )
 
 
-def _estimate_cost(total_tokens: int, results: list) -> float:
+def _estimate_cost(total_tokens: int, results: list[Any]) -> float:
     """
     Estimate cost based on tokens and models used.
 

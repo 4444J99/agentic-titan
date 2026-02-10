@@ -91,28 +91,97 @@ class ExtractedEntities:
 # Known technologies
 TECHNOLOGIES = {
     # Languages
-    "python", "javascript", "typescript", "java", "go", "golang", "rust",
-    "ruby", "php", "c++", "c#", "swift", "kotlin", "scala", "elixir",
+    "python",
+    "javascript",
+    "typescript",
+    "java",
+    "go",
+    "golang",
+    "rust",
+    "ruby",
+    "php",
+    "c++",
+    "c#",
+    "swift",
+    "kotlin",
+    "scala",
+    "elixir",
     # Frameworks
-    "react", "vue", "angular", "django", "flask", "fastapi", "express",
-    "spring", "rails", "laravel", "nextjs", "nuxt", "svelte",
+    "react",
+    "vue",
+    "angular",
+    "django",
+    "flask",
+    "fastapi",
+    "express",
+    "spring",
+    "rails",
+    "laravel",
+    "nextjs",
+    "nuxt",
+    "svelte",
     # Tools
-    "docker", "kubernetes", "k8s", "terraform", "ansible", "jenkins",
-    "github", "gitlab", "aws", "azure", "gcp", "redis", "postgres",
-    "postgresql", "mysql", "mongodb", "sqlite", "elasticsearch",
+    "docker",
+    "kubernetes",
+    "k8s",
+    "terraform",
+    "ansible",
+    "jenkins",
+    "github",
+    "gitlab",
+    "aws",
+    "azure",
+    "gcp",
+    "redis",
+    "postgres",
+    "postgresql",
+    "mysql",
+    "mongodb",
+    "sqlite",
+    "elasticsearch",
     # AI/ML
-    "pytorch", "tensorflow", "keras", "scikit-learn", "sklearn",
-    "pandas", "numpy", "huggingface", "transformers", "langchain",
-    "openai", "anthropic", "claude", "gpt", "llm", "rag",
+    "pytorch",
+    "tensorflow",
+    "keras",
+    "scikit-learn",
+    "sklearn",
+    "pandas",
+    "numpy",
+    "huggingface",
+    "transformers",
+    "langchain",
+    "openai",
+    "anthropic",
+    "claude",
+    "gpt",
+    "llm",
+    "rag",
 }
 
 # Common topics/skills
 SKILLS = {
-    "machine learning", "deep learning", "natural language processing",
-    "nlp", "computer vision", "data science", "data engineering",
-    "backend", "frontend", "full stack", "devops", "sre", "security",
-    "api design", "microservices", "distributed systems", "databases",
-    "cloud computing", "agile", "scrum", "testing", "ci/cd",
+    "machine learning",
+    "deep learning",
+    "natural language processing",
+    "nlp",
+    "computer vision",
+    "data science",
+    "data engineering",
+    "backend",
+    "frontend",
+    "full stack",
+    "devops",
+    "sre",
+    "security",
+    "api design",
+    "microservices",
+    "distributed systems",
+    "databases",
+    "cloud computing",
+    "agile",
+    "scrum",
+    "testing",
+    "ci/cd",
 }
 
 
@@ -130,11 +199,32 @@ def extract_entities_pattern(text: str) -> ExtractedEntities:
     # Extract technologies (case-insensitive)
     for tech in TECHNOLOGIES:
         if tech in text_lower:
-            if tech in {"python", "javascript", "typescript", "java", "go",
-                        "rust", "ruby", "php", "swift", "kotlin", "scala"}:
+            if tech in {
+                "python",
+                "javascript",
+                "typescript",
+                "java",
+                "go",
+                "rust",
+                "ruby",
+                "php",
+                "swift",
+                "kotlin",
+                "scala",
+            }:
                 entities.languages.append(tech)
-            elif tech in {"react", "vue", "angular", "django", "flask",
-                          "fastapi", "express", "spring", "rails", "nextjs"}:
+            elif tech in {
+                "react",
+                "vue",
+                "angular",
+                "django",
+                "flask",
+                "fastapi",
+                "express",
+                "spring",
+                "rails",
+                "nextjs",
+            }:
                 entities.frameworks.append(tech)
             else:
                 entities.technologies.append(tech)
@@ -156,8 +246,13 @@ def extract_entities_pattern(text: str) -> ExtractedEntities:
     name_pattern = re.compile(r"\b([A-Z][a-z]+(?:\s+[A-Z][a-z]+)+)\b")
     for match in name_pattern.findall(text):
         # Filter out common non-names
-        if match.lower() not in {"new york", "los angeles", "san francisco",
-                                  "machine learning", "deep learning"}:
+        if match.lower() not in {
+            "new york",
+            "los angeles",
+            "san francisco",
+            "machine learning",
+            "deep learning",
+        }:
             entities.people.append(match)
 
     # Extract keywords (important nouns, simplified)
@@ -182,26 +277,119 @@ def extract_entities_pattern(text: str) -> ExtractedEntities:
 
     # Generate keywords from unique words (filtered)
     stopwords = {
-        "the", "a", "an", "is", "are", "was", "were", "be", "been",
-        "being", "have", "has", "had", "do", "does", "did", "will",
-        "would", "could", "should", "may", "might", "must", "shall",
-        "can", "need", "dare", "ought", "used", "to", "of", "in",
-        "for", "on", "with", "at", "by", "from", "as", "into", "through",
-        "during", "before", "after", "above", "below", "between",
-        "and", "but", "or", "nor", "so", "yet", "both", "either",
-        "neither", "not", "only", "own", "same", "than", "too", "very",
-        "just", "also", "now", "here", "there", "when", "where", "why",
-        "how", "all", "each", "every", "any", "some", "no", "this",
-        "that", "these", "those", "i", "you", "he", "she", "it", "we",
-        "they", "me", "him", "her", "us", "them", "my", "your", "his",
-        "its", "our", "their", "what", "which", "who", "whom",
+        "the",
+        "a",
+        "an",
+        "is",
+        "are",
+        "was",
+        "were",
+        "be",
+        "been",
+        "being",
+        "have",
+        "has",
+        "had",
+        "do",
+        "does",
+        "did",
+        "will",
+        "would",
+        "could",
+        "should",
+        "may",
+        "might",
+        "must",
+        "shall",
+        "can",
+        "need",
+        "dare",
+        "ought",
+        "used",
+        "to",
+        "of",
+        "in",
+        "for",
+        "on",
+        "with",
+        "at",
+        "by",
+        "from",
+        "as",
+        "into",
+        "through",
+        "during",
+        "before",
+        "after",
+        "above",
+        "below",
+        "between",
+        "and",
+        "but",
+        "or",
+        "nor",
+        "so",
+        "yet",
+        "both",
+        "either",
+        "neither",
+        "not",
+        "only",
+        "own",
+        "same",
+        "than",
+        "too",
+        "very",
+        "just",
+        "also",
+        "now",
+        "here",
+        "there",
+        "when",
+        "where",
+        "why",
+        "how",
+        "all",
+        "each",
+        "every",
+        "any",
+        "some",
+        "no",
+        "this",
+        "that",
+        "these",
+        "those",
+        "i",
+        "you",
+        "he",
+        "she",
+        "it",
+        "we",
+        "they",
+        "me",
+        "him",
+        "her",
+        "us",
+        "them",
+        "my",
+        "your",
+        "his",
+        "its",
+        "our",
+        "their",
+        "what",
+        "which",
+        "who",
+        "whom",
     }
 
     for word in words:
-        if (len(word) > 3 and
-            word not in stopwords and
-            word.isalpha() and
-            word not in text_lower.split("@")):  # Skip email parts
+        if (
+            len(word) > 3
+            and word not in stopwords
+            and word.isalpha()
+            and word not in text_lower.split("@")
+        ):  # Skip email parts
             entities.keywords.append(word)
 
     # Deduplicate
@@ -262,6 +450,7 @@ Return ONLY valid JSON, no explanation."""
 
     try:
         import json
+
         data = json.loads(response.content)
         return ExtractedEntities(
             people=data.get("people", []),
@@ -303,6 +492,7 @@ def extract_entities(
     """
     if use_llm and llm_complete:
         import asyncio
+
         return asyncio.run(extract_entities_llm(text, llm_complete))
 
     return extract_entities_pattern(text)

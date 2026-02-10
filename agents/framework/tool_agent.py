@@ -11,13 +11,14 @@ from __future__ import annotations
 
 import logging
 from abc import abstractmethod
-from typing import Any, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
+from adapters.base import LLMMessage
+from adapters.base import Tool as LLMTool
+from adapters.router import LLMRouter, get_router
 from agents.framework.base_agent import BaseAgent
-from adapters.base import LLMMessage, Tool as LLMTool
-from adapters.router import get_router, LLMRouter
-from tools.base import get_registry, ToolRegistry
-from tools.executor import get_executor, ToolExecutor
+from tools.base import ToolRegistry, get_registry
+from tools.executor import ToolExecutor, get_executor
 
 if TYPE_CHECKING:
     pass
@@ -126,12 +127,10 @@ class ToolUsingAgent(BaseAgent):
         # Import builtin tools if not already registered
         if not self._tool_registry.list():
             from tools.builtin import register_builtin_tools
+
             register_builtin_tools()
 
-        logger.info(
-            f"Agent '{self.name}' initialized with "
-            f"{len(self.get_available_tools())} tools"
-        )
+        logger.info(f"Agent '{self.name}' initialized with {len(self.get_available_tools())} tools")
 
     async def work(self) -> dict[str, Any]:
         """
@@ -144,17 +143,15 @@ class ToolUsingAgent(BaseAgent):
             return {"error": "No task specified", "messages": []}
 
         # Start conversation
-        self._messages = [
-            LLMMessage(role="user", content=self.task)
-        ]
+        self._messages = [LLMMessage(role="user", content=self.task)]
 
         # Get available tools
         available_tool_names = self.get_available_tools()
-        tools = [
-            self._tool_registry.get(name)
-            for name in available_tool_names
-            if self._tool_registry.get(name)
-        ]
+        tools = []
+        for name in available_tool_names:
+            tool = self._tool_registry.get(name)
+            if tool is not None:
+                tools.append(tool)
         llm_tools = [
             LLMTool(
                 name=t.name,
@@ -184,10 +181,12 @@ class ToolUsingAgent(BaseAgent):
             else:
                 # No tool calls - check if done
                 final_response = response.content
-                self._messages.append(LLMMessage(
-                    role="assistant",
-                    content=final_response,
-                ))
+                self._messages.append(
+                    LLMMessage(
+                        role="assistant",
+                        content=final_response,
+                    )
+                )
 
                 if self.is_task_complete(final_response):
                     logger.info("Task marked as complete")
@@ -202,20 +201,19 @@ class ToolUsingAgent(BaseAgent):
             "final_response": final_response,
             "tool_calls_made": self._tool_calls_made,
             "turns": self._context.turn_number if self._context else 0,
-            "messages": [
-                {"role": m.role, "content": m.content[:500]}
-                for m in self._messages
-            ],
+            "messages": [{"role": m.role, "content": m.content[:500]} for m in self._messages],
         }
 
     async def _process_tool_calls(self, response: Any) -> None:
         """Process tool calls from LLM response."""
         # Add assistant message with tool calls
-        self._messages.append(LLMMessage(
-            role="assistant",
-            content=response.content or "",
-            tool_calls=response.tool_calls,
-        ))
+        self._messages.append(
+            LLMMessage(
+                role="assistant",
+                content=response.content or "",
+                tool_calls=response.tool_calls,
+            )
+        )
 
         # Execute each tool
         for tc in response.tool_calls:
@@ -226,11 +224,13 @@ class ToolUsingAgent(BaseAgent):
             # Pre-hook
             if not await self.pre_tool_call(tool_name, arguments):
                 # Tool call skipped
-                self._messages.append(LLMMessage(
-                    role="user",
-                    content=f"Tool call to {tool_name} was skipped.",
-                    tool_call_id=tool_id,
-                ))
+                self._messages.append(
+                    LLMMessage(
+                        role="user",
+                        content=f"Tool call to {tool_name} was skipped.",
+                        tool_call_id=tool_id,
+                    )
+                )
                 continue
 
             # Execute tool
@@ -245,11 +245,13 @@ class ToolUsingAgent(BaseAgent):
                 await self.post_tool_call(tool_name, arguments, result)
 
                 # Add tool result to conversation
-                self._messages.append(LLMMessage(
-                    role="user",  # Tool results are "user" role in many APIs
-                    content=f"[Tool Result for {tool_name}]\n{result_text}",
-                    tool_call_id=tool_id,
-                ))
+                self._messages.append(
+                    LLMMessage(
+                        role="user",  # Tool results are "user" role in many APIs
+                        content=f"[Tool Result for {tool_name}]\n{result_text}",
+                        tool_call_id=tool_id,
+                    )
+                )
 
                 logger.info(
                     f"Tool {tool_name} executed "
@@ -258,10 +260,7 @@ class ToolUsingAgent(BaseAgent):
 
     async def shutdown(self) -> None:
         """Cleanup the agent."""
-        logger.info(
-            f"Agent '{self.name}' shutdown. "
-            f"Made {self._tool_calls_made} tool calls"
-        )
+        logger.info(f"Agent '{self.name}' shutdown. Made {self._tool_calls_made} tool calls")
 
 
 class SimpleToolAgent(ToolUsingAgent):

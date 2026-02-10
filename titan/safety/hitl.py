@@ -6,15 +6,13 @@ Manages approval requests and responses for high-risk actions.
 
 from __future__ import annotations
 
-import asyncio
 import json
 import logging
+from collections.abc import Callable, Coroutine
 from dataclasses import dataclass, field
-from datetime import datetime
-from typing import TYPE_CHECKING, Any, Callable, Coroutine
+from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
-from titan.safety.policies import ActionClassifier, ActionPolicy, RiskLevel, get_action_classifier
 from titan.safety.gates import (
     ApprovalGate,
     ApprovalRequest,
@@ -23,6 +21,7 @@ from titan.safety.gates import (
     GateRegistry,
     get_gate_registry,
 )
+from titan.safety.policies import ActionClassifier, ActionPolicy, RiskLevel, get_action_classifier
 
 if TYPE_CHECKING:
     from titan.persistence.audit import AuditLogger
@@ -92,6 +91,7 @@ class HITLHandler:
         if self.config.redis_url:
             try:
                 import redis.asyncio as redis
+
                 self._redis = await redis.from_url(self.config.redis_url)
                 logger.info("HITL connected to Redis for distributed state")
             except Exception as e:

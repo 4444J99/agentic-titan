@@ -8,14 +8,15 @@ common inquiry types with optimal configurations.
 from __future__ import annotations
 
 import logging
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 logger = logging.getLogger("titan.mcp.prompts")
 
 
-class PromptCategory(str, Enum):
+class PromptCategory(StrEnum):
     """Categories of MCP prompts."""
 
     INQUIRY = "inquiry"
@@ -478,7 +479,9 @@ def _generate_workflow_execute_messages(args: dict[str, str]) -> list[dict[str, 
 
 
 # Mapping of prompt names to message generators
-PROMPT_GENERATORS: dict[str, Any] = {
+_PromptGenerator = Callable[[dict[str, str]], list[dict[str, Any]]]
+
+PROMPT_GENERATORS: dict[str, _PromptGenerator] = {
     "expansive-inquiry": _generate_expansive_inquiry_messages,
     "quick-inquiry": _generate_quick_inquiry_messages,
     "creative-inquiry": _generate_creative_inquiry_messages,

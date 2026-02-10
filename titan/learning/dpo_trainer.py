@@ -11,7 +11,7 @@ import json
 import logging
 import os
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 from uuid import uuid4
@@ -121,7 +121,7 @@ class DPOMetrics:
     log_probs_rejected: float = 0.0
     step: int = 0
     epoch: float = 0.0
-    timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    timestamp: datetime = field(default_factory=lambda: datetime.now(UTC))
 
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
@@ -146,7 +146,7 @@ class TrainingResult:
 
     run_id: str = field(default_factory=lambda: str(uuid4())[:8])
     config: DPOConfig = field(default_factory=DPOConfig)
-    started_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    started_at: datetime = field(default_factory=lambda: datetime.now(UTC))
     completed_at: datetime | None = None
     final_metrics: DPOMetrics | None = None
     checkpoint_path: str | None = None
@@ -207,7 +207,7 @@ class DPOTrainer:
         except Exception as e:
             result.status = "failed"
             result.error = str(e)
-            result.completed_at = datetime.now(timezone.utc)
+            result.completed_at = datetime.now(UTC)
             logger.error(f"DPO training failed: {e}")
             raise
 
@@ -223,9 +223,9 @@ class DPOTrainer:
         result: TrainingResult,
     ) -> None:
         """Train using TRL's DPOTrainer."""
-        from trl import DPOTrainer as TRLDPOTrainer, DPOConfig as TRLDPOConfig
         from transformers import AutoModelForCausalLM, AutoTokenizer
-        from datasets import Dataset
+        from trl import DPOConfig as TRLDPOConfig
+        from trl import DPOTrainer as TRLDPOTrainer
 
         # Load tokenizer
         tokenizer = AutoTokenizer.from_pretrained(self._config.base_model)
@@ -305,7 +305,7 @@ class DPOTrainer:
             )
 
         result.status = "completed"
-        result.completed_at = datetime.now(timezone.utc)
+        result.completed_at = datetime.now(UTC)
         result.checkpoint_path = self._config.output_dir
 
     def _apply_lora(self, model: Any) -> Any:
@@ -336,11 +336,13 @@ class DPOTrainer:
 
         data = []
         for pair in dataset.pairs:
-            data.append({
-                "prompt": pair.prompt,
-                "chosen": pair.chosen,
-                "rejected": pair.rejected,
-            })
+            data.append(
+                {
+                    "prompt": pair.prompt,
+                    "chosen": pair.chosen,
+                    "rejected": pair.rejected,
+                }
+            )
 
         return Dataset.from_list(data)
 
@@ -353,7 +355,7 @@ class DPOTrainer:
         logger.info(f"Mock DPO training on {len(dataset)} preference pairs")
 
         result.status = "completed"
-        result.completed_at = datetime.now(timezone.utc)
+        result.completed_at = datetime.now(UTC)
         result.final_metrics = DPOMetrics(
             loss=0.5,
             accuracy=0.5,
@@ -407,7 +409,7 @@ class DPOTrainer:
         # Save step info
         step_path = Path(checkpoint_dir) / "trainer_state.json"
         with open(step_path, "w") as f:
-            json.dump({"step": step, "timestamp": datetime.now(timezone.utc).isoformat()}, f)
+            json.dump({"step": step, "timestamp": datetime.now(UTC).isoformat()}, f)
 
         logger.info(f"Saved checkpoint at step {step} to {checkpoint_dir}")
         return checkpoint_dir
@@ -433,7 +435,7 @@ class DPOTrainer:
         if step_path.exists():
             with open(step_path) as f:
                 state = json.load(f)
-                return state.get("step", 0)
+                return int(state.get("step", 0))
 
         return 0
 

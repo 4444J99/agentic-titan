@@ -6,19 +6,19 @@ Defines the core authentication data models including users, API keys, and token
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
-from enum import Enum
+from datetime import UTC, datetime
+from enum import StrEnum
 from typing import Any
 from uuid import UUID, uuid4
 
-from pydantic import BaseModel, Field, EmailStr
+from pydantic import BaseModel, Field
 
 
-class UserRole(str, Enum):
+class UserRole(StrEnum):
     """User role enumeration for role-based access control."""
 
-    ADMIN = "admin"      # Full system access
-    USER = "user"        # Standard user access
+    ADMIN = "admin"  # Full system access
+    USER = "user"  # Standard user access
     SERVICE = "service"  # Service account for automation
     READONLY = "readonly"  # Read-only access
 
@@ -37,7 +37,7 @@ class User(BaseModel):
     hashed_password: str = Field(...)
     role: UserRole = Field(default=UserRole.USER)
     is_active: bool = Field(default=True)
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     updated_at: datetime | None = Field(default=None)
     last_login: datetime | None = Field(default=None)
     metadata: dict[str, Any] = Field(default_factory=dict)
@@ -134,7 +134,7 @@ class APIKey(BaseModel):
     scopes: list[str] = Field(default_factory=list)
     expires_at: datetime | None = Field(default=None)
     is_active: bool = Field(default=True)
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     last_used_at: datetime | None = Field(default=None)
     metadata: dict[str, Any] = Field(default_factory=dict)
 
@@ -143,7 +143,7 @@ class APIKey(BaseModel):
         """Check if the API key has expired."""
         if self.expires_at is None:
             return False
-        return datetime.now(timezone.utc) > self.expires_at
+        return datetime.now(UTC) > self.expires_at
 
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""

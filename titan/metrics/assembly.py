@@ -14,14 +14,14 @@ from __future__ import annotations
 import logging
 import math
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
-from enum import Enum
+from datetime import UTC, datetime
+from enum import StrEnum
 from typing import Any
 
 logger = logging.getLogger("titan.metrics.assembly")
 
 
-class SelectionSignal(str, Enum):
+class SelectionSignal(StrEnum):
     """Strength of selection signal in assembly history.
 
     Based on Assembly Theory's approach to detecting selection:
@@ -30,22 +30,22 @@ class SelectionSignal(str, Enum):
     - Low assembly index = absent selection signal (random assembly)
     """
 
-    STRONG = "strong"      # Clear evidence of selection
+    STRONG = "strong"  # Clear evidence of selection
     MODERATE = "moderate"  # Some evidence of selection
-    WEAK = "weak"          # Minimal evidence
-    ABSENT = "absent"      # No selection signal
+    WEAK = "weak"  # Minimal evidence
+    ABSENT = "absent"  # No selection signal
 
 
-class StepType(str, Enum):
+class StepType(StrEnum):
     """Types of assembly steps."""
 
-    COORDINATION = "coordination"      # Agents coordinating
+    COORDINATION = "coordination"  # Agents coordinating
     TRANSFORMATION = "transformation"  # State change
-    AGGREGATION = "aggregation"        # Combining elements
+    AGGREGATION = "aggregation"  # Combining elements
     SPECIALIZATION = "specialization"  # Role differentiation
-    COMMUNICATION = "communication"    # Information exchange
-    DECISION = "decision"              # Choice point
-    SYNTHESIS = "synthesis"            # Creating new output
+    COMMUNICATION = "communication"  # Information exchange
+    DECISION = "decision"  # Choice point
+    SYNTHESIS = "synthesis"  # Creating new output
 
 
 @dataclass
@@ -62,7 +62,7 @@ class AssemblyStep:
     input_state: dict[str, Any] = field(default_factory=dict)
     output_state: dict[str, Any] = field(default_factory=dict)
     agent_ids: list[str] = field(default_factory=list)
-    timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    timestamp: datetime = field(default_factory=lambda: datetime.now(UTC))
     metadata: dict[str, Any] = field(default_factory=dict)
 
     @property
@@ -94,7 +94,7 @@ class AssemblyStep:
         if isinstance(timestamp, str):
             timestamp = datetime.fromisoformat(timestamp)
         elif timestamp is None:
-            timestamp = datetime.now(timezone.utc)
+            timestamp = datetime.now(UTC)
 
         return cls(
             step_id=data["step_id"],
@@ -118,7 +118,7 @@ class AssemblyPath:
 
     path_id: str
     steps: list[AssemblyStep] = field(default_factory=list)
-    start_time: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    start_time: datetime = field(default_factory=lambda: datetime.now(UTC))
     end_time: datetime | None = None
     metadata: dict[str, Any] = field(default_factory=dict)
 
@@ -158,7 +158,7 @@ class AssemblyPath:
 
     def complete(self) -> None:
         """Mark the path as complete."""
-        self.end_time = datetime.now(timezone.utc)
+        self.end_time = datetime.now(UTC)
 
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
@@ -179,7 +179,7 @@ class AssemblyPath:
         if isinstance(start_time, str):
             start_time = datetime.fromisoformat(start_time)
         elif start_time is None:
-            start_time = datetime.now(timezone.utc)
+            start_time = datetime.now(UTC)
 
         end_time = data.get("end_time")
         if isinstance(end_time, str):
@@ -211,7 +211,7 @@ class AssemblyMetrics:
 
     paths: list[AssemblyPath] = field(default_factory=list)
     ensemble_id: str = ""
-    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
 
     @property
     def total_objects(self) -> int:
@@ -330,7 +330,7 @@ class AssemblyMetrics:
         if isinstance(created_at, str):
             created_at = datetime.fromisoformat(created_at)
         elif created_at is None:
-            created_at = datetime.now(timezone.utc)
+            created_at = datetime.now(UTC)
 
         paths = [AssemblyPath.from_dict(p) for p in data.get("paths", [])]
 

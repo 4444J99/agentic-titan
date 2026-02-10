@@ -16,8 +16,8 @@ import logging
 import random
 from collections import defaultdict
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
-from enum import Enum
+from datetime import UTC, datetime
+from enum import StrEnum
 from typing import Any
 
 logger = logging.getLogger("titan.hive.neighborhood")
@@ -27,7 +27,7 @@ logger = logging.getLogger("titan.hive.neighborhood")
 DEFAULT_NEIGHBOR_COUNT = 7
 
 
-class NeighborLayer(str, Enum):
+class NeighborLayer(StrEnum):
     """Layers of topological coupling based on murmuration research.
 
     Multi-scale coupling allows systems to have:
@@ -36,30 +36,30 @@ class NeighborLayer(str, Enum):
     - Rare global events (tertiary)
     """
 
-    PRIMARY = "primary"      # 6-7 neighbors, strong coupling (main interactions)
+    PRIMARY = "primary"  # 6-7 neighbors, strong coupling (main interactions)
     SECONDARY = "secondary"  # 20-30 neighbors, weak coupling (information spread)
-    TERTIARY = "tertiary"    # Global, rare events only (emergency broadcast)
+    TERTIARY = "tertiary"  # Global, rare events only (emergency broadcast)
 
 
 @dataclass
 class LayeredNeighborConfig:
     """Configuration for multi-scale neighbor layers."""
 
-    primary_count: int = 7          # N=7 from murmuration research
-    secondary_count: int = 25       # Weaker, broader connections
-    secondary_weight: float = 0.3   # Interaction strength for secondary
+    primary_count: int = 7  # N=7 from murmuration research
+    secondary_count: int = 25  # Weaker, broader connections
+    secondary_weight: float = 0.3  # Interaction strength for secondary
     tertiary_probability: float = 0.05  # Probability of tertiary connection
 
 
-class InteractionType(str, Enum):
+class InteractionType(StrEnum):
     """Types of agent-to-agent interactions."""
 
     COLLABORATION = "collaboration"  # Worked together on task
     COMMUNICATION = "communication"  # Exchanged messages
-    DELEGATION = "delegation"        # Delegated task
-    REVIEW = "review"                # Reviewed work
-    ASSISTANCE = "assistance"        # Provided help
-    CONFLICT = "conflict"            # Had disagreement
+    DELEGATION = "delegation"  # Delegated task
+    REVIEW = "review"  # Reviewed work
+    ASSISTANCE = "assistance"  # Provided help
+    CONFLICT = "conflict"  # Had disagreement
 
 
 @dataclass
@@ -70,7 +70,7 @@ class InteractionRecord:
     agent_b: str
     interaction_type: InteractionType
     success: bool
-    timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    timestamp: datetime = field(default_factory=lambda: datetime.now(UTC))
     weight: float = 1.0  # Interaction strength
     metadata: dict[str, Any] = field(default_factory=dict)
 
@@ -97,8 +97,8 @@ class AgentProfile:
     task_tags: list[str] = field(default_factory=list)
     performance_score: float = 1.0
     active: bool = True
-    joined_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
-    last_seen: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    joined_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+    last_seen: datetime = field(default_factory=lambda: datetime.now(UTC))
     metadata: dict[str, Any] = field(default_factory=dict)
 
     def capability_overlap(self, other: AgentProfile) -> float:
@@ -267,7 +267,7 @@ class TopologicalNeighborhood:
         if capabilities is not None:
             profile.capabilities = capabilities
 
-        profile.last_seen = datetime.now(timezone.utc)
+        profile.last_seen = datetime.now(UTC)
         self._cache_valid = False
 
         return profile
@@ -307,7 +307,7 @@ class TopologicalNeighborhood:
 
         # Trim history if needed
         if len(self._interactions) > self._max_history:
-            self._interactions = self._interactions[-self._max_history:]
+            self._interactions = self._interactions[-self._max_history :]
 
         self._cache_valid = False
 
@@ -385,22 +385,24 @@ class TopologicalNeighborhood:
             task_score = profile.task_similarity(other_profile)
 
             total = (
-                self._history_weight * collab_score +
-                self._capability_weight * cap_score +
-                self._task_weight * task_score
+                self._history_weight * collab_score
+                + self._capability_weight * cap_score
+                + self._task_weight * task_score
             )
 
-            scores.append(NeighborScore(
-                agent_id=other_id,
-                total_score=total,
-                collaboration_score=collab_score,
-                capability_score=cap_score,
-                task_similarity_score=task_score,
-            ))
+            scores.append(
+                NeighborScore(
+                    agent_id=other_id,
+                    total_score=total,
+                    collaboration_score=collab_score,
+                    capability_score=cap_score,
+                    task_similarity_score=task_score,
+                )
+            )
 
         # Sort by score and take top N (secondary count)
         scores.sort(key=lambda x: x.total_score, reverse=True)
-        neighbors = [s.agent_id for s in scores[:self._layer_config.secondary_count]]
+        neighbors = [s.agent_id for s in scores[: self._layer_config.secondary_count]]
 
         return neighbors
 
@@ -410,15 +412,11 @@ class TopologicalNeighborhood:
         Tertiary connections are used for emergency broadcasts or
         rare global events. Selection is probabilistic.
         """
-        all_agents = [
-            aid for aid, p in self._profiles.items()
-            if aid != agent_id and p.active
-        ]
+        all_agents = [aid for aid, p in self._profiles.items() if aid != agent_id and p.active]
 
         # Probabilistic selection
         selected = [
-            aid for aid in all_agents
-            if random.random() < self._layer_config.tertiary_probability
+            aid for aid in all_agents if random.random() < self._layer_config.tertiary_probability
         ]
 
         return selected
@@ -458,22 +456,24 @@ class TopologicalNeighborhood:
 
             # Combined score
             total = (
-                self._history_weight * collab_score +
-                self._capability_weight * cap_score +
-                self._task_weight * task_score
+                self._history_weight * collab_score
+                + self._capability_weight * cap_score
+                + self._task_weight * task_score
             )
 
-            scores.append(NeighborScore(
-                agent_id=other_id,
-                total_score=total,
-                collaboration_score=collab_score,
-                capability_score=cap_score,
-                task_similarity_score=task_score,
-            ))
+            scores.append(
+                NeighborScore(
+                    agent_id=other_id,
+                    total_score=total,
+                    collaboration_score=collab_score,
+                    capability_score=cap_score,
+                    task_similarity_score=task_score,
+                )
+            )
 
         # Sort by total score and take top N
         scores.sort(key=lambda x: x.total_score, reverse=True)
-        neighbors = [s.agent_id for s in scores[:self._neighbor_count]]
+        neighbors = [s.agent_id for s in scores[: self._neighbor_count]]
 
         return neighbors
 
@@ -483,14 +483,14 @@ class TopologicalNeighborhood:
         agent_b: str,
     ) -> float:
         """Calculate collaboration score from interaction history."""
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         total_score = 0.0
         interaction_count = 0
 
         for record in self._interactions:
             if not (
-                (record.agent_a == agent_a and record.agent_b == agent_b) or
-                (record.agent_a == agent_b and record.agent_b == agent_a)
+                (record.agent_a == agent_a and record.agent_b == agent_b)
+                or (record.agent_a == agent_b and record.agent_b == agent_a)
             ):
                 continue
 
@@ -648,7 +648,8 @@ class TopologicalNeighborhood:
 
         logger.debug(
             f"Layered propagation from {source_agent}: "
-            f"reached {len(reached)} agents using layers {[l.value for l in use_layers]}"
+            f"reached {len(reached)} agents using layers "
+            f"{[layer.value for layer in use_layers]}"
         )
 
         return reached
@@ -680,17 +681,17 @@ class TopologicalNeighborhood:
         # Calculate average clustering coefficient
         clustering_sum = 0.0
         for agent in active_agents:
-            neighbors = set(self.get_neighbors(agent.agent_id))
-            if len(neighbors) < 2:
+            neighbor_set = set(self.get_neighbors(agent.agent_id))
+            if len(neighbor_set) < 2:
                 continue
 
             # Count connections between neighbors
             neighbor_connections = 0
-            for n1 in neighbors:
+            for n1 in neighbor_set:
                 n1_neighbors = set(self.get_neighbors(n1))
-                neighbor_connections += len(neighbors & n1_neighbors)
+                neighbor_connections += len(neighbor_set & n1_neighbors)
 
-            possible = len(neighbors) * (len(neighbors) - 1)
+            possible = len(neighbor_set) * (len(neighbor_set) - 1)
             if possible > 0:
                 clustering_sum += neighbor_connections / possible
 

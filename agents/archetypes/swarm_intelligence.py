@@ -13,22 +13,17 @@ indirect coordination through the environment or shared state.
 from __future__ import annotations
 
 import logging
-import math
 import random
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
-from enum import Enum
-from typing import TYPE_CHECKING, Any
+from enum import StrEnum
+from typing import Any
 
-from agents.framework.base_agent import BaseAgent, AgentState
-
-if TYPE_CHECKING:
-    from hive.stigmergy import PheromoneField
+from agents.framework.base_agent import AgentState, BaseAgent
 
 logger = logging.getLogger("titan.agents.swarm_intelligence")
 
 
-class SwarmAlgorithm(str, Enum):
+class SwarmAlgorithm(StrEnum):
     """Types of swarm intelligence algorithms."""
 
     PSO = "pso"  # Particle Swarm Optimization
@@ -138,12 +133,15 @@ class SwarmIntelligenceAgent(BaseAgent):
             **kwargs: Base agent arguments.
         """
         kwargs.setdefault("name", f"swarm_{algorithm.value}")
-        kwargs.setdefault("capabilities", [
-            "optimization",
-            "swarm_coordination",
-            "exploration",
-            "exploitation",
-        ])
+        kwargs.setdefault(
+            "capabilities",
+            [
+                "optimization",
+                "swarm_coordination",
+                "exploration",
+                "exploitation",
+            ],
+        )
         super().__init__(**kwargs)
 
         self._algorithm = algorithm
@@ -229,7 +227,9 @@ class SwarmIntelligenceAgent(BaseAgent):
 
         # Check for stagnation
         if len(self._swarm_state.convergence_history) > 2:
-            if self._swarm_state.convergence_history[-1] == self._swarm_state.convergence_history[-2]:
+            current = self._swarm_state.convergence_history[-1]
+            previous = self._swarm_state.convergence_history[-2]
+            if current == previous:
                 self._swarm_state.stagnation_count += 1
             else:
                 self._swarm_state.stagnation_count = 0
@@ -255,7 +255,6 @@ class SwarmIntelligenceAgent(BaseAgent):
         Returns:
             Iteration results.
         """
-        config = self._pso_config
         improvements = 0
         avg_fitness = 0.0
 
@@ -288,24 +287,26 @@ class SwarmIntelligenceAgent(BaseAgent):
             r1, r2 = random.random(), random.random()
 
             # Velocity update: v = w*v + c1*r1*(pbest-x) + c2*r2*(gbest-x)
-            cognitive = config.cognitive_weight * r1 * (
-                particle.personal_best_position[d] - particle.position[d]
+            cognitive = (
+                config.cognitive_weight
+                * r1
+                * (particle.personal_best_position[d] - particle.position[d])
             )
-            social = config.social_weight * r2 * (
-                self._swarm_state.global_best_position[d] - particle.position[d]
-                if self._swarm_state.global_best_position else 0
+            social = (
+                config.social_weight
+                * r2
+                * (
+                    self._swarm_state.global_best_position[d] - particle.position[d]
+                    if self._swarm_state.global_best_position
+                    else 0
+                )
             )
 
-            particle.velocity[d] = (
-                config.inertia_weight * particle.velocity[d] +
-                cognitive +
-                social
-            )
+            particle.velocity[d] = config.inertia_weight * particle.velocity[d] + cognitive + social
 
             # Clamp velocity
             particle.velocity[d] = max(
-                -config.velocity_clamp,
-                min(config.velocity_clamp, particle.velocity[d])
+                -config.velocity_clamp, min(config.velocity_clamp, particle.velocity[d])
             )
 
     def _update_position(self, particle: Particle) -> None:
@@ -317,8 +318,7 @@ class SwarmIntelligenceAgent(BaseAgent):
 
             # Clamp position to bounds
             particle.position[d] = max(
-                config.position_bounds[0],
-                min(config.position_bounds[1], particle.position[d])
+                config.position_bounds[0], min(config.position_bounds[1], particle.position[d])
             )
 
     def _update_global_best(self, particle: Particle) -> bool:
@@ -385,7 +385,6 @@ class SwarmIntelligenceAgent(BaseAgent):
         if not self._graph:
             return [], 0.0
 
-        config = self._aco_config
         path: list[str] = []
         visited: set[str] = set()
 
@@ -447,7 +446,7 @@ class SwarmIntelligenceAgent(BaseAgent):
             heuristic = 1.0
 
             # Probability = pheromone^alpha * heuristic^beta
-            prob = (pheromone ** config.alpha) * (heuristic ** config.beta)
+            prob = (pheromone**config.alpha) * (heuristic**config.beta)
             probabilities.append(prob)
 
         # Normalize and select
@@ -487,7 +486,7 @@ class SwarmIntelligenceAgent(BaseAgent):
         deposit_amount = config.pheromone_deposit * quality
 
         for i in range(len(path) - 1):
-            edge = f"{path[i]}_{path[i+1]}"
+            edge = f"{path[i]}_{path[i + 1]}"
             await self._pheromone_field.deposit(
                 agent_id=self.agent_id,
                 trace_type=TraceType.PATH,
@@ -565,7 +564,7 @@ class SwarmIntelligenceAgent(BaseAgent):
             Fitness value.
         """
         # Sphere function (minimize sum of squares) -> negate for maximization
-        return -sum(x ** 2 for x in position)
+        return -sum(x**2 for x in position)
 
     def set_fitness_function(self, func: Any) -> None:
         """Set a custom fitness function.

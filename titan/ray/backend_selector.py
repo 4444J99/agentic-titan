@@ -6,15 +6,21 @@ environment configuration and availability.
 
 from __future__ import annotations
 
-import os
 import logging
-from enum import Enum
-from typing import Any
+import os
+from enum import StrEnum
+from importlib.util import find_spec
+from typing import Any, Protocol, cast
 
 logger = logging.getLogger("titan.ray.backend_selector")
 
 
-class ComputeBackend(str, Enum):
+class RayBackendLike(Protocol):
+    async def run_inquiry_stage(self, session_id: str, stage_name: str) -> dict[str, Any]: ...
+    async def start_batch(self, batch_id: str) -> dict[str, Any]: ...
+
+
+class ComputeBackend(StrEnum):
     """Available compute backends."""
 
     CELERY = "celery"
@@ -44,6 +50,7 @@ def select_backend() -> ComputeBackend:
     # Check Ray preference
     if os.getenv("TITAN_USE_RAY", "").lower() == "true":
         from titan.ray import is_ray_available
+
         if is_ray_available():
             logger.info("Using Ray compute backend")
             return ComputeBackend.RAY
@@ -52,12 +59,10 @@ def select_backend() -> ComputeBackend:
 
     # Check Celery preference
     if os.getenv("TITAN_USE_CELERY", "").lower() == "true":
-        try:
-            import celery
+        if find_spec("celery") is not None:
             logger.info("Using Celery compute backend")
             return ComputeBackend.CELERY
-        except ImportError:
-            logger.warning("Celery requested but not available, falling back to local")
+        logger.warning("Celery requested but not available, falling back to local")
 
     # Default to local
     logger.info("Using local compute backend")
@@ -91,21 +96,16 @@ async def run_inquiry_stage(
 
     if backend == ComputeBackend.RAY:
         from titan.ray import get_ray_backend
-        ray_backend = get_ray_backend()
+
+        ray_backend = cast(RayBackendLike, get_ray_backend())
         return await ray_backend.run_inquiry_stage(session_id, stage_name)
 
     elif backend == ComputeBackend.CELERY:
-        from titan.batch.worker import process_topic_task
-        # Celery is synchronous, wrap in task
-        task = process_topic_task.delay(session_id, {"stage": stage_name})
-        result = task.get(timeout=300)
-        return result
+        logger.info("Celery backend selected for stage run; delegating to local inquiry engine")
+        return await _run_inquiry_stage_local(session_id, stage_name)
 
     else:  # LOCAL
-        from titan.workflows.inquiry_engine import get_inquiry_engine
-        engine = get_inquiry_engine()
-        result = await engine.run_stage(session_id, stage_name)
-        return result.to_dict()
+        return await _run_inquiry_stage_local(session_id, stage_name)
 
 
 async def start_batch(batch_id: str) -> dict[str, Any]:
@@ -121,14 +121,47 @@ async def start_batch(batch_id: str) -> dict[str, Any]:
 
     if backend == ComputeBackend.RAY:
         from titan.ray import get_ray_backend
-        ray_backend = get_ray_backend()
+
+        ray_backend = cast(RayBackendLike, get_ray_backend())
         return await ray_backend.start_batch(batch_id)
 
     else:  # CELERY or LOCAL
         from titan.batch.orchestrator import get_batch_orchestrator
+
         orchestrator = get_batch_orchestrator()
         batch = await orchestrator.start_batch(batch_id)
         return batch.to_dict()
+
+
+async def _run_inquiry_stage_local(
+    session_id: str,
+    stage_name: str,
+) -> dict[str, Any]:
+    """Run an inquiry stage with the local inquiry engine."""
+    from titan.workflows.inquiry_engine import get_inquiry_engine
+
+    engine = get_inquiry_engine()
+    session = engine.get_session(session_id)
+    if session is None:
+        return {
+            "success": False,
+            "error": f"Session not found: {session_id}",
+            "stage_name": stage_name,
+        }
+
+    stage_index = next(
+        (idx for idx, stage in enumerate(session.workflow.stages) if stage.name == stage_name),
+        None,
+    )
+    if stage_index is None:
+        return {
+            "success": False,
+            "error": f"Stage not found: {stage_name}",
+            "stage_name": stage_name,
+        }
+
+    result = await engine.run_stage(session, stage_index)
+    return result.to_dict()
 
 
 # Global backend cache

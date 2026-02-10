@@ -18,24 +18,23 @@ from __future__ import annotations
 
 import asyncio
 import time
-from datetime import datetime
 from typing import Any
 
 # Rich console for beautiful output
 try:
+    from rich import box
     from rich.console import Console
     from rich.panel import Panel
     from rich.table import Table
-    from rich.progress import Progress, SpinnerColumn, TextColumn
-    from rich import box
+
     RICH_AVAILABLE = True
 except ImportError:
     RICH_AVAILABLE = False
 
 # Titan imports
-from hive.topology import TopologyEngine, TopologyType, TaskProfile
-from hive.decision.voting import VotingSession, VotingStrategy, Vote, VotingResult
-from hive.learning import EpisodicLearner, Episode, EpisodeOutcome
+from hive.decision.voting import Vote, VotingResult, VotingSession, VotingStrategy
+from hive.learning import Episode, EpisodeOutcome, EpisodicLearner
+from hive.topology import TaskProfile, TopologyEngine, TopologyType
 
 console = Console() if RICH_AVAILABLE else None
 
@@ -124,8 +123,14 @@ class MockAgent:
         elif self.archetype == "reviewer":
             return {
                 "issues_found": [
-                    {"severity": "critical", "message": "Missing error handling in qubit_measure()"},
-                    {"severity": "critical", "message": "Potential race condition in parallel execution"},
+                    {
+                        "severity": "critical",
+                        "message": "Missing error handling in qubit_measure()",
+                    },
+                    {
+                        "severity": "critical",
+                        "message": "Potential race condition in parallel execution",
+                    },
                 ],
                 "suggestions": [
                     {"message": "Consider adding type hints for better IDE support"},
@@ -157,7 +162,6 @@ async def phase_1_swarm(engine: TopologyEngine, agents: list[MockAgent]) -> dict
     print_result("Topology created:", type="swarm", agents=len(agents))
 
     # Simulate brainstorming
-    framework_options = ["cirq", "qiskit", "pennylane", "pyquil"]
     votes = []
 
     for agent in agents:
@@ -179,12 +183,14 @@ async def phase_1_swarm(engine: TopologyEngine, agents: list[MockAgent]) -> dict
             confidence = 0.65
             reasoning = "More mature ecosystem"
 
-        votes.append({
-            "agent": agent.name,
-            "choice": choice,
-            "confidence": confidence,
-            "reasoning": reasoning,
-        })
+        votes.append(
+            {
+                "agent": agent.name,
+                "choice": choice,
+                "confidence": confidence,
+                "reasoning": reasoning,
+            }
+        )
 
     # Tally votes
     vote_counts: dict[str, float] = {}
@@ -236,8 +242,14 @@ async def phase_2_pipeline(engine: TopologyEngine, agents: list[MockAgent]) -> d
     print_agent_action("Researcher", "Gathering information on quantum frameworks...")
     research_result = await researcher.work("Research quantum computing frameworks")
     results["research"] = research_result
-    print_agent_action("Researcher", f"Generated {len(research_result['questions'])} research questions")
-    print_agent_action("Researcher", f"Found {len(research_result['sources'])} authoritative sources")
+    print_agent_action(
+        "Researcher",
+        f"Generated {len(research_result['questions'])} research questions",
+    )
+    print_agent_action(
+        "Researcher",
+        f"Found {len(research_result['sources'])} authoritative sources",
+    )
 
     # Stage 2: Code
     print_agent_action("Coder", "Implementing quantum circuit based on research...")
@@ -282,7 +294,12 @@ async def phase_3_hierarchy(engine: TopologyEngine, agents: list[MockAgent]) -> 
     topology.add_agent(reviewer.agent_id, reviewer.name, reviewer.capabilities)
     # Others report to reviewer
     topology.add_agent(coder.agent_id, coder.name, coder.capabilities, parent_id=reviewer.agent_id)
-    topology.add_agent(researcher.agent_id, researcher.name, researcher.capabilities, parent_id=reviewer.agent_id)
+    topology.add_agent(
+        researcher.agent_id,
+        researcher.name,
+        researcher.capabilities,
+        parent_id=reviewer.agent_id,
+    )
 
     switch_ms = (time.time() - start) * 1000
     print_result(f"-> Switched from {old_type} to hierarchy in {switch_ms:.1f}ms")
@@ -295,26 +312,19 @@ async def phase_3_hierarchy(engine: TopologyEngine, agents: list[MockAgent]) -> 
     review_findings = {
         "architecture": {
             "score": 8,
-            "notes": "Clean separation of concerns, good abstraction layers"
+            "notes": "Clean separation of concerns, good abstraction layers",
         },
-        "correctness": {
-            "score": 7,
-            "notes": "Minor issues with edge cases in measurement"
-        },
-        "performance": {
-            "score": 9,
-            "notes": "Efficient use of numpy for matrix operations"
-        },
-        "maintainability": {
-            "score": 8,
-            "notes": "Good code organization, could use more comments"
-        },
+        "correctness": {"score": 7, "notes": "Minor issues with edge cases in measurement"},
+        "performance": {"score": 9, "notes": "Efficient use of numpy for matrix operations"},
+        "maintainability": {"score": 8, "notes": "Good code organization, could use more comments"},
     }
 
     overall_score = sum(f["score"] for f in review_findings.values()) / len(review_findings)
+    architecture_score = review_findings["architecture"]["score"]
+    correctness_score = review_findings["correctness"]["score"]
 
-    print_agent_action("Reviewer", f"Architecture score: {review_findings['architecture']['score']}/10")
-    print_agent_action("Reviewer", f"Correctness score: {review_findings['correctness']['score']}/10")
+    print_agent_action("Reviewer", f"Architecture score: {architecture_score}/10")
+    print_agent_action("Reviewer", f"Correctness score: {correctness_score}/10")
     print_agent_action("Reviewer", f"Overall score: {overall_score:.1f}/10")
 
     # Subordinates acknowledge
@@ -379,7 +389,8 @@ async def phase_4_voting(agents: list[MockAgent]) -> VotingResult:
         )
         session.cast_vote(vote)
 
-        print_agent_action(agent.name, f"Voted {choice} (confidence={confidence:.2f}, weight={weight:.1f})")
+        vote_message = f"Voted {choice} (confidence={confidence:.2f}, weight={weight:.1f})"
+        print_agent_action(agent.name, vote_message)
 
     # Tally results
     result = session.tally()
@@ -400,8 +411,9 @@ async def phase_4_voting(agents: list[MockAgent]) -> VotingResult:
             print(f"   {choice}: {count:.2f}")
 
     print_result(f"-> Winner: {result.winner}")
-    print_result(f"-> Consensus: {result.consensus_reached}",
-                 strength=f"{result.consensus_strength:.0%}")
+    print_result(
+        f"-> Consensus: {result.consensus_reached}", strength=f"{result.consensus_strength:.0%}"
+    )
 
     return result
 
@@ -585,18 +597,20 @@ async def run_demo() -> dict[str, Any]:
     # Summary
     if console:
         console.print("\n")
-        console.print(Panel(
-            "[bold green]Demo completed successfully![/bold green]\n\n"
-            "Demonstrated:\n"
-            "  * Dynamic topology switching (Swarm -> Pipeline -> Hierarchy -> Swarm)\n"
-            "  * Sequential agent workflows with pipeline topology\n"
-            "  * Authority-based review with hierarchy topology\n"
-            "  * Weighted voting for consensus decisions\n"
-            "  * Episodic learning for topology optimization\n"
-            "  * Knowledge retrieval for future tasks",
-            title="Demo Summary",
-            border_style="green",
-        ))
+        console.print(
+            Panel(
+                "[bold green]Demo completed successfully![/bold green]\n\n"
+                "Demonstrated:\n"
+                "  * Dynamic topology switching (Swarm -> Pipeline -> Hierarchy -> Swarm)\n"
+                "  * Sequential agent workflows with pipeline topology\n"
+                "  * Authority-based review with hierarchy topology\n"
+                "  * Weighted voting for consensus decisions\n"
+                "  * Episodic learning for topology optimization\n"
+                "  * Knowledge retrieval for future tasks",
+                title="Demo Summary",
+                border_style="green",
+            )
+        )
     else:
         print("\n" + "=" * 60)
         print("Demo completed successfully!")

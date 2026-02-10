@@ -14,20 +14,21 @@ from __future__ import annotations
 
 import logging
 import os
-from dataclasses import dataclass, field
-from enum import Enum
-from typing import Any, AsyncIterator
+from collections.abc import AsyncIterator
+from dataclasses import dataclass
+from enum import StrEnum
+from typing import Any
 
 from adapters.base import (
+    AnthropicAdapter,
+    GroqAdapter,
     LLMAdapter,
     LLMConfig,
     LLMMessage,
     LLMProvider,
     LLMResponse,
     OllamaAdapter,
-    AnthropicAdapter,
     OpenAIAdapter,
-    GroqAdapter,
     Tool,
 )
 from agents.framework.errors import LLMAdapterError
@@ -35,14 +36,14 @@ from agents.framework.errors import LLMAdapterError
 logger = logging.getLogger("titan.adapters.router")
 
 
-class RoutingStrategy(str, Enum):
+class RoutingStrategy(StrEnum):
     """Routing strategies for provider selection."""
 
-    COST_OPTIMIZED = "cost_optimized"   # Prefer cheaper/local options
-    QUALITY_FIRST = "quality_first"     # Prefer best quality
-    SPEED_FIRST = "speed_first"         # Prefer fastest
-    ROUND_ROBIN = "round_robin"         # Rotate between providers
-    FALLBACK = "fallback"               # Use fallback chain
+    COST_OPTIMIZED = "cost_optimized"  # Prefer cheaper/local options
+    QUALITY_FIRST = "quality_first"  # Prefer best quality
+    SPEED_FIRST = "speed_first"  # Prefer fastest
+    ROUND_ROBIN = "round_robin"  # Rotate between providers
+    FALLBACK = "fallback"  # Use fallback chain
 
 
 @dataclass
@@ -348,7 +349,10 @@ class LLMRouter:
         actual_tools = tools
         actual_system = system
         if tools and not supports_native_tools:
-            logger.info(f"Provider {provider.value} doesn't support tools natively, using prompt-based tools")
+            logger.info(
+                "Provider %s doesn't support tools natively, using prompt-based tools",
+                provider.value,
+            )
             actual_tools = None
             actual_system = self._build_tool_prompt(system, tools)
 
@@ -417,29 +421,31 @@ If you don't need to use a tool, just respond normally.
 
     def _parse_simulated_tools(self, response: LLMResponse) -> LLMResponse:
         """Parse tool calls from text response for non-native tool support."""
-        import re
         import json
+        import re
 
         content = response.content
         tool_calls = []
 
         # Find all <tool_call>...</tool_call> blocks
-        pattern = r'<tool_call>\s*(.*?)\s*</tool_call>'
+        pattern = r"<tool_call>\s*(.*?)\s*</tool_call>"
         matches = re.findall(pattern, content, re.DOTALL)
 
         for i, match in enumerate(matches):
             try:
                 call_data = json.loads(match)
-                tool_calls.append({
-                    "id": f"sim_call_{i}",
-                    "name": call_data.get("name", "unknown"),
-                    "arguments": call_data.get("arguments", {}),
-                })
+                tool_calls.append(
+                    {
+                        "id": f"sim_call_{i}",
+                        "name": call_data.get("name", "unknown"),
+                        "arguments": call_data.get("arguments", {}),
+                    }
+                )
             except json.JSONDecodeError:
                 logger.warning(f"Failed to parse tool call: {match[:100]}")
 
         # Remove tool call blocks from content
-        clean_content = re.sub(pattern, '', content, flags=re.DOTALL).strip()
+        clean_content = re.sub(pattern, "", content, flags=re.DOTALL).strip()
 
         return LLMResponse(
             content=clean_content,
@@ -525,16 +531,19 @@ If you don't need to use a tool, just respond normally.
 
         # Prefer OpenAI for embeddings if available
         if not provider:
-            if self._providers.get(LLMProvider.OPENAI, ProviderInfo(
-                provider=LLMProvider.OPENAI,
-                available=False,
-                models=[],
-                supports_tools=False,
-                supports_streaming=False,
-                cost_tier=3,
-                quality_tier=3,
-                speed_tier=3,
-            )).available:
+            if self._providers.get(
+                LLMProvider.OPENAI,
+                ProviderInfo(
+                    provider=LLMProvider.OPENAI,
+                    available=False,
+                    models=[],
+                    supports_tools=False,
+                    supports_streaming=False,
+                    cost_tier=3,
+                    quality_tier=3,
+                    speed_tier=3,
+                ),
+            ).available:
                 provider = LLMProvider.OPENAI
             else:
                 provider = self._fallback_chain[0] if self._fallback_chain else LLMProvider.OLLAMA

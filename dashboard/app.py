@@ -6,27 +6,26 @@ Provides a web interface for managing and monitoring the agent swarm.
 
 from __future__ import annotations
 
-import asyncio
 import json
 import logging
-import os
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from datetime import datetime
 from pathlib import Path
-from typing import Any, AsyncGenerator
+from typing import Any, cast
 
 from dashboard.models import (
-    StatusResponse,
-    AgentResponse,
     AgentCancelResponse,
-    TopologyResponse,
-    TopologySwitchResponse,
+    AgentResponse,
+    AgentStateEnum,
+    ErrorResponse,
+    LearningStatsResponse,
+    StatusResponse,
     TopologyAgentInfo,
     TopologyHistoryEntry,
-    LearningStatsResponse,
-    ErrorResponse,
+    TopologyResponse,
+    TopologySwitchResponse,
     TopologyTypeEnum,
-    AgentStateEnum,
 )
 
 logger = logging.getLogger("titan.dashboard")
@@ -34,9 +33,10 @@ logger = logging.getLogger("titan.dashboard")
 # Try to import FastAPI, provide helpful error if missing
 try:
     from fastapi import FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect
-    from fastapi.responses import HTMLResponse, JSONResponse
+    from fastapi.responses import HTMLResponse
     from fastapi.staticfiles import StaticFiles
     from fastapi.templating import Jinja2Templates
+
     FASTAPI_AVAILABLE = True
 except ImportError:
     FASTAPI_AVAILABLE = False
@@ -47,6 +47,13 @@ except ImportError:
 PACKAGE_DIR = Path(__file__).parent
 TEMPLATES_DIR = PACKAGE_DIR / "templates"
 STATIC_DIR = PACKAGE_DIR / "static"
+
+
+def _parse_datetime(value: object) -> datetime:
+    """Parse optional ISO datetime values with a safe fallback."""
+    if isinstance(value, str):
+        return datetime.fromisoformat(value)
+    return datetime.now()
 
 
 class ConnectionManager:
@@ -152,6 +159,9 @@ class TitanDashboard:
         if not self.app:
             return
 
+        def render_template(template_name: str, context: dict[str, Any]) -> HTMLResponse:
+            return cast(HTMLResponse, templates.TemplateResponse(template_name, context))
+
         # ====================================================================
         # HTML Routes
         # ====================================================================
@@ -159,7 +169,7 @@ class TitanDashboard:
         @self.app.get("/", response_class=HTMLResponse)
         async def index(request: Request) -> HTMLResponse:
             """Dashboard home page."""
-            return templates.TemplateResponse(
+            return render_template(
                 "index.html",
                 {
                     "request": request,
@@ -172,7 +182,7 @@ class TitanDashboard:
         @self.app.get("/agents", response_class=HTMLResponse)
         async def agents_page(request: Request) -> HTMLResponse:
             """Agents management page."""
-            return templates.TemplateResponse(
+            return render_template(
                 "agents.html",
                 {
                     "request": request,
@@ -184,7 +194,7 @@ class TitanDashboard:
         @self.app.get("/topology", response_class=HTMLResponse)
         async def topology_page(request: Request) -> HTMLResponse:
             """Topology visualization page."""
-            return templates.TemplateResponse(
+            return render_template(
                 "topology.html",
                 {
                     "request": request,
@@ -197,7 +207,7 @@ class TitanDashboard:
         @self.app.get("/models", response_class=HTMLResponse)
         async def models_page(request: Request) -> HTMLResponse:
             """Model cognitive signatures page."""
-            return templates.TemplateResponse(
+            return render_template(
                 "models.html",
                 {
                     "request": request,
@@ -210,7 +220,7 @@ class TitanDashboard:
             """Inquiry sessions page."""
             sessions = await self._get_inquiry_sessions()
             stats = self._get_inquiry_stats(sessions)
-            return templates.TemplateResponse(
+            return render_template(
                 "inquiry.html",
                 {
                     "request": request,
@@ -228,16 +238,19 @@ class TitanDashboard:
                 raise HTTPException(status_code=404, detail="Session not found")
 
             import json
-            stages_json = json.dumps([
-                {
-                    "name": s["name"],
-                    "emoji": s.get("emoji", ""),
-                    "result": s.get("result"),
-                }
-                for s in stages
-            ])
 
-            return templates.TemplateResponse(
+            stages_json = json.dumps(
+                [
+                    {
+                        "name": s["name"],
+                        "emoji": s.get("emoji", ""),
+                        "result": s.get("result"),
+                    }
+                    for s in stages
+                ]
+            )
+
+            return render_template(
                 "inquiry_detail.html",
                 {
                     "request": request,
@@ -251,7 +264,7 @@ class TitanDashboard:
         @self.app.get("/analysis", response_class=HTMLResponse)
         async def analysis_page(request: Request) -> HTMLResponse:
             """Contradiction analysis page."""
-            return templates.TemplateResponse(
+            return render_template(
                 "analysis.html",
                 {
                     "request": request,
@@ -262,7 +275,7 @@ class TitanDashboard:
         @self.app.get("/knowledge", response_class=HTMLResponse)
         async def knowledge_page(request: Request) -> HTMLResponse:
             """Knowledge graph browser page."""
-            return templates.TemplateResponse(
+            return render_template(
                 "knowledge.html",
                 {
                     "request": request,
@@ -273,20 +286,11 @@ class TitanDashboard:
         @self.app.get("/lexicon", response_class=HTMLResponse)
         async def lexicon_page(request: Request) -> HTMLResponse:
             """Organizational Body Lexicon visualization page."""
-            return templates.TemplateResponse(
+            return render_template(
                 "lexicon.html",
                 {
                     "request": request,
                     "title": "Body Lexicon",
-                },
-            )
-        async def knowledge_page(request: Request) -> HTMLResponse:
-            """Knowledge graph browser page."""
-            return templates.TemplateResponse(
-                "knowledge.html",
-                {
-                    "request": request,
-                    "title": "Knowledge Graph",
                 },
             )
 
@@ -297,11 +301,14 @@ class TitanDashboard:
             """Get organizational body lexicon."""
             try:
                 import yaml
+
                 with open("data/lexicon/seed_lexicon.yaml") as f:
-                    return yaml.safe_load(f)
+                    loaded = yaml.safe_load(f)
+                    return cast(dict[str, Any], loaded if isinstance(loaded, dict) else {})
             except Exception as e:
                 logger.error(f"Error loading lexicon: {e}")
                 return {}
+
         # ====================================================================
 
         @self.app.get("/api/status", response_model=StatusResponse)
@@ -323,13 +330,17 @@ class TitanDashboard:
                     name=a.get("name", "unknown"),
                     role=a.get("role", "worker"),
                     state=AgentStateEnum(a.get("state", "running")),
-                    joined_at=datetime.fromisoformat(a["joined_at"]) if isinstance(a.get("joined_at"), str) else datetime.now(),
+                    joined_at=_parse_datetime(a.get("joined_at")),
                     capabilities=a.get("capabilities", []),
                 )
                 for a in self._active_agents.values()
             ]
 
-        @self.app.get("/api/agents/{agent_id}", response_model=AgentResponse, responses={404: {"model": ErrorResponse}})
+        @self.app.get(
+            "/api/agents/{agent_id}",
+            response_model=AgentResponse,
+            responses={404: {"model": ErrorResponse}},
+        )
         async def get_agent(agent_id: str) -> AgentResponse:
             """Get specific agent details by ID."""
             if agent_id not in self._active_agents:
@@ -340,11 +351,15 @@ class TitanDashboard:
                 name=a.get("name", "unknown"),
                 role=a.get("role", "worker"),
                 state=AgentStateEnum(a.get("state", "running")),
-                joined_at=datetime.fromisoformat(a["joined_at"]) if isinstance(a.get("joined_at"), str) else datetime.now(),
+                joined_at=_parse_datetime(a.get("joined_at")),
                 capabilities=a.get("capabilities", []),
             )
 
-        @self.app.post("/api/agents/{agent_id}/cancel", response_model=AgentCancelResponse, responses={404: {"model": ErrorResponse}})
+        @self.app.post(
+            "/api/agents/{agent_id}/cancel",
+            response_model=AgentCancelResponse,
+            responses={404: {"model": ErrorResponse}},
+        )
         async def cancel_agent(agent_id: str) -> AgentCancelResponse:
             """Cancel a running agent by ID."""
             if agent_id not in self._active_agents:
@@ -363,19 +378,26 @@ class TitanDashboard:
                     for a in self._active_agents.values()
                 ],
                 history=[
-                    TopologyHistoryEntry(
-                        from_type=TopologyTypeEnum(h["from"]) if h.get("from") else None,
-                        to_type=TopologyTypeEnum(h["to"]),
-                        timestamp=datetime.fromisoformat(h["timestamp"]) if isinstance(h.get("timestamp"), str) else datetime.now(),
+                    TopologyHistoryEntry.model_validate(
+                        {
+                            "from": TopologyTypeEnum(h["from"]) if h.get("from") else None,
+                            "to": TopologyTypeEnum(h["to"]),
+                            "timestamp": _parse_datetime(h.get("timestamp")),
+                        }
                     )
                     for h in self._topology_history[-10:]
                 ],
             )
 
-        @self.app.post("/api/topology/switch/{topology_type}", response_model=TopologySwitchResponse, responses={400: {"model": ErrorResponse}})
+        @self.app.post(
+            "/api/topology/switch/{topology_type}",
+            response_model=TopologySwitchResponse,
+            responses={400: {"model": ErrorResponse}},
+        )
         async def switch_topology(topology_type: TopologyTypeEnum) -> TopologySwitchResponse:
             """Switch to a different topology type. Migrates all agents to the new topology."""
             import time
+
             start_time = time.time()
 
             if self.topology_engine:
@@ -392,11 +414,13 @@ class TitanDashboard:
                     raise HTTPException(status_code=500, detail=str(e))
             else:
                 # Mock response
-                self._topology_history.append({
-                    "from": self._get_current_topology(),
-                    "to": topology_type.value,
-                    "timestamp": datetime.now().isoformat(),
-                })
+                self._topology_history.append(
+                    {
+                        "from": self._get_current_topology(),
+                        "to": topology_type.value,
+                        "timestamp": datetime.now().isoformat(),
+                    }
+                )
                 duration_ms = (time.time() - start_time) * 1000
                 return TopologySwitchResponse(
                     status="success",
@@ -412,27 +436,29 @@ class TitanDashboard:
             Calculates metrics based on stage results and content.
             """
             try:
-                from titan.workflows.inquiry_engine import get_inquiry_engine
                 from titan.workflows.inquiry_config import CognitiveStyle
-                
+                from titan.workflows.inquiry_engine import get_inquiry_engine
+
                 engine = get_inquiry_engine()
                 session = engine.get_session(session_id)
-                
+
                 if not session or not session.results:
                     # Return default/empty data
                     return {
-                        "labels": ['Logic', 'Mythos', 'Lateral', 'Recursive', 'Pattern'],
-                        "datasets": [{
-                            "label": "Epistemic Signature",
-                            "data": [0, 0, 0, 0, 0],
-                            "fill": True,
-                            "backgroundColor": "rgba(54, 162, 235, 0.2)",
-                            "borderColor": "rgb(54, 162, 235)",
-                            "pointBackgroundColor": "rgb(54, 162, 235)",
-                            "pointBorderColor": "#fff",
-                            "pointHoverBackgroundColor": "#fff",
-                            "pointHoverBorderColor": "rgb(54, 162, 235)"
-                        }]
+                        "labels": ["Logic", "Mythos", "Lateral", "Recursive", "Pattern"],
+                        "datasets": [
+                            {
+                                "label": "Epistemic Signature",
+                                "data": [0, 0, 0, 0, 0],
+                                "fill": True,
+                                "backgroundColor": "rgba(54, 162, 235, 0.2)",
+                                "borderColor": "rgb(54, 162, 235)",
+                                "pointBackgroundColor": "rgb(54, 162, 235)",
+                                "pointBorderColor": "#fff",
+                                "pointHoverBackgroundColor": "#fff",
+                                "pointHoverBorderColor": "rgb(54, 162, 235)",
+                            }
+                        ],
                     }
 
                 # Calculate metrics from session results
@@ -443,10 +469,10 @@ class TitanDashboard:
                     CognitiveStyle.META_ANALYSIS.value: 0.0,
                     CognitiveStyle.PATTERN_RECOGNITION.value: 0.0,
                 }
-                
+
                 # Count occurrences and sum intensity
                 counts = {k: 0 for k in metrics.keys()}
-                
+
                 for result in session.results:
                     # Infer style from role if metadata missing
                     style = result.metadata.get("cognitive_style")
@@ -458,20 +484,20 @@ class TitanDashboard:
                             "Bridge AI": CognitiveStyle.CROSS_DOMAIN.value,
                             "Meta AI": CognitiveStyle.META_ANALYSIS.value,
                             "Pattern AI": CognitiveStyle.PATTERN_RECOGNITION.value,
-                            "Scope AI": CognitiveStyle.STRUCTURED_REASONING.value
+                            "Scope AI": CognitiveStyle.STRUCTURED_REASONING.value,
                         }
                         style = role_map.get(result.role, CognitiveStyle.STRUCTURED_REASONING.value)
-                    
+
                     if style in metrics:
                         # Basic intensity calc: presence + length factor
                         intensity = min(len(result.content.split()) / 500.0, 1.0)
                         metrics[style] += intensity
                         counts[style] += 1
-                
+
                 # Normalize (average intensity per style present, or cumulative?)
-                # Radar charts usually show "strength" of dimension. 
+                # Radar charts usually show "strength" of dimension.
                 # Let's use max observed intensity for each dimension to show peak capability
-                
+
                 data_values = [
                     metrics[CognitiveStyle.STRUCTURED_REASONING.value],
                     metrics[CognitiveStyle.CREATIVE_SYNTHESIS.value],
@@ -479,25 +505,27 @@ class TitanDashboard:
                     metrics[CognitiveStyle.META_ANALYSIS.value],
                     metrics[CognitiveStyle.PATTERN_RECOGNITION.value],
                 ]
-                
+
                 # Normalize to 0-1 range for chart
                 max_val = max(data_values) if data_values else 1.0
                 if max_val > 0:
                     data_values = [v / max_val for v in data_values]
 
                 return {
-                    "labels": ['Logic', 'Mythos', 'Lateral', 'Recursive', 'Pattern'],
-                    "datasets": [{
-                        "label": "Epistemic Signature",
-                        "data": data_values,
-                        "fill": True,
-                        "backgroundColor": "rgba(54, 162, 235, 0.2)",
-                        "borderColor": "rgb(54, 162, 235)",
-                        "pointBackgroundColor": "rgb(54, 162, 235)",
-                        "pointBorderColor": "#fff",
-                        "pointHoverBackgroundColor": "#fff",
-                        "pointHoverBorderColor": "rgb(54, 162, 235)"
-                    }]
+                    "labels": ["Logic", "Mythos", "Lateral", "Recursive", "Pattern"],
+                    "datasets": [
+                        {
+                            "label": "Epistemic Signature",
+                            "data": data_values,
+                            "fill": True,
+                            "backgroundColor": "rgba(54, 162, 235, 0.2)",
+                            "borderColor": "rgb(54, 162, 235)",
+                            "pointBackgroundColor": "rgb(54, 162, 235)",
+                            "pointBorderColor": "#fff",
+                            "pointHoverBackgroundColor": "#fff",
+                            "pointHoverBorderColor": "rgb(54, 162, 235)",
+                        }
+                    ],
                 }
 
             except Exception as e:
@@ -526,6 +554,7 @@ class TitanDashboard:
             """Get Prometheus metrics."""
             try:
                 from titan.metrics import get_metrics_text
+
                 return get_metrics_text()
             except Exception as e:
                 return f"# Error getting metrics: {e}"
@@ -569,30 +598,38 @@ class TitanDashboard:
                 "state": "running",
                 "joined_at": event.timestamp.isoformat(),
             }
-            await self.manager.broadcast({
-                "type": "agent_joined",
-                "data": agent_data,
-            })
+            await self.manager.broadcast(
+                {
+                    "type": "agent_joined",
+                    "data": agent_data,
+                }
+            )
 
         async def on_agent_left(event: Any) -> None:
             agent_id = event.payload.get("agent_id")
             if agent_id in self._active_agents:
                 del self._active_agents[agent_id]
-            await self.manager.broadcast({
-                "type": "agent_left",
-                "data": event.payload,
-            })
+            await self.manager.broadcast(
+                {
+                    "type": "agent_left",
+                    "data": event.payload,
+                }
+            )
 
         async def on_topology_changed(event: Any) -> None:
-            self._topology_history.append({
-                "from": event.payload.get("old_type"),
-                "to": event.payload.get("new_type"),
-                "timestamp": event.timestamp.isoformat(),
-            })
-            await self.manager.broadcast({
-                "type": "topology_changed",
-                "data": event.payload,
-            })
+            self._topology_history.append(
+                {
+                    "from": event.payload.get("old_type"),
+                    "to": event.payload.get("new_type"),
+                    "timestamp": event.timestamp.isoformat(),
+                }
+            )
+            await self.manager.broadcast(
+                {
+                    "type": "topology_changed",
+                    "data": event.payload,
+                }
+            )
 
         self.event_bus.subscribe(EventType.AGENT_JOINED, on_agent_joined)
         self.event_bus.subscribe(EventType.AGENT_LEFT, on_agent_left)
@@ -601,15 +638,16 @@ class TitanDashboard:
     def _get_current_topology(self) -> str:
         """Get current topology type."""
         if self.topology_engine and self.topology_engine.current_topology:
-            return self.topology_engine.current_topology.topology_type.value
+            return cast(str, self.topology_engine.current_topology.topology_type.value)
         if self._topology_history:
-            return self._topology_history[-1]["to"]
+            return cast(str, self._topology_history[-1].get("to", "swarm"))
         return "swarm"
 
     async def _get_inquiry_sessions(self) -> list[dict[str, Any]]:
         """Get inquiry sessions for dashboard."""
         try:
             from titan.workflows.inquiry_engine import get_inquiry_engine
+
             engine = get_inquiry_engine()
             sessions = engine.list_sessions()
             return [s.to_dict() for s in sessions]
@@ -635,6 +673,7 @@ class TitanDashboard:
         """Get inquiry session detail with stages."""
         try:
             from titan.workflows.inquiry_engine import get_inquiry_engine
+
             engine = get_inquiry_engine()
             session = engine.get_session(session_id)
 
@@ -646,7 +685,7 @@ class TitanDashboard:
             # Build stages with results
             stages = []
             for i, stage in enumerate(session.workflow.stages):
-                stage_info = {
+                stage_info: dict[str, Any] = {
                     "name": stage.name,
                     "role": stage.role,
                     "description": stage.description,

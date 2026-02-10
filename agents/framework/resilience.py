@@ -14,9 +14,10 @@ from __future__ import annotations
 import asyncio
 import logging
 import time
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Callable, TypeVar
+from typing import Any, TypeVar, cast
 
 from agents.framework.errors import CircuitBreakerError, TitanError
 
@@ -28,8 +29,8 @@ T = TypeVar("T")
 class CircuitState(Enum):
     """Circuit breaker states."""
 
-    CLOSED = "closed"      # Normal operation, requests pass through
-    OPEN = "open"          # Failures exceeded threshold, requests blocked
+    CLOSED = "closed"  # Normal operation, requests pass through
+    OPEN = "open"  # Failures exceeded threshold, requests blocked
     HALF_OPEN = "half_open"  # Testing if service recovered
 
 
@@ -37,10 +38,10 @@ class CircuitState(Enum):
 class CircuitBreakerConfig:
     """Configuration for circuit breaker."""
 
-    failure_threshold: int = 5       # Failures before opening
-    success_threshold: int = 2       # Successes to close from half-open
-    timeout_seconds: float = 30.0    # Time before trying half-open
-    half_open_max_calls: int = 3     # Max calls in half-open state
+    failure_threshold: int = 5  # Failures before opening
+    success_threshold: int = 2  # Successes to close from half-open
+    timeout_seconds: float = 30.0  # Time before trying half-open
+    half_open_max_calls: int = 3  # Max calls in half-open state
 
 
 @dataclass
@@ -118,9 +119,7 @@ class CircuitBreaker:
         """Circuit breaker statistics."""
         return self._stats
 
-    def on_state_change(
-        self, handler: Callable[[CircuitState, CircuitState], None]
-    ) -> None:
+    def on_state_change(self, handler: Callable[[CircuitState, CircuitState], None]) -> None:
         """Register state change handler."""
         self._on_state_change.append(handler)
 
@@ -131,8 +130,7 @@ class CircuitBreaker:
             self._state = new_state
             self._stats.state_changes += 1
             logger.info(
-                f"Circuit '{self.name}' state change: "
-                f"{old_state.value} -> {new_state.value}"
+                f"Circuit '{self.name}' state change: {old_state.value} -> {new_state.value}"
             )
             for handler in self._on_state_change:
                 try:
@@ -224,7 +222,7 @@ class CircuitBreaker:
             else:
                 result = func(*args, **kwargs)
             await self._record_success()
-            return result
+            return cast(T, result)
         except Exception as e:
             await self._record_failure(e)
             raise
@@ -295,20 +293,17 @@ async def retry_with_backoff(
     for attempt in range(1, config.max_attempts + 1):
         try:
             if asyncio.iscoroutinefunction(func):
-                return await func(*args, **kwargs)
+                return cast(T, await func(*args, **kwargs))
             else:
                 return func(*args, **kwargs)
         except tuple(config.retryable_errors) as e:
             last_error = e
             if attempt == config.max_attempts:
-                logger.error(
-                    f"All {config.max_attempts} retry attempts exhausted: {e}"
-                )
+                logger.error(f"All {config.max_attempts} retry attempts exhausted: {e}")
                 raise
 
             logger.warning(
-                f"Attempt {attempt}/{config.max_attempts} failed: {e}. "
-                f"Retrying in {delay_ms}ms..."
+                f"Attempt {attempt}/{config.max_attempts} failed: {e}. Retrying in {delay_ms}ms..."
             )
             await asyncio.sleep(delay_ms / 1000)
             delay_ms = min(

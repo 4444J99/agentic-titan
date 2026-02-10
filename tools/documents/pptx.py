@@ -11,7 +11,6 @@ Provides capabilities for:
 from __future__ import annotations
 
 import logging
-from pathlib import Path
 from typing import Any
 
 from tools.base import Tool, ToolParameter, ToolResult, register_tool
@@ -75,7 +74,9 @@ class PPTXTool(Tool):
             return ToolResult(
                 success=False,
                 output=None,
-                error="python-pptx is required. Install with: pip install 'agentic-titan[documents]'",
+                error=(
+                    "python-pptx is required. Install with: pip install 'agentic-titan[documents]'"
+                ),
             )
 
         action = kwargs.get("action", "")
@@ -159,7 +160,10 @@ class PPTXTool(Tool):
                     return ToolResult(
                         success=False,
                         output=None,
-                        error=f"Invalid slide number {slide_number}. Presentation has {len(prs.slides)} slides.",
+                        error=(
+                            f"Invalid slide number {slide_number}. "
+                            f"Presentation has {len(prs.slides)} slides."
+                        ),
                     )
 
                 slide = prs.slides[slide_number - 1]
@@ -172,10 +176,14 @@ class PPTXTool(Tool):
                     if shape == slide.shapes.title:
                         title = shape.text if hasattr(shape, "text") else None
                     elif hasattr(shape, "text") and shape.text.strip():
-                        content.append({
-                            "type": shape.shape_type.name if hasattr(shape, "shape_type") else "Unknown",
-                            "text": shape.text,
-                        })
+                        content.append(
+                            {
+                                "type": shape.shape_type.name
+                                if hasattr(shape, "shape_type")
+                                else "Unknown",
+                                "text": shape.text,
+                            }
+                        )
 
                 # Get notes if present
                 notes = None
@@ -201,10 +209,12 @@ class PPTXTool(Tool):
                     if slide.has_notes_slide and slide.notes_slide.notes_text_frame:
                         notes_text = slide.notes_slide.notes_text_frame.text
                         if notes_text.strip():
-                            notes_data.append({
-                                "slide_number": i,
-                                "notes": notes_text,
-                            })
+                            notes_data.append(
+                                {
+                                    "slide_number": i,
+                                    "notes": notes_text,
+                                }
+                            )
 
                 return ToolResult(
                     success=True,

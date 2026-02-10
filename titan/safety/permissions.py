@@ -7,11 +7,11 @@ Defines permissions for role-based access control.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 
-class Permission(str, Enum):
+class Permission(StrEnum):
     """Available permissions in the system."""
 
     # Agent management
@@ -55,7 +55,7 @@ class Permission(str, Enum):
     MODIFY_TOPOLOGY = "modify_topology"
 
 
-class PersonaRole(str, Enum):
+class PersonaRole(StrEnum):
     """Pre-defined persona roles."""
 
     ORCHESTRATOR = "orchestrator"

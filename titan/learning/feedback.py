@@ -8,19 +8,20 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from collections.abc import Callable, Coroutine
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
-from enum import Enum
-from typing import TYPE_CHECKING, Any, Callable, Coroutine
+from datetime import UTC, datetime
+from enum import StrEnum
+from typing import TYPE_CHECKING, Any
 from uuid import UUID, uuid4
 
 if TYPE_CHECKING:
-    from titan.learning.rlhf import RLHFCollector, RLHFSample, FeedbackType
+    from titan.learning.rlhf import RLHFCollector
 
 logger = logging.getLogger("titan.learning.feedback")
 
 
-class FeedbackChannel(str, Enum):
+class FeedbackChannel(StrEnum):
     """Channels for receiving feedback."""
 
     DASHBOARD = "dashboard"
@@ -39,7 +40,7 @@ class FeedbackRequest:
     prompt_preview: str = ""
     response_preview: str = ""
     channel: FeedbackChannel = FeedbackChannel.DASHBOARD
-    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
     expires_at: datetime | None = None
     metadata: dict[str, Any] = field(default_factory=dict)
 
@@ -48,8 +49,16 @@ class FeedbackRequest:
         return {
             "id": str(self.id),
             "tracking_id": self.tracking_id,
-            "prompt_preview": self.prompt_preview[:200] + "..." if len(self.prompt_preview) > 200 else self.prompt_preview,
-            "response_preview": self.response_preview[:500] + "..." if len(self.response_preview) > 500 else self.response_preview,
+            "prompt_preview": (
+                self.prompt_preview[:200] + "..."
+                if len(self.prompt_preview) > 200
+                else self.prompt_preview
+            ),
+            "response_preview": (
+                self.response_preview[:500] + "..."
+                if len(self.response_preview) > 500
+                else self.response_preview
+            ),
             "channel": self.channel.value,
             "created_at": self.created_at.isoformat(),
             "expires_at": self.expires_at.isoformat() if self.expires_at else None,
@@ -68,7 +77,7 @@ class FeedbackResponse:
     correction: str | None = None
     comment: str | None = None
     responder_id: str | None = None
-    responded_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    responded_at: datetime = field(default_factory=lambda: datetime.now(UTC))
 
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
@@ -167,7 +176,7 @@ class FeedbackHandler:
         try:
             await asyncio.wait_for(event.wait(), timeout=timeout_seconds)
             return self._responses.get(request.id)
-        except asyncio.TimeoutError:
+        except TimeoutError:
             logger.warning(f"Feedback request {request.id} timed out")
             return None
         finally:
@@ -238,7 +247,11 @@ class FeedbackHandler:
             await self._rlhf_collector.record_feedback(
                 tracking_id=request.tracking_id,
                 rating=rating,
-                accepted=accepted if accepted is not None else (thumbs_up if thumbs_up is not None else None),
+                accepted=(
+                    accepted
+                    if accepted is not None
+                    else (thumbs_up if thumbs_up is not None else None)
+                ),
                 correction=correction,
                 feedback_type=feedback_type,
             )

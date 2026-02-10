@@ -2,12 +2,12 @@
 Tests for titan.prompts.metrics module.
 """
 
+from datetime import UTC, datetime, timedelta
+
 import pytest
-from datetime import datetime, timedelta, timezone
 
 from titan.prompts.metrics import (
     AggregatedMetrics,
-    MetricAggregation,
     OptimizationRecommendation,
     PromptMetrics,
     PromptTracker,
@@ -290,7 +290,7 @@ class TestPromptTracker:
         )
 
         # Manually set old timestamp
-        tracker._metrics[0].timestamp = datetime.now(timezone.utc) - timedelta(days=2)
+        tracker._metrics[0].timestamp = datetime.now(UTC) - timedelta(days=2)
 
         pruned = tracker.prune_old_metrics()
         assert pruned == 1

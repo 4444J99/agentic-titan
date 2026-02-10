@@ -11,31 +11,31 @@ Components:
 - storage: PostgreSQL backend for users and API keys
 """
 
-from titan.auth.models import (
-    User,
-    UserCreate,
-    UserRole,
-    APIKey,
-    APIKeyCreate,
-    TokenPair,
-    TokenData,
-)
-from titan.auth.jwt import (
-    create_access_token,
-    create_refresh_token,
-    verify_token,
-    decode_token,
-)
 from titan.auth.api_keys import (
     generate_api_key,
     hash_api_key,
     verify_api_key,
 )
+from titan.auth.jwt import (
+    create_access_token,
+    create_refresh_token,
+    decode_token,
+    verify_token,
+)
 from titan.auth.middleware import (
     get_current_user,
     get_current_user_optional,
-    require_role,
     require_admin,
+    require_role,
+)
+from titan.auth.models import (
+    APIKey,
+    APIKeyCreate,
+    TokenData,
+    TokenPair,
+    User,
+    UserCreate,
+    UserRole,
 )
 
 __all__ = [

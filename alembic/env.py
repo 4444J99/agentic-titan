@@ -4,7 +4,6 @@ Alembic Environment Configuration for Titan
 Handles database migrations for the audit and persistence layer.
 """
 
-import asyncio
 import os
 from logging.config import fileConfig
 
@@ -16,6 +15,7 @@ config = context.config
 # Set up Python logging from alembic.ini
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
+
 
 # Database URL from environment or config
 def get_database_url() -> str:

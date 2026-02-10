@@ -15,13 +15,15 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
+import inspect
 import json
 import logging
 import time
 import uuid
-from dataclasses import dataclass, field
+from collections.abc import Callable
+from dataclasses import dataclass
 from datetime import datetime
-from typing import Any, Callable
+from typing import Any
 
 logger = logging.getLogger("titan.hive.memory")
 
@@ -169,7 +171,7 @@ class HiveMind:
         # In-memory fallbacks for development
         self._memory_store: dict[str, Memory] = {}
         self._working_memory: dict[str, Any] = {}
-        self._subscriptions: dict[str, list[Callable]] = {}
+        self._subscriptions: dict[str, list[Callable[[dict[str, Any]], Any]]] = {}
 
         # State
         self._topology_state: dict[str, Any] = {}
@@ -210,8 +212,7 @@ class HiveMind:
                 metadata={"hnsw:space": "cosine"},
             )
             logger.info(
-                f"Connected to ChromaDB at "
-                f"{self.config.chroma_host}:{self.config.chroma_port}"
+                f"Connected to ChromaDB at {self.config.chroma_host}:{self.config.chroma_port}"
             )
         except Exception as e:
             logger.warning(f"ChromaDB unavailable, using in-memory fallback: {e}")
@@ -269,14 +270,15 @@ class HiveMind:
 
         memory_id = f"mem-{uuid.uuid4().hex[:12]}"
         loop = asyncio.get_running_loop()
-        
+
         # Track executor wait time
         start_wait = time.time()
         embedding = await loop.run_in_executor(None, hash_embedding, content)
         wait_duration = time.time() - start_wait
-        
+
         if self._initialized:
             from titan.metrics import get_metrics
+
             get_metrics().embedding_wait(wait_duration)
 
         memory = Memory(
@@ -360,9 +362,7 @@ class HiveMind:
                     {
                         "id": results["ids"][0][i] if results["ids"] else f"mem-{i}",
                         "content": doc,
-                        "distance": results["distances"][0][i]
-                        if results.get("distances")
-                        else 0,
+                        "distance": results["distances"][0][i] if results.get("distances") else 0,
                         "agent_id": meta.get("agent_id"),
                         "importance": meta.get("importance", 0.5),
                         "tags": json.loads(meta.get("tags", "[]")),
@@ -383,9 +383,7 @@ class HiveMind:
 
             # Compute similarity
             if mem.embedding:
-                similarity = sum(
-                    a * b for a, b in zip(query_embedding, mem.embedding)
-                )
+                similarity = sum(a * b for a, b in zip(query_embedding, mem.embedding))
             else:
                 similarity = 0
 
@@ -493,7 +491,7 @@ class HiveMind:
 
         if self._redis:
             result = await self._redis.delete(full_key)
-            return result > 0
+            return isinstance(result, int) and result > 0
 
         # In-memory fallback
         if full_key in self._working_memory:
@@ -541,7 +539,7 @@ class HiveMind:
             handlers = self._subscriptions.get(topic, [])
             for handler in handlers:
                 try:
-                    await handler(msg.to_dict())
+                    await self._invoke_handler(handler, msg.to_dict())
                 except Exception as e:
                     logger.error(f"Handler error: {e}")
 
@@ -583,7 +581,7 @@ class HiveMind:
             handlers = self._subscriptions.get(f"agent:{target_agent_id}", [])
             for handler in handlers:
                 try:
-                    await handler(msg.to_dict())
+                    await self._invoke_handler(handler, msg.to_dict())
                 except Exception as e:
                     logger.error(f"Handler error: {e}")
 
@@ -611,7 +609,7 @@ class HiveMind:
 
             async def nats_handler(msg: Any) -> None:
                 data = json.loads(msg.data.decode())
-                await handler(data)
+                await self._invoke_handler(handler, data)
 
             await self._nats.subscribe(channel, cb=nats_handler)
         elif self._redis:
@@ -622,7 +620,7 @@ class HiveMind:
                 async for message in pubsub.listen():
                     if message["type"] == "message":
                         data = json.loads(message["data"])
-                        await handler(data)
+                        await self._invoke_handler(handler, data)
 
             asyncio.create_task(redis_reader())
         else:
@@ -639,7 +637,11 @@ class HiveMind:
 
     async def get_topology(self) -> dict[str, Any]:
         """Get current topology state."""
-        return await self.get("topology", {"type": "swarm", "agents": []})
+        default_topology: dict[str, Any] = {"type": "swarm", "agents": []}
+        value = await self.get("topology", default_topology)
+        if isinstance(value, dict):
+            return value
+        return default_topology
 
     async def set_topology(self, topology: dict[str, Any]) -> None:
         """Set topology state."""
@@ -668,7 +670,10 @@ class HiveMind:
 
     async def get_agent_status(self, agent_id: str) -> dict[str, Any] | None:
         """Get status of a registered agent."""
-        return await self.get(f"agent:{agent_id}")
+        value = await self.get(f"agent:{agent_id}")
+        if isinstance(value, dict):
+            return value
+        return None
 
     async def list_agents(self) -> list[dict[str, Any]]:
         """List all registered agents."""
@@ -679,6 +684,7 @@ class HiveMind:
             keys = await self._redis.keys(pattern)
             if keys:
                 from titan.metrics import get_metrics
+
                 get_metrics().memory_mget()
                 values = await self._redis.mget(keys)
                 for data in values:
@@ -697,6 +703,16 @@ class HiveMind:
         """Ensure Hive Mind is initialized."""
         if not self._initialized:
             await self.initialize()
+
+    async def _invoke_handler(
+        self,
+        handler: Callable[[dict[str, Any]], Any],
+        payload: dict[str, Any],
+    ) -> None:
+        """Invoke message handler, supporting sync and async callbacks."""
+        result = handler(payload)
+        if inspect.isawaitable(result):
+            await result
 
     async def health_check(self) -> dict[str, Any]:
         """Check health of all components."""

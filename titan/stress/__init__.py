@@ -5,23 +5,23 @@ Provides tools for stress testing agent swarms at scale (50-100+ agents).
 Measures throughput, latency, memory usage, and identifies bottlenecks.
 """
 
+from titan.stress.metrics import (
+    LatencyHistogram,
+    StressMetrics,
+    ThroughputCounter,
+)
 from titan.stress.runner import (
-    StressTestRunner,
+    AgentFactory,
     StressTestConfig,
     StressTestResult,
-    AgentFactory,
+    StressTestRunner,
 )
 from titan.stress.scenarios import (
+    ChaosScenario,
+    HierarchyDelegationScenario,
+    PipelineWorkflowScenario,
     Scenario,
     SwarmBrainstormScenario,
-    PipelineWorkflowScenario,
-    HierarchyDelegationScenario,
-    ChaosScenario,
-)
-from titan.stress.metrics import (
-    StressMetrics,
-    LatencyHistogram,
-    ThroughputCounter,
 )
 
 __all__ = [

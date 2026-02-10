@@ -12,20 +12,20 @@ Capabilities:
 from __future__ import annotations
 
 import logging
-import re
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any
 
-from agents.framework.base_agent import BaseAgent, AgentState
 from adapters.base import LLMMessage
 from adapters.router import get_router
+from agents.framework.base_agent import BaseAgent
 
 logger = logging.getLogger("titan.agents.data_engineer")
 
 
 class DataFormat(Enum):
     """Supported data formats."""
+
     JSON = "json"
     CSV = "csv"
     PARQUET = "parquet"
@@ -37,6 +37,7 @@ class DataFormat(Enum):
 
 class DatabaseType(Enum):
     """Supported database types."""
+
     POSTGRESQL = "postgresql"
     MYSQL = "mysql"
     SQLITE = "sqlite"
@@ -49,6 +50,7 @@ class DatabaseType(Enum):
 
 class QualityRuleType(Enum):
     """Types of data quality rules."""
+
     NOT_NULL = "not_null"
     UNIQUE = "unique"
     RANGE = "range"
@@ -62,6 +64,7 @@ class QualityRuleType(Enum):
 @dataclass
 class Column:
     """Schema column definition."""
+
     name: str
     data_type: str
     nullable: bool = True
@@ -74,6 +77,7 @@ class Column:
 @dataclass
 class TableSchema:
     """Database table schema."""
+
     name: str
     columns: list[Column] = field(default_factory=list)
     primary_keys: list[str] = field(default_factory=list)
@@ -84,6 +88,7 @@ class TableSchema:
 @dataclass
 class QualityRule:
     """Data quality validation rule."""
+
     name: str
     rule_type: QualityRuleType
     column: str
@@ -95,6 +100,7 @@ class QualityRule:
 @dataclass
 class QualityResult:
     """Result of a data quality check."""
+
     rule_name: str
     passed: bool
     total_records: int = 0
@@ -107,6 +113,7 @@ class QualityResult:
 @dataclass
 class ETLPipeline:
     """ETL pipeline definition."""
+
     name: str
     source: dict[str, Any]
     destination: dict[str, Any]
@@ -119,6 +126,7 @@ class ETLPipeline:
 @dataclass
 class QueryOptimization:
     """Query optimization result."""
+
     original_query: str
     optimized_query: str
     improvements: list[str] = field(default_factory=list)
@@ -145,13 +153,16 @@ class DataEngineerAgent(BaseAgent):
         **kwargs: Any,
     ) -> None:
         kwargs.setdefault("name", "data_engineer")
-        kwargs.setdefault("capabilities", [
-            "etl_design",
-            "data_quality",
-            "schema_analysis",
-            "query_optimization",
-            "data_lineage",
-        ])
+        kwargs.setdefault(
+            "capabilities",
+            [
+                "etl_design",
+                "data_quality",
+                "schema_analysis",
+                "query_optimization",
+                "data_lineage",
+            ],
+        )
         super().__init__(**kwargs)
 
         self.default_database = default_database
@@ -220,7 +231,7 @@ class DataEngineerAgent(BaseAgent):
 
 Source: {source_description}
 Destination: {destination_description}
-Requirements: {', '.join(requirements or ['standard ETL'])}
+Requirements: {", ".join(requirements or ["standard ETL"])}
 
 Provide:
 NAME: pipeline_name
@@ -300,12 +311,14 @@ QUALITY_CHECKS:
                 elif current_section == "quality":
                     if ":" in item:
                         _, desc = item.split(":", 1)
-                        pipeline.quality_checks.append(QualityRule(
-                            name=f"check_{len(pipeline.quality_checks)}",
-                            rule_type=QualityRuleType.CUSTOM,
-                            column="*",
-                            description=desc.strip(),
-                        ))
+                        pipeline.quality_checks.append(
+                            QualityRule(
+                                name=f"check_{len(pipeline.quality_checks)}",
+                                rule_type=QualityRuleType.CUSTOM,
+                                column="*",
+                                description=desc.strip(),
+                            )
+                        )
 
         return pipeline
 
@@ -486,8 +499,7 @@ Provide:
         self.increment_turn()
 
         rules_text = "\n".join(
-            f"- {r.name} ({r.rule_type.value}): {r.description or r.column}"
-            for r in rules
+            f"- {r.name} ({r.rule_type.value}): {r.description or r.column}" for r in rules
         )
 
         messages = [
@@ -535,7 +547,11 @@ MESSAGE: explanation""",
                     results.append(self._create_quality_result(current))
                 current = {"rule": line.replace("RULE:", "").strip()}
             elif line.startswith("PASSED:") and current:
-                current["passed"] = line.replace("PASSED:", "").strip().lower() in ("yes", "true", "1")
+                current["passed"] = line.replace("PASSED:", "").strip().lower() in (
+                    "yes",
+                    "true",
+                    "1",
+                )
             elif line.startswith("TOTAL:") and current:
                 try:
                     current["total"] = int(line.replace("TOTAL:", "").strip())
@@ -695,46 +711,54 @@ WARNINGS:
         for col in schema.columns:
             # Not null check for non-nullable columns
             if not col.nullable:
-                rules.append(QualityRule(
-                    name=f"{col.name}_not_null",
-                    rule_type=QualityRuleType.NOT_NULL,
-                    column=col.name,
-                    severity="error",
-                    description=f"{col.name} must not be null",
-                ))
+                rules.append(
+                    QualityRule(
+                        name=f"{col.name}_not_null",
+                        rule_type=QualityRuleType.NOT_NULL,
+                        column=col.name,
+                        severity="error",
+                        description=f"{col.name} must not be null",
+                    )
+                )
 
             # Primary key uniqueness
             if col.primary_key:
-                rules.append(QualityRule(
-                    name=f"{col.name}_unique",
-                    rule_type=QualityRuleType.UNIQUE,
-                    column=col.name,
-                    severity="error",
-                    description=f"{col.name} must be unique",
-                ))
+                rules.append(
+                    QualityRule(
+                        name=f"{col.name}_unique",
+                        rule_type=QualityRuleType.UNIQUE,
+                        column=col.name,
+                        severity="error",
+                        description=f"{col.name} must be unique",
+                    )
+                )
 
             # Type-specific rules
             col_type = col.data_type.lower()
             if strict:
                 if "int" in col_type or "numeric" in col_type or "decimal" in col_type:
-                    rules.append(QualityRule(
-                        name=f"{col.name}_range",
-                        rule_type=QualityRuleType.RANGE,
-                        column=col.name,
-                        parameters={"min": 0},  # Adjust based on context
-                        severity="warning",
-                        description=f"{col.name} should be non-negative",
-                    ))
+                    rules.append(
+                        QualityRule(
+                            name=f"{col.name}_range",
+                            rule_type=QualityRuleType.RANGE,
+                            column=col.name,
+                            parameters={"min": 0},  # Adjust based on context
+                            severity="warning",
+                            description=f"{col.name} should be non-negative",
+                        )
+                    )
 
                 if "email" in col.name.lower():
-                    rules.append(QualityRule(
-                        name=f"{col.name}_email_format",
-                        rule_type=QualityRuleType.PATTERN,
-                        column=col.name,
-                        parameters={"pattern": r"^[\w\.-]+@[\w\.-]+\.\w+$"},
-                        severity="error",
-                        description=f"{col.name} must be valid email",
-                    ))
+                    rules.append(
+                        QualityRule(
+                            name=f"{col.name}_email_format",
+                            rule_type=QualityRuleType.PATTERN,
+                            column=col.name,
+                            parameters={"pattern": r"^[\w\.-]+@[\w\.-]+\.\w+$"},
+                            severity="error",
+                            description=f"{col.name} must be valid email",
+                        )
+                    )
 
         return rules
 

@@ -14,18 +14,19 @@ from __future__ import annotations
 import asyncio
 import logging
 import uuid
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from datetime import datetime
-from enum import Enum
-from typing import Any, Callable, Awaitable
+from enum import StrEnum
+from typing import Any
 
+from hive.migration.runtime import RuntimeSelector
 from hive.migration.state import AgentState, StateSnapshot
-from hive.migration.runtime import RuntimeType, RuntimeSelector, RuntimeConfig
 
 logger = logging.getLogger("titan.migration.manager")
 
 
-class MigrationStatus(str, Enum):
+class MigrationStatus(StrEnum):
     """Migration status."""
 
     PENDING = "pending"
@@ -180,8 +181,6 @@ class MigrationManager:
         try:
             # Select target runtime if not specified
             if not request.target_runtime:
-                from hive.migration.runtime import AgentRequirements
-
                 requirements = self._infer_requirements(agent_state)
                 target = self._selector.select(
                     requirements,
@@ -198,9 +197,7 @@ class MigrationManager:
 
             # Step 1: Prepare (pause and snapshot)
             result.status = MigrationStatus.PREPARING
-            snapshot = await self._prepare_migration(
-                request, agent_state, result
-            )
+            snapshot = await self._prepare_migration(request, agent_state, result)
 
             # Step 2: Transfer state
             result.status = MigrationStatus.TRANSFERRING
@@ -208,15 +205,11 @@ class MigrationManager:
 
             # Step 3: Spawn in target
             result.status = MigrationStatus.SPAWNING
-            new_instance = await self._spawn_in_target(
-                agent_state, result
-            )
+            new_instance = await self._spawn_in_target(agent_state, result)
 
             # Step 4: Verify health
             result.status = MigrationStatus.VERIFYING
-            healthy = await self._verify_health(
-                new_instance, result
-            )
+            healthy = await self._verify_health(new_instance, result)
 
             if not healthy:
                 raise RuntimeError("Health check failed in target runtime")
@@ -227,14 +220,9 @@ class MigrationManager:
             # Success
             result.status = MigrationStatus.COMPLETED
             result.completed_at = datetime.now()
-            result.duration_seconds = (
-                result.completed_at - result.started_at
-            ).total_seconds()
+            result.duration_seconds = (result.completed_at - result.started_at).total_seconds()
 
-            logger.info(
-                f"Migration {migration_id} completed in "
-                f"{result.duration_seconds:.1f}s"
-            )
+            logger.info(f"Migration {migration_id} completed in {result.duration_seconds:.1f}s")
 
         except Exception as e:
             logger.error(f"Migration {migration_id} failed: {e}")
@@ -328,7 +316,7 @@ class MigrationManager:
                 except Exception as e:
                     logger.warning(f"Health check attempt {attempt + 1} failed: {e}")
 
-                await asyncio.sleep(2 ** attempt)
+                await asyncio.sleep(2**attempt)
 
             return False
 
@@ -385,9 +373,7 @@ class MigrationManager:
             needs_gpu=state.context.get("needs_gpu", False),
             needs_long_running=state.turn_number > 10,
             min_memory_mb=256,
-            expected_duration_seconds=state.context.get(
-                "expected_duration", 60
-            ),
+            expected_duration_seconds=state.context.get("expected_duration", 60),
         )
 
     def get_active_migrations(self) -> list[MigrationResult]:
@@ -416,10 +402,7 @@ class MigrationManager:
             optimal = self._selector.select(requirements)
 
             if optimal.name != current_runtime:
-                logger.info(
-                    f"Auto-migrating {agent_id}: "
-                    f"{current_runtime} -> {optimal.name}"
-                )
+                logger.info(f"Auto-migrating {agent_id}: {current_runtime} -> {optimal.name}")
 
                 request = MigrationRequest(
                     agent_id=agent_id,

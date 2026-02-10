@@ -5,17 +5,17 @@ from __future__ import annotations
 import pytest
 
 from mcp.resources import (
-    MCPResourceDefinition,
-    ResourceType,
-    ResourceHandler,
-    get_all_resources,
-    get_resource_definition,
-    get_resources_by_type,
-    get_resource_handler,
-    read_resource,
-    format_resource_contents,
     LEARNING_STATS_RESOURCE,
     MODEL_SIGNATURES_RESOURCE,
+    MCPResourceDefinition,
+    ResourceHandler,
+    ResourceType,
+    format_resource_contents,
+    get_all_resources,
+    get_resource_definition,
+    get_resource_handler,
+    get_resources_by_type,
+    read_resource,
 )
 
 

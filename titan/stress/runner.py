@@ -15,13 +15,12 @@ import json
 import logging
 import os
 import signal
-import sys
 import time
-import traceback
+from collections.abc import Callable, Coroutine
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Callable, Coroutine
+from typing import TYPE_CHECKING, Any
 
 from titan.stress.metrics import StressMetrics
 from titan.stress.scenarios import Scenario, ScenarioPhase, get_scenario
@@ -167,7 +166,7 @@ class StressTestRunner:
         # State
         self._running = False
         self._cancelled = False
-        self._active_agents: dict[str, "BaseAgent"] = {}
+        self._active_agents: dict[str, BaseAgent] = {}
         self._agent_tasks: dict[str, asyncio.Task[Any]] = {}
         self._semaphore: asyncio.Semaphore | None = None
 
@@ -283,13 +282,17 @@ class StressTestRunner:
             return
 
         self.scenario.phase = ScenarioPhase.STRESS
-        logger.info(f"Stress phase: {self.config.duration_seconds}s, {self.config.target_agents} agents")
+        logger.info(
+            f"Stress phase: {self.config.duration_seconds}s, {self.config.target_agents} agents"
+        )
 
         # Calculate ramp-up schedule
         remaining_agents = self.config.target_agents - len(self._active_agents)
         if remaining_agents > 0 and self.config.ramp_up_seconds > 0:
             agents_per_second = remaining_agents / self.config.ramp_up_seconds
-            batch_interval = self.config.batch_size / agents_per_second if agents_per_second > 0 else 1.0
+            batch_interval = (
+                self.config.batch_size / agents_per_second if agents_per_second > 0 else 1.0
+            )
 
             # Spawn agents during ramp-up
             spawned = len(self._active_agents)
@@ -353,7 +356,7 @@ class StressTestRunner:
                     asyncio.gather(*self._agent_tasks.values(), return_exceptions=True),
                     timeout=30.0,
                 )
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 logger.warning("Cooldown timeout, cancelling remaining agents")
 
     async def _spawn_agents_batch(self, start_index: int, end_index: int) -> None:
@@ -402,7 +405,7 @@ class StressTestRunner:
             logger.error(f"Failed to spawn agent {index}: {e}")
             self.metrics.record_error()
 
-    async def _run_agent(self, agent: "BaseAgent") -> None:
+    async def _run_agent(self, agent: BaseAgent) -> None:
         """Run a single agent with metrics collection."""
         if not self.scenario or not self._semaphore:
             return
@@ -433,7 +436,7 @@ class StressTestRunner:
                 if not result.success:
                     self.metrics.record_error()
 
-        except asyncio.TimeoutError:
+        except TimeoutError:
             self.metrics.record_timeout()
             self.metrics.total_agent_latency.observe((time.time() - agent_start) * 1000)
 
@@ -460,7 +463,7 @@ class StressTestRunner:
         if not self.topology_engine or self.config.topology_switch_interval <= 0:
             return
 
-        if not self.scenario or not hasattr(self.scenario, 'get_next_topology'):
+        if not self.scenario or not hasattr(self.scenario, "get_next_topology"):
             return
 
         current_topology = "swarm"
@@ -489,6 +492,7 @@ class StressTestRunner:
         """Track memory usage periodically."""
         try:
             import psutil
+
             process = psutil.Process(os.getpid())
 
             while self._running:
@@ -516,6 +520,7 @@ class StressTestRunner:
 
     def _setup_signal_handlers(self) -> None:
         """Setup signal handlers for graceful shutdown."""
+
         def handler(signum: int, frame: Any) -> None:
             logger.info(f"Received signal {signum}, initiating graceful shutdown")
             self._cancelled = True

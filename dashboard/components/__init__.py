@@ -8,10 +8,10 @@ Provides:
 - ApprovalComponent: Human-in-the-Loop approval UI
 """
 
-from dashboard.components.conversations import ConversationManager, Conversation
+from dashboard.components.approval import ApprovalComponent, ApprovalWebSocketHandler
+from dashboard.components.conversations import Conversation, ConversationManager
 from dashboard.components.diff import DiffViewer, FileDiff
 from dashboard.components.filebrowser import FileBrowser, FileEntry
-from dashboard.components.approval import ApprovalComponent, ApprovalWebSocketHandler
 
 __all__ = [
     "ConversationManager",

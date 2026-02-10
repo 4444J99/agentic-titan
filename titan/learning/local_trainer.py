@@ -17,10 +17,9 @@ import hashlib
 import json
 import logging
 import re
-from collections import Counter, defaultdict
+from collections import Counter
 from dataclasses import dataclass, field
-from datetime import datetime
-from enum import Enum
+from enum import StrEnum
 from pathlib import Path
 from typing import Any
 
@@ -32,8 +31,9 @@ logger = logging.getLogger("titan.learning.local_trainer")
 # ============================================================================
 
 
-class PatternType(str, Enum):
+class PatternType(StrEnum):
     """Types of coding patterns."""
+
     NAMING = "naming"  # Variable/function naming
     STRUCTURE = "structure"  # Code organization
     STYLE = "style"  # Formatting preferences
@@ -140,33 +140,39 @@ class StyleProfile:
         lines = ["# Coding Style Guide", ""]
 
         # Naming
-        lines.extend([
-            "## Naming Conventions",
-            f"- Variables: {self.variable_case}",
-            f"- Functions: {self.function_case}",
-            f"- Classes: {self.class_case}",
-            f"- Constants: {self.constant_case}",
-            f"- Private members: prefix with '{self.private_prefix}'",
-            "",
-        ])
+        lines.extend(
+            [
+                "## Naming Conventions",
+                f"- Variables: {self.variable_case}",
+                f"- Functions: {self.function_case}",
+                f"- Classes: {self.class_case}",
+                f"- Constants: {self.constant_case}",
+                f"- Private members: prefix with '{self.private_prefix}'",
+                "",
+            ]
+        )
 
         # Formatting
-        lines.extend([
-            "## Formatting",
-            f"- Indent: {self.indent_size} spaces",
-            f"- Max line length: {self.max_line_length}",
-            f"- Quotes: {self.quote_style}",
-            f"- Trailing commas: {'yes' if self.trailing_comma else 'no'}",
-            "",
-        ])
+        lines.extend(
+            [
+                "## Formatting",
+                f"- Indent: {self.indent_size} spaces",
+                f"- Max line length: {self.max_line_length}",
+                f"- Quotes: {self.quote_style}",
+                f"- Trailing commas: {'yes' if self.trailing_comma else 'no'}",
+                "",
+            ]
+        )
 
         # Documentation
-        lines.extend([
-            "## Documentation",
-            f"- Docstring style: {self.docstring_style}",
-            f"- Type annotations: {'yes' if self.type_annotations else 'no'}",
-            "",
-        ])
+        lines.extend(
+            [
+                "## Documentation",
+                f"- Docstring style: {self.docstring_style}",
+                f"- Type annotations: {'yes' if self.type_annotations else 'no'}",
+                "",
+            ]
+        )
 
         # Common patterns
         if self.patterns:
@@ -186,7 +192,9 @@ class TrainingConfig:
     # Source directories
     source_dirs: list[str] = field(default_factory=list)
     include_patterns: list[str] = field(default_factory=lambda: ["*.py"])
-    exclude_patterns: list[str] = field(default_factory=lambda: ["*test*", "*__pycache__*", "*.pyc"])
+    exclude_patterns: list[str] = field(
+        default_factory=lambda: ["*test*", "*__pycache__*", "*.pyc"]
+    )
 
     # Analysis options
     min_file_size: int = 100  # bytes
@@ -241,9 +249,9 @@ class PatternExtractor:
     """Extracts coding patterns from Python source code."""
 
     def __init__(self) -> None:
-        self._naming_stats: Counter = Counter()
-        self._import_stats: Counter = Counter()
-        self._docstring_stats: Counter = Counter()
+        self._naming_stats: Counter[str] = Counter()
+        self._import_stats: Counter[str] = Counter()
+        self._docstring_stats: Counter[str] = Counter()
         self._patterns: list[CodingPattern] = []
 
     def analyze_file(self, filepath: Path) -> list[CodingPattern]:
@@ -268,7 +276,7 @@ class PatternExtractor:
 
     def _extract_naming_patterns(self, tree: ast.AST, filepath: Path) -> list[CodingPattern]:
         """Extract naming convention patterns."""
-        patterns = []
+        patterns: list[CodingPattern] = []
 
         for node in ast.walk(tree):
             # Function names
@@ -302,8 +310,8 @@ class PatternExtractor:
 
     def _extract_import_patterns(self, tree: ast.AST, filepath: Path) -> list[CodingPattern]:
         """Extract import organization patterns."""
-        patterns = []
-        imports = []
+        patterns: list[CodingPattern] = []
+        imports: list[tuple[str, str, str | None]] = []
 
         for node in ast.walk(tree):
             if isinstance(node, ast.Import):
@@ -327,7 +335,7 @@ class PatternExtractor:
 
     def _extract_docstring_patterns(self, tree: ast.AST, filepath: Path) -> list[CodingPattern]:
         """Extract docstring style patterns."""
-        patterns = []
+        patterns: list[CodingPattern] = []
 
         for node in ast.walk(tree):
             if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef, ast.Module)):
@@ -340,7 +348,7 @@ class PatternExtractor:
 
     def _extract_structure_patterns(self, tree: ast.AST, filepath: Path) -> list[CodingPattern]:
         """Extract code structure patterns."""
-        patterns = []
+        patterns: list[CodingPattern] = []
 
         # Count decorators usage
         decorator_count = 0
@@ -349,65 +357,75 @@ class PatternExtractor:
                 decorator_count += len(node.decorator_list)
 
         if decorator_count > 0:
-            patterns.append(CodingPattern(
-                type=PatternType.STRUCTURE,
-                name="decorator_usage",
-                description="Uses decorators for cross-cutting concerns",
-                frequency=decorator_count,
-                source_files=[str(filepath)],
-            ))
+            patterns.append(
+                CodingPattern(
+                    type=PatternType.STRUCTURE,
+                    name="decorator_usage",
+                    description="Uses decorators for cross-cutting concerns",
+                    frequency=decorator_count,
+                    source_files=[str(filepath)],
+                )
+            )
 
         return patterns
 
     def _extract_idiom_patterns(self, content: str, filepath: Path) -> list[CodingPattern]:
         """Extract common Python idioms."""
-        patterns = []
+        patterns: list[CodingPattern] = []
 
         # List comprehensions
-        list_comp_count = len(re.findall(r'\[.+\s+for\s+.+\s+in\s+.+\]', content))
+        list_comp_count = len(re.findall(r"\[.+\s+for\s+.+\s+in\s+.+\]", content))
         if list_comp_count > 0:
-            patterns.append(CodingPattern(
-                type=PatternType.IDIOM,
-                name="list_comprehension",
-                description="Uses list comprehensions for transformations",
-                frequency=list_comp_count,
-                source_files=[str(filepath)],
-            ))
+            patterns.append(
+                CodingPattern(
+                    type=PatternType.IDIOM,
+                    name="list_comprehension",
+                    description="Uses list comprehensions for transformations",
+                    frequency=list_comp_count,
+                    source_files=[str(filepath)],
+                )
+            )
 
         # Context managers
-        with_count = len(re.findall(r'\bwith\s+', content))
+        with_count = len(re.findall(r"\bwith\s+", content))
         if with_count > 0:
-            patterns.append(CodingPattern(
-                type=PatternType.IDIOM,
-                name="context_manager",
-                description="Uses context managers for resource management",
-                frequency=with_count,
-                source_files=[str(filepath)],
-            ))
+            patterns.append(
+                CodingPattern(
+                    type=PatternType.IDIOM,
+                    name="context_manager",
+                    description="Uses context managers for resource management",
+                    frequency=with_count,
+                    source_files=[str(filepath)],
+                )
+            )
 
         # F-strings vs format
         fstring_count = len(re.findall(r'f["\']', content))
-        format_count = len(re.findall(r'\.format\(', content))
+        format_count = len(re.findall(r"\.format\(", content))
 
         if fstring_count > format_count:
-            patterns.append(CodingPattern(
-                type=PatternType.STYLE,
-                name="fstring_preferred",
-                description="Prefers f-strings over .format()",
-                frequency=fstring_count,
-                source_files=[str(filepath)],
-            ))
+            patterns.append(
+                CodingPattern(
+                    type=PatternType.STYLE,
+                    name="fstring_preferred",
+                    description="Prefers f-strings over .format()",
+                    frequency=fstring_count,
+                    source_files=[str(filepath)],
+                )
+            )
 
         # Type annotations
-        type_hint_count = len(re.findall(r':\s*\w+(?:\[.+\])?\s*[=\)]', content))
+        type_hint_count = len(re.findall(r":\s*\w+(?:\[.+\])?\s*[=\)]", content))
         if type_hint_count > 5:
-            patterns.append(CodingPattern(
-                type=PatternType.TYPING,
-                name="type_annotations",
-                description="Uses type annotations extensively",
-                frequency=type_hint_count,
-                source_files=[str(filepath)],
-            ))
+            patterns.append(
+                CodingPattern(
+                    type=PatternType.TYPING,
+                    name="type_annotations",
+                    description="Uses type annotations extensively",
+                    frequency=type_hint_count,
+                    source_files=[str(filepath)],
+                )
+            )
 
         return patterns
 
@@ -438,21 +456,30 @@ class PatternExtractor:
         profile = StyleProfile()
 
         # Naming conventions
-        func_cases = {k.split(":")[1]: v for k, v in self._naming_stats.items() if k.startswith("function:")}
+        func_cases = {
+            k.split(":")[1]: v for k, v in self._naming_stats.items() if k.startswith("function:")
+        }
         if func_cases:
-            profile.function_case = max(func_cases, key=func_cases.get)
+            profile.function_case = max(func_cases, key=lambda case: func_cases[case])
 
-        class_cases = {k.split(":")[1]: v for k, v in self._naming_stats.items() if k.startswith("class:")}
+        class_cases = {
+            k.split(":")[1]: v for k, v in self._naming_stats.items() if k.startswith("class:")
+        }
         if class_cases:
-            profile.class_case = max(class_cases, key=class_cases.get)
+            profile.class_case = max(class_cases, key=lambda case: class_cases[case])
 
-        var_cases = {k.split(":")[1]: v for k, v in self._naming_stats.items() if k.startswith("variable:")}
+        var_cases = {
+            k.split(":")[1]: v for k, v in self._naming_stats.items() if k.startswith("variable:")
+        }
         if var_cases:
-            profile.variable_case = max(var_cases, key=var_cases.get)
+            profile.variable_case = max(var_cases, key=lambda case: var_cases[case])
 
         # Docstring style
         if self._docstring_stats:
-            profile.docstring_style = max(self._docstring_stats, key=self._docstring_stats.get)
+            profile.docstring_style = max(
+                self._docstring_stats,
+                key=lambda style: self._docstring_stats[style],
+            )
 
         # Aggregate patterns
         pattern_map: dict[str, CodingPattern] = {}
@@ -465,10 +492,7 @@ class PatternExtractor:
                 pattern_map[key] = pattern
 
         # Filter by frequency
-        profile.patterns = [
-            p for p in pattern_map.values()
-            if p.frequency >= min_frequency
-        ]
+        profile.patterns = [p for p in pattern_map.values() if p.frequency >= min_frequency]
         profile.patterns.sort(key=lambda p: p.frequency, reverse=True)
 
         return profile
@@ -587,7 +611,7 @@ class StyleAdapter:
 
         # Check docstrings
         if self.style_profile.type_annotations:
-            if not re.search(r':\s*\w+', code):
+            if not re.search(r":\s*\w+", code):
                 suggestions.append("Consider adding type annotations (project uses them)")
 
         return suggestions

@@ -5,20 +5,20 @@ from __future__ import annotations
 import pytest
 
 from mcp.prompts import (
+    CREATIVE_INQUIRY_PROMPT,
+    EXPANSIVE_INQUIRY_PROMPT,
+    MODEL_COMPARISON_PROMPT,
+    QUICK_INQUIRY_PROMPT,
+    ROUTE_TASK_PROMPT,
     MCPPrompt,
     MCPPromptArgument,
     PromptCategory,
     get_all_prompts,
-    get_prompt,
-    get_prompt_messages,
     get_inquiry_prompts,
     get_model_prompts,
+    get_prompt,
+    get_prompt_messages,
     list_prompts_by_category,
-    EXPANSIVE_INQUIRY_PROMPT,
-    QUICK_INQUIRY_PROMPT,
-    CREATIVE_INQUIRY_PROMPT,
-    MODEL_COMPARISON_PROMPT,
-    ROUTE_TASK_PROMPT,
 )
 
 
@@ -88,9 +88,7 @@ class TestMCPPrompt:
             name="test-prompt",
             description="A test prompt",
             category=PromptCategory.INQUIRY,
-            arguments=[
-                MCPPromptArgument(name="topic", description="Topic", required=True)
-            ],
+            arguments=[MCPPromptArgument(name="topic", description="Topic", required=True)],
         )
 
         assert prompt.name == "test-prompt"

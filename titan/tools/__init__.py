@@ -7,23 +7,22 @@ Provides:
 """
 
 from titan.tools.image_gen import (
-    ImageGenerationTool,
-    ImageRequest,
+    DallEBackend,
     GeneratedImage,
     ImageGenerationResult,
+    ImageGenerationTool,
+    ImageRequest,
     StableDiffusionBackend,
-    DallEBackend,
     generate_image,
     get_image_tool,
 )
-
 from titan.tools.m365 import (
-    Microsoft365Tool,
-    GraphClient,
-    M365User,
-    EmailMessage,
     CalendarEvent,
     DriveItem,
+    EmailMessage,
+    GraphClient,
+    M365User,
+    Microsoft365Tool,
     TeamsMessage,
     get_m365_tool,
 )

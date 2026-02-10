@@ -13,14 +13,14 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
-from tools.base import Tool, ToolResult, ToolRegistry, get_registry
+from tools.base import ToolRegistry, ToolResult, get_registry
 
 if TYPE_CHECKING:
-    from titan.safety.hitl import HITLHandler
     from titan.persistence.audit import AuditLogger
+    from titan.safety.hitl import HITLHandler
 
 logger = logging.getLogger("titan.tools.executor")
 
@@ -112,17 +112,20 @@ class ToolExecutor:
                 name = tc["name"]
                 args = tc.get("arguments") or tc.get("input", {})
 
-            parsed.append(ToolCall(
-                id=tc.get("id", f"call_{len(parsed)}"),
-                name=name,
-                arguments=args if isinstance(args, dict) else {},
-            ))
+            parsed.append(
+                ToolCall(
+                    id=tc.get("id", f"call_{len(parsed)}"),
+                    name=name,
+                    arguments=args if isinstance(args, dict) else {},
+                )
+            )
 
         return parsed
 
     async def execute_one(self, call: ToolCall) -> ToolExecution:
         """Execute a single tool call with HITL check."""
         import time
+
         start = time.perf_counter()
 
         tool = self.registry.get(call.name)
@@ -151,7 +154,10 @@ class ToolExecutor:
                 result = ToolResult(
                     success=False,
                     output=None,
-                    error=f"Tool execution denied: {approval_result.reason if approval_result else 'Approval required'}",
+                    error=(
+                        "Tool execution denied: "
+                        f"{approval_result.reason if approval_result else 'Approval required'}"
+                    ),
                     metadata={"approval_status": "denied"},
                 )
                 execution_time_ms = int((time.perf_counter() - start) * 1000)
@@ -169,7 +175,7 @@ class ToolExecutor:
                     tool.execute(**call.arguments),
                     timeout=self.timeout_seconds,
                 )
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 result = ToolResult(
                     success=False,
                     output=None,
@@ -185,8 +191,7 @@ class ToolExecutor:
 
         execution_time_ms = int((time.perf_counter() - start) * 1000)
         logger.info(
-            f"Tool {call.name} executed in {execution_time_ms}ms "
-            f"(success={result.success})"
+            f"Tool {call.name} executed in {execution_time_ms}ms (success={result.success})"
         )
 
         # Log completion to audit
@@ -262,10 +267,12 @@ class ToolExecutor:
             executions = []
             for i, result in enumerate(results):
                 if isinstance(result, Exception):
-                    executions.append(ToolExecution(
-                        call=calls[i],
-                        result=ToolResult(success=False, output=None, error=str(result)),
-                    ))
+                    executions.append(
+                        ToolExecution(
+                            call=calls[i],
+                            result=ToolResult(success=False, output=None, error=str(result)),
+                        )
+                    )
                 else:
                     executions.append(result)
             return executions

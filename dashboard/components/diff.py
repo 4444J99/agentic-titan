@@ -15,7 +15,7 @@ from __future__ import annotations
 import difflib
 import logging
 from dataclasses import dataclass, field
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 logger = logging.getLogger("titan.dashboard.diff")
@@ -26,7 +26,7 @@ logger = logging.getLogger("titan.dashboard.diff")
 # ============================================================================
 
 
-class ChangeType(str, Enum):
+class ChangeType(StrEnum):
     """Type of change in a diff."""
 
     ADDED = "added"
@@ -71,7 +71,7 @@ class Hunk:
             "new_start": self.new_start,
             "new_count": self.new_count,
             "header": self.header,
-            "lines": [l.to_dict() for l in self.lines],
+            "lines": [line.to_dict() for line in self.lines],
         }
 
 
@@ -232,32 +232,38 @@ class DiffViewer:
             content = line[1:] if line else ""
 
             if line.startswith("+"):
-                current_hunk.lines.append(LineDiff(
-                    line_number_old=None,
-                    line_number_new=new_line,
-                    content=content.rstrip("\n"),
-                    change_type=ChangeType.ADDED,
-                ))
+                current_hunk.lines.append(
+                    LineDiff(
+                        line_number_old=None,
+                        line_number_new=new_line,
+                        content=content.rstrip("\n"),
+                        change_type=ChangeType.ADDED,
+                    )
+                )
                 file_diff.additions += 1
                 new_line += 1
 
             elif line.startswith("-"):
-                current_hunk.lines.append(LineDiff(
-                    line_number_old=old_line,
-                    line_number_new=None,
-                    content=content.rstrip("\n"),
-                    change_type=ChangeType.REMOVED,
-                ))
+                current_hunk.lines.append(
+                    LineDiff(
+                        line_number_old=old_line,
+                        line_number_new=None,
+                        content=content.rstrip("\n"),
+                        change_type=ChangeType.REMOVED,
+                    )
+                )
                 file_diff.deletions += 1
                 old_line += 1
 
             else:
-                current_hunk.lines.append(LineDiff(
-                    line_number_old=old_line,
-                    line_number_new=new_line,
-                    content=content.rstrip("\n"),
-                    change_type=ChangeType.UNCHANGED,
-                ))
+                current_hunk.lines.append(
+                    LineDiff(
+                        line_number_old=old_line,
+                        line_number_new=new_line,
+                        content=content.rstrip("\n"),
+                        change_type=ChangeType.UNCHANGED,
+                    )
+                )
                 old_line += 1
                 new_line += 1
 
@@ -303,40 +309,48 @@ class DiffViewer:
         Returns:
             List of row dicts for side-by-side display
         """
-        rows = []
+        rows: list[dict[str, Any]] = []
 
         for hunk in file_diff.hunks:
             # Add hunk separator
-            rows.append({
-                "type": "hunk_header",
-                "header": hunk.header,
-            })
+            rows.append(
+                {
+                    "type": "hunk_header",
+                    "header": hunk.header,
+                }
+            )
 
             for line in hunk.lines:
                 if line.change_type == ChangeType.UNCHANGED:
-                    rows.append({
-                        "type": "unchanged",
-                        "left_num": line.line_number_old,
-                        "left_content": line.content,
-                        "right_num": line.line_number_new,
-                        "right_content": line.content,
-                    })
+                    rows.append(
+                        {
+                            "type": "unchanged",
+                            "left_num": line.line_number_old,
+                            "left_content": line.content,
+                            "right_num": line.line_number_new,
+                            "right_content": line.content,
+                        }
+                    )
                 elif line.change_type == ChangeType.REMOVED:
-                    rows.append({
-                        "type": "removed",
-                        "left_num": line.line_number_old,
-                        "left_content": line.content,
-                        "right_num": None,
-                        "right_content": "",
-                    })
+                    rows.append(
+                        {
+                            "type": "removed",
+                            "left_num": line.line_number_old,
+                            "left_content": line.content,
+                            "right_num": None,
+                            "right_content": "",
+                        }
+                    )
                 elif line.change_type == ChangeType.ADDED:
-                    rows.append({
-                        "type": "added",
-                        "left_num": None,
-                        "left_content": "",
-                        "right_num": line.line_number_new,
-                        "right_content": line.content,
-                    })
+                    rows.append(
+                        {
+                            "type": "added",
+                            "left_num": None,
+                            "left_content": "",
+                            "right_num": line.line_number_new,
+                            "right_content": line.content,
+                        }
+                    )
 
         return rows
 
@@ -362,17 +376,21 @@ class DiffViewer:
     def _to_html_unified(self, file_diff: FileDiff) -> str:
         """Generate unified HTML diff."""
         html = ['<div class="diff-viewer unified">']
-        html.append(f'<div class="diff-header">')
+        html.append('<div class="diff-header">')
         html.append(f'<span class="diff-old-path">{file_diff.old_path}</span>')
-        html.append(f' → ')
+        html.append(" → ")
         html.append(f'<span class="diff-new-path">{file_diff.new_path}</span>')
-        html.append(f'<span class="diff-stats">+{file_diff.additions} -{file_diff.deletions}</span>')
-        html.append('</div>')
+        html.append(
+            f'<span class="diff-stats">+{file_diff.additions} -{file_diff.deletions}</span>'
+        )
+        html.append("</div>")
 
         html.append('<table class="diff-table">')
 
         for hunk in file_diff.hunks:
-            html.append(f'<tr class="hunk-header"><td colspan="3">{_escape_html(hunk.header)}</td></tr>')
+            html.append(
+                f'<tr class="hunk-header"><td colspan="3">{_escape_html(hunk.header)}</td></tr>'
+            )
 
             for line in hunk.lines:
                 css_class = line.change_type.value
@@ -391,38 +409,41 @@ class DiffViewer:
                 html.append(f'<td class="line-num">{line_num}</td>')
                 html.append(f'<td class="line-prefix">{prefix}</td>')
                 html.append(f'<td class="line-content">{content}</td>')
-                html.append('</tr>')
+                html.append("</tr>")
 
-        html.append('</table>')
-        html.append('</div>')
+        html.append("</table>")
+        html.append("</div>")
 
         return "\n".join(html)
 
     def _to_html_side_by_side(self, file_diff: FileDiff) -> str:
         """Generate side-by-side HTML diff."""
         html = ['<div class="diff-viewer side-by-side">']
-        html.append(f'<div class="diff-header">')
-        html.append(f'<span class="diff-stats">+{file_diff.additions} -{file_diff.deletions}</span>')
-        html.append('</div>')
+        html.append('<div class="diff-header">')
+        html.append(
+            f'<span class="diff-stats">+{file_diff.additions} -{file_diff.deletions}</span>'
+        )
+        html.append("</div>")
 
         html.append('<table class="diff-table">')
-        html.append('<colgroup>')
+        html.append("<colgroup>")
         html.append('<col class="line-num-col">')
         html.append('<col class="content-col">')
         html.append('<col class="line-num-col">')
         html.append('<col class="content-col">')
-        html.append('</colgroup>')
+        html.append("</colgroup>")
 
-        html.append('<thead>')
+        html.append("<thead>")
         html.append(f'<tr><th colspan="2">{_escape_html(file_diff.old_path)}</th>')
         html.append(f'<th colspan="2">{_escape_html(file_diff.new_path)}</th></tr>')
-        html.append('</thead>')
+        html.append("</thead>")
 
-        html.append('<tbody>')
+        html.append("<tbody>")
 
         for row in self.to_side_by_side(file_diff):
             if row["type"] == "hunk_header":
-                html.append(f'<tr class="hunk-header"><td colspan="4">{_escape_html(row["header"])}</td></tr>')
+                header_html = _escape_html(row["header"])
+                html.append(f'<tr class="hunk-header"><td colspan="4">{header_html}</td></tr>')
             else:
                 css_class = row["type"]
                 left_num = row["left_num"] or ""
@@ -435,11 +456,11 @@ class DiffViewer:
                 html.append(f'<td class="line-content left">{left_content}</td>')
                 html.append(f'<td class="line-num">{right_num}</td>')
                 html.append(f'<td class="line-content right">{right_content}</td>')
-                html.append('</tr>')
+                html.append("</tr>")
 
-        html.append('</tbody>')
-        html.append('</table>')
-        html.append('</div>')
+        html.append("</tbody>")
+        html.append("</table>")
+        html.append("</div>")
 
         return "\n".join(html)
 

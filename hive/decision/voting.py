@@ -19,7 +19,7 @@ import logging
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 logger = logging.getLogger("titan.decision.voting")
@@ -30,7 +30,7 @@ logger = logging.getLogger("titan.decision.voting")
 # ============================================================================
 
 
-class VotingStrategy(str, Enum):
+class VotingStrategy(StrEnum):
     """Voting strategies."""
 
     MAJORITY = "majority"  # Simple majority wins
@@ -332,8 +332,7 @@ class VotingSession:
         """Instant-runoff ranked choice voting."""
         # Each vote tracks current active ranking
         active_rankings = [
-            list(v.ranked_choices) if v.ranked_choices else [v.choice]
-            for v in votes
+            list(v.ranked_choices) if v.ranked_choices else [v.choice] for v in votes
         ]
         remaining_choices = set(self.choices)
         eliminated: list[str] = []

@@ -3,22 +3,21 @@
 from __future__ import annotations
 
 from datetime import datetime
-from unittest.mock import MagicMock
 
 import pytest
 
+from titan.workflows.inquiry_config import QUICK_INQUIRY_WORKFLOW
+from titan.workflows.inquiry_engine import InquirySession, InquiryStatus, StageResult
 from titan.workflows.narrative_synthesizer import (
-    NarrativeStyle,
-    TargetLength,
     NarrativeConfig,
     NarrativeSection,
+    NarrativeStyle,
     NarrativeSynthesis,
     NarrativeSynthesizer,
-    get_narrative_synthesizer,
+    TargetLength,
     generate_narrative,
+    get_narrative_synthesizer,
 )
-from titan.workflows.inquiry_engine import InquirySession, StageResult, InquiryStatus
-from titan.workflows.inquiry_config import QUICK_INQUIRY_WORKFLOW
 
 
 class TestNarrativeStyle:
@@ -305,9 +304,7 @@ class TestNarrativeSynthesizer:
 
         assert transition in synthesizer.STYLE_TRANSITIONS[NarrativeStyle.ACADEMIC]
 
-    def test_get_transition_conversational(
-        self, synthesizer: NarrativeSynthesizer
-    ) -> None:
+    def test_get_transition_conversational(self, synthesizer: NarrativeSynthesizer) -> None:
         """Test transition phrases for conversational style."""
         transition = synthesizer._get_transition(0, NarrativeStyle.CONVERSATIONAL)
 

@@ -1,12 +1,8 @@
 """Tests for multi-scale neighbor support (Phase 16A)."""
 
-import asyncio
-from unittest.mock import MagicMock
-
 import pytest
 
 from hive.neighborhood import (
-    AgentProfile,
     InteractionType,
     LayeredNeighborConfig,
     NeighborLayer,
@@ -128,7 +124,7 @@ class TestMultiScaleNeighborhood:
 
     def test_force_recalculate(self, neighborhood):
         """Test forcing recalculation bypasses cache."""
-        neighbors1 = neighborhood.get_neighbors("agent_0", layer=NeighborLayer.PRIMARY)
+        neighborhood.get_neighbors("agent_0", layer=NeighborLayer.PRIMARY)
         neighborhood._cache_valid = True
 
         # Force recalculate

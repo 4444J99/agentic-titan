@@ -11,13 +11,13 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 logger = logging.getLogger("titan.migration.runtime")
 
 
-class RuntimeType(str, Enum):
+class RuntimeType(StrEnum):
     """Available runtime environments."""
 
     LOCAL = "local"  # Direct Python process
@@ -254,10 +254,7 @@ class RuntimeSelector:
         candidates.sort(key=lambda x: x[1], reverse=True)
         selected = candidates[0][0]
 
-        logger.info(
-            f"Selected runtime: {selected.name} "
-            f"(score={candidates[0][1]:.2f})"
-        )
+        logger.info(f"Selected runtime: {selected.name} (score={candidates[0][1]:.2f})")
         return selected
 
     def _score_runtime(

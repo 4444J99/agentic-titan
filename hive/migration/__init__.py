@@ -7,10 +7,6 @@ Provides:
 - RuntimeSelector: Choose optimal runtime
 """
 
-from hive.migration.state import (
-    AgentState,
-    StateSnapshot,
-)
 from hive.migration.manager import (
     MigrationManager,
     MigrationRequest,
@@ -18,9 +14,13 @@ from hive.migration.manager import (
     MigrationStatus,
 )
 from hive.migration.runtime import (
-    RuntimeType,
-    RuntimeSelector,
     RuntimeConfig,
+    RuntimeSelector,
+    RuntimeType,
+)
+from hive.migration.state import (
+    AgentState,
+    StateSnapshot,
 )
 
 __all__ = [

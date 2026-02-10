@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import os
 
-
 # =============================================================================
 # Broker Configuration
 # =============================================================================
@@ -196,13 +195,14 @@ CELERY_BROKER_CONNECTION_MAX_RETRIES = 10
 # Helper Functions
 # =============================================================================
 
-def get_celery_config() -> dict:
+
+def get_celery_config() -> dict[str, object]:
     """
     Get Celery configuration as a dictionary.
 
     Returns configuration suitable for celery_app.config_from_object().
     """
-    config = {}
+    config: dict[str, object] = {}
     for key, value in globals().items():
         if key.startswith("CELERY_"):
             # Convert CELERY_* to celery lowercase config keys

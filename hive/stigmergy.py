@@ -15,10 +15,9 @@ from __future__ import annotations
 
 import asyncio
 import logging
-import math
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
-from enum import Enum
+from datetime import UTC, datetime
+from enum import StrEnum
 from typing import Any
 
 from titan.metrics import get_metrics
@@ -26,17 +25,17 @@ from titan.metrics import get_metrics
 logger = logging.getLogger("titan.hive.stigmergy")
 
 
-class TraceType(str, Enum):
+class TraceType(StrEnum):
     """Types of pheromone traces agents can deposit."""
 
-    PATH = "path"              # Successful solution routes
-    RESOURCE = "resource"      # Valuable information found
-    WARNING = "warning"        # Danger/failure indicators
-    SUCCESS = "success"        # Task completion markers
-    FAILURE = "failure"        # Dead ends to avoid
+    PATH = "path"  # Successful solution routes
+    RESOURCE = "resource"  # Valuable information found
+    WARNING = "warning"  # Danger/failure indicators
+    SUCCESS = "success"  # Task completion markers
+    FAILURE = "failure"  # Dead ends to avoid
     COLLABORATION = "collaboration"  # Help requests
-    EXPLORATION = "exploration"      # Areas being explored
-    TERRITORY = "territory"    # Claimed regions
+    EXPLORATION = "exploration"  # Areas being explored
+    TERRITORY = "territory"  # Claimed regions
 
 
 @dataclass
@@ -53,14 +52,14 @@ class PheromoneTrace:
     intensity: float  # 0.0 to 1.0
     payload: dict[str, Any] = field(default_factory=dict)
     depositor_id: str = ""
-    deposited_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    deposited_at: datetime = field(default_factory=lambda: datetime.now(UTC))
     decay_rate: float = 0.1  # Intensity loss per decay cycle
     ttl_seconds: float = 3600.0  # Time to live
 
     @property
     def age_seconds(self) -> float:
         """Age of the trace in seconds."""
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         return (now - self.deposited_at).total_seconds()
 
     @property
@@ -78,7 +77,7 @@ class PheromoneTrace:
             New intensity after decay.
         """
         for _ in range(cycles):
-            self.intensity *= (1.0 - self.decay_rate)
+            self.intensity *= 1.0 - self.decay_rate
         self.intensity = max(0.0, self.intensity)
         return self.intensity
 
@@ -115,7 +114,7 @@ class PheromoneTrace:
         if isinstance(deposited_at, str):
             deposited_at = datetime.fromisoformat(deposited_at)
         elif deposited_at is None:
-            deposited_at = datetime.now(timezone.utc)
+            deposited_at = datetime.now(UTC)
 
         return cls(
             trace_id=data["trace_id"],
@@ -711,8 +710,6 @@ class PheromoneField:
             field._traces[location] = {}
             for trace_type_str, traces in type_traces.items():
                 trace_type = TraceType(trace_type_str)
-                field._traces[location][trace_type] = [
-                    PheromoneTrace.from_dict(t) for t in traces
-                ]
+                field._traces[location][trace_type] = [PheromoneTrace.from_dict(t) for t in traces]
 
         return field

@@ -8,20 +8,20 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass, field
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 
-class VMState(str, Enum):
+class VMState(StrEnum):
     """State of a MicroVM."""
 
-    CREATED = "created"      # VM created but not started
-    STARTING = "starting"    # VM is booting
-    RUNNING = "running"      # VM is running and ready
-    PAUSED = "paused"        # VM is paused
-    STOPPING = "stopping"    # VM is shutting down
-    STOPPED = "stopped"      # VM has stopped
-    ERROR = "error"          # VM encountered an error
+    CREATED = "created"  # VM created but not started
+    STARTING = "starting"  # VM is booting
+    RUNNING = "running"  # VM is running and ready
+    PAUSED = "paused"  # VM is paused
+    STOPPING = "stopping"  # VM is shutting down
+    STOPPED = "stopped"  # VM has stopped
+    ERROR = "error"  # VM encountered an error
 
 
 @dataclass
@@ -38,9 +38,7 @@ class FirecrackerConfig:
     """
 
     # VM Resources
-    vcpu_count: int = field(
-        default_factory=lambda: int(os.getenv("FIRECRACKER_VCPU_COUNT", "1"))
-    )
+    vcpu_count: int = field(default_factory=lambda: int(os.getenv("FIRECRACKER_VCPU_COUNT", "1")))
     mem_size_mib: int = field(
         default_factory=lambda: int(os.getenv("FIRECRACKER_MEM_SIZE_MIB", "128"))
     )
@@ -48,14 +46,9 @@ class FirecrackerConfig:
 
     # Kernel and rootfs images
     kernel_path: str = field(
-        default_factory=lambda: os.getenv(
-            "FIRECRACKER_KERNEL_PATH", "/var/lib/firecracker/vmlinux"
-        )
+        default_factory=lambda: os.getenv("FIRECRACKER_KERNEL_PATH", "/var/lib/firecracker/vmlinux")
     )
-    kernel_boot_args: str = (
-        "console=ttyS0 reboot=k panic=1 pci=off "
-        "init=/usr/bin/agent"
-    )
+    kernel_boot_args: str = "console=ttyS0 reboot=k panic=1 pci=off init=/usr/bin/agent"
 
     rootfs_path: str = field(
         default_factory=lambda: os.getenv(
@@ -87,9 +80,7 @@ class FirecrackerConfig:
 
     # Firecracker binary and socket
     firecracker_path: str = field(
-        default_factory=lambda: os.getenv(
-            "FIRECRACKER_BINARY", "/usr/local/bin/firecracker"
-        )
+        default_factory=lambda: os.getenv("FIRECRACKER_BINARY", "/usr/local/bin/firecracker")
     )
     jailer_path: str | None = None  # Optional jailer for additional isolation
     socket_path_template: str = "/tmp/firecracker-{vm_id}.socket"

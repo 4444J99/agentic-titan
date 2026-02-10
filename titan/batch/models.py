@@ -10,12 +10,12 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import datetime
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 from uuid import UUID, uuid4
 
 
-class BatchStatus(str, Enum):
+class BatchStatus(StrEnum):
     """Status of a batch job."""
 
     PENDING = "pending"
@@ -28,7 +28,7 @@ class BatchStatus(str, Enum):
     PARTIALLY_COMPLETED = "partially_completed"
 
 
-class SessionQueueStatus(str, Enum):
+class SessionQueueStatus(StrEnum):
     """Status of a queued session within a batch."""
 
     PENDING = "pending"
@@ -159,7 +159,9 @@ class QueuedSession:
         """Create from dictionary."""
         return cls(
             id=UUID(data["id"]) if isinstance(data["id"], str) else data["id"],
-            batch_id=UUID(data["batch_id"]) if isinstance(data["batch_id"], str) else data["batch_id"],
+            batch_id=UUID(data["batch_id"])
+            if isinstance(data["batch_id"], str)
+            else data["batch_id"],
             topic=data["topic"],
             status=SessionQueueStatus(data["status"]),
             worker_id=data.get("worker_id"),
@@ -363,8 +365,10 @@ class BatchJob:
     def get_active_sessions(self) -> list[QueuedSession]:
         """Get sessions currently being processed."""
         return [
-            s for s in self.sessions
-            if s.status in (SessionQueueStatus.QUEUED, SessionQueueStatus.RUNNING, SessionQueueStatus.RETRYING)
+            s
+            for s in self.sessions
+            if s.status
+            in (SessionQueueStatus.QUEUED, SessionQueueStatus.RUNNING, SessionQueueStatus.RETRYING)
         ]
 
     def get_completed_sessions(self) -> list[QueuedSession]:
@@ -426,9 +430,7 @@ class BatchJob:
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> BatchJob:
         """Create from dictionary."""
-        sessions = [
-            QueuedSession.from_dict(s) for s in data.get("sessions", [])
-        ]
+        sessions = [QueuedSession.from_dict(s) for s in data.get("sessions", [])]
         return cls(
             id=UUID(data["id"]) if isinstance(data["id"], str) else data["id"],
             topics=data.get("topics", []),

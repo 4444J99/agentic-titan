@@ -7,9 +7,6 @@ Tests complete RLHF training flow from data collection through deployment.
 from __future__ import annotations
 
 import pytest
-from datetime import datetime, timezone
-from unittest.mock import AsyncMock, MagicMock, patch
-from uuid import uuid4
 
 # Mark all tests in this module as e2e
 pytestmark = [pytest.mark.e2e, pytest.mark.asyncio]
@@ -23,7 +20,7 @@ pytestmark = [pytest.mark.e2e, pytest.mark.asyncio]
 @pytest.fixture
 def mock_rlhf_samples():
     """Create mock RLHF samples."""
-    from titan.learning.rlhf import RLHFSample, ResponseQuality, FeedbackType
+    from titan.learning.rlhf import FeedbackType, RLHFSample
 
     return [
         RLHFSample(
@@ -46,7 +43,10 @@ def mock_rlhf_samples():
         ),
         RLHFSample(
             prompt="Explain recursion",
-            response="Recursion is when a function calls itself to solve smaller instances of the same problem.",
+            response=(
+                "Recursion is when a function calls itself "
+                "to solve smaller instances of the same problem."
+            ),
             human_rating=4,
             feedback_type=FeedbackType.EXPLICIT_RATING,
             session_id="session-2",
@@ -80,7 +80,10 @@ def mock_preference_pairs():
         ),
         PreferencePair(
             prompt="Explain recursion",
-            chosen="Recursion is when a function calls itself to solve smaller instances of the same problem.",
+            chosen=(
+                "Recursion is when a function calls itself "
+                "to solve smaller instances of the same problem."
+            ),
             rejected="It loops.",
             margin=0.75,
             source="rating",
@@ -184,12 +187,14 @@ class TestPreferencePairsE2E:
         from titan.learning.preference_pairs import PreferencePair
 
         for i in range(10):
-            mock_preference_dataset.add(PreferencePair(
-                prompt=f"Test prompt {i}",
-                chosen=f"Good response {i}",
-                rejected=f"Bad response {i}",
-                margin=0.5,
-            ))
+            mock_preference_dataset.add(
+                PreferencePair(
+                    prompt=f"Test prompt {i}",
+                    chosen=f"Good response {i}",
+                    rejected=f"Bad response {i}",
+                    margin=0.5,
+                )
+            )
 
         train, eval_ds = mock_preference_dataset.split(train_ratio=0.8)
 
@@ -198,18 +203,12 @@ class TestPreferencePairsE2E:
 
     async def test_preference_dataset_filter_by_margin(self, mock_preference_pairs):
         """Test filtering dataset by minimum margin."""
-        from titan.learning.preference_pairs import PreferencePairDataset, PreferencePair
+        from titan.learning.preference_pairs import PreferencePair, PreferencePairDataset
 
         dataset = PreferencePairDataset(name="test")
-        dataset.add(PreferencePair(
-            prompt="p1", chosen="c1", rejected="r1", margin=0.3
-        ))
-        dataset.add(PreferencePair(
-            prompt="p2", chosen="c2", rejected="r2", margin=0.7
-        ))
-        dataset.add(PreferencePair(
-            prompt="p3", chosen="c3", rejected="r3", margin=0.9
-        ))
+        dataset.add(PreferencePair(prompt="p1", chosen="c1", rejected="r1", margin=0.3))
+        dataset.add(PreferencePair(prompt="p2", chosen="c2", rejected="r2", margin=0.7))
+        dataset.add(PreferencePair(prompt="p3", chosen="c3", rejected="r3", margin=0.9))
 
         filtered = dataset.filter_by_margin(min_margin=0.5)
 
@@ -254,13 +253,10 @@ class TestRewardModelE2E:
         model = RewardModel(config=config)
 
         # Test prediction (mock model returns length-based score)
-        score1 = model.predict(
-            prompt="Write hello world",
-            response="print('hello world')"
-        )
+        score1 = model.predict(prompt="Write hello world", response="print('hello world')")
         score2 = model.predict(
             prompt="Write hello world",
-            response="x"  # Very short
+            response="x",  # Very short
         )
 
         # Both should be floats
@@ -310,7 +306,7 @@ class TestDPOTrainerE2E:
 
     async def test_dpo_trainer_initialization(self):
         """Test DPO trainer initialization."""
-        from titan.learning.dpo_trainer import DPOTrainer, DPOConfig
+        from titan.learning.dpo_trainer import DPOConfig, DPOTrainer
 
         config = DPOConfig(base_model="gpt2", max_steps=5)
         trainer = DPOTrainer(config)
@@ -390,9 +386,7 @@ class TestEvalSuiteE2E:
         assert result.samples_evaluated == len(mock_prompts)
         assert "wins" in result.metadata
 
-    async def test_full_eval_report(
-        self, mock_model_outputs, mock_baseline_outputs, mock_prompts
-    ):
+    async def test_full_eval_report(self, mock_model_outputs, mock_baseline_outputs, mock_prompts):
         """Test full evaluation report generation."""
         from titan.learning.eval_suite import RLHFEvalSuite
 
@@ -441,8 +435,8 @@ class TestABDeploymentE2E:
     async def test_start_ab_test(self, tmp_path):
         """Test starting an A/B test."""
         from titan.learning.deployment import (
-            RLHFDeployment,
             DeploymentConfig,
+            RLHFDeployment,
         )
 
         config = DeploymentConfig(
@@ -463,8 +457,8 @@ class TestABDeploymentE2E:
     async def test_get_ab_stats(self, tmp_path):
         """Test getting A/B test statistics."""
         from titan.learning.deployment import (
-            RLHFDeployment,
             DeploymentConfig,
+            RLHFDeployment,
         )
 
         config = DeploymentConfig(state_dir=str(tmp_path / "deployment"))
@@ -485,8 +479,8 @@ class TestABDeploymentE2E:
     async def test_route_request(self, tmp_path):
         """Test request routing between models."""
         from titan.learning.deployment import (
-            RLHFDeployment,
             DeploymentConfig,
+            RLHFDeployment,
         )
 
         config = DeploymentConfig(
@@ -514,8 +508,8 @@ class TestABDeploymentE2E:
     async def test_record_result(self, tmp_path):
         """Test recording request results."""
         from titan.learning.deployment import (
-            RLHFDeployment,
             DeploymentConfig,
+            RLHFDeployment,
         )
 
         config = DeploymentConfig(state_dir=str(tmp_path / "deployment"))
@@ -551,8 +545,8 @@ class TestABDeploymentE2E:
     async def test_promote_winner(self, tmp_path):
         """Test promoting new model as winner."""
         from titan.learning.deployment import (
-            RLHFDeployment,
             DeploymentConfig,
+            RLHFDeployment,
         )
 
         config = DeploymentConfig(
@@ -576,8 +570,8 @@ class TestABDeploymentE2E:
     async def test_rollback(self, tmp_path):
         """Test rolling back to baseline model."""
         from titan.learning.deployment import (
-            RLHFDeployment,
             DeploymentConfig,
+            RLHFDeployment,
         )
 
         config = DeploymentConfig(state_dir=str(tmp_path / "deployment"))
@@ -607,8 +601,8 @@ class TestExperimentTrackingE2E:
     async def test_start_run(self, tmp_path):
         """Test starting an experiment run."""
         from titan.learning.experiment import (
-            ExperimentTracker,
             ExperimentConfig,
+            ExperimentTracker,
         )
 
         config = ExperimentConfig(
@@ -631,8 +625,8 @@ class TestExperimentTrackingE2E:
     async def test_log_metrics(self, tmp_path):
         """Test logging metrics to experiment."""
         from titan.learning.experiment import (
-            ExperimentTracker,
             ExperimentConfig,
+            ExperimentTracker,
         )
 
         config = ExperimentConfig(
@@ -652,8 +646,8 @@ class TestExperimentTrackingE2E:
     async def test_end_run(self, tmp_path):
         """Test ending an experiment run."""
         from titan.learning.experiment import (
-            ExperimentTracker,
             ExperimentConfig,
+            ExperimentTracker,
         )
 
         config = ExperimentConfig(
@@ -677,8 +671,8 @@ class TestExperimentTrackingE2E:
     async def test_list_runs(self, tmp_path):
         """Test listing experiment runs."""
         from titan.learning.experiment import (
-            ExperimentTracker,
             ExperimentConfig,
+            ExperimentTracker,
         )
 
         config = ExperimentConfig(
@@ -746,7 +740,7 @@ class TestLearningPipelineE2E:
 
     async def test_process_feedback(self):
         """Test processing user feedback."""
-        from titan.learning.pipeline import LearningPipeline, FeedbackResponse
+        from titan.learning.pipeline import FeedbackResponse, LearningPipeline
 
         pipeline = LearningPipeline()
 
@@ -795,7 +789,7 @@ class TestLearningPipelineE2E:
 
     async def test_feedback_callbacks(self):
         """Test feedback event callbacks."""
-        from titan.learning.pipeline import LearningPipeline, FeedbackResponse
+        from titan.learning.pipeline import FeedbackResponse, LearningPipeline
 
         pipeline = LearningPipeline()
 
@@ -815,7 +809,7 @@ class TestLearningPipelineE2E:
 
     async def test_learning_metrics(self):
         """Test learning metrics tracking."""
-        from titan.learning.pipeline import LearningPipeline, FeedbackResponse
+        from titan.learning.pipeline import FeedbackResponse, LearningPipeline
 
         pipeline = LearningPipeline()
 
@@ -865,11 +859,11 @@ class TestFullRLHFPipelineE2E:
 
     async def test_full_pipeline_flow(self, tmp_path):
         """Test complete RLHF pipeline from data to deployment."""
-        from titan.learning.pipeline import LearningPipeline, FeedbackResponse
-        from titan.learning.preference_pairs import PreferencePairBuilder
+        from titan.learning.deployment import DeploymentConfig, RLHFDeployment
         from titan.learning.eval_suite import RLHFEvalSuite
-        from titan.learning.deployment import RLHFDeployment, DeploymentConfig
-        from titan.learning.experiment import ExperimentTracker, ExperimentConfig
+        from titan.learning.experiment import ExperimentConfig, ExperimentTracker
+        from titan.learning.pipeline import FeedbackResponse, LearningPipeline
+        from titan.learning.preference_pairs import PreferencePairBuilder
 
         # 1. Collect RLHF data via learning pipeline
         pipeline = LearningPipeline()
@@ -949,11 +943,13 @@ class TestFullRLHFPipelineE2E:
             config={"model": "new-model", "dataset_size": len(dataset)},
         )
 
-        tracker.log_metrics({
-            "win_rate": report.win_rate.value if report.win_rate else 0,
-            "coherence": report.coherence_score.value if report.coherence_score else 0,
-            "safety": report.safety_score.value if report.safety_score else 0,
-        })
+        tracker.log_metrics(
+            {
+                "win_rate": report.win_rate.value if report.win_rate else 0,
+                "coherence": report.coherence_score.value if report.coherence_score else 0,
+                "safety": report.safety_score.value if report.safety_score else 0,
+            }
+        )
 
         tracker.end_run(status="completed")
 

@@ -6,17 +6,17 @@ from datetime import datetime
 
 import pytest
 
+from titan.workflows.inquiry_config import QUICK_INQUIRY_WORKFLOW
+from titan.workflows.inquiry_engine import InquirySession, InquiryStatus, StageResult
 from titan.workflows.visualization_generator import (
-    VisualizationType,
+    VisualizationGenerator,
     VisualizationLibrary,
     VisualizationSpec,
     VisualizationSuite,
-    VisualizationGenerator,
-    get_visualization_generator,
+    VisualizationType,
     generate_visualizations,
+    get_visualization_generator,
 )
-from titan.workflows.inquiry_engine import InquirySession, StageResult, InquiryStatus
-from titan.workflows.inquiry_config import QUICK_INQUIRY_WORKFLOW
 
 
 class TestVisualizationType:
@@ -243,7 +243,10 @@ class TestVisualizationGenerator:
             StageResult(
                 stage_name="Scope Clarification",
                 role="Scope AI",
-                content="Data visualization involves multiple techniques: bar charts, line graphs, scatter plots.",
+                content=(
+                    "Data visualization involves multiple techniques: bar charts, "
+                    "line graphs, scatter plots."
+                ),
                 model_used="claude-3",
                 timestamp=datetime.now(),
                 duration_ms=1500,
@@ -252,7 +255,11 @@ class TestVisualizationGenerator:
             StageResult(
                 stage_name="Logical Analysis",
                 role="Logic AI",
-                content="1. Charts help pattern recognition\n2. Colors convey meaning\n3. Interactivity improves engagement",
+                content=(
+                    "1. Charts help pattern recognition\n"
+                    "2. Colors convey meaning\n"
+                    "3. Interactivity improves engagement"
+                ),
                 model_used="gpt-4",
                 timestamp=datetime.now(),
                 duration_ms=2000,
@@ -261,7 +268,9 @@ class TestVisualizationGenerator:
             StageResult(
                 stage_name="Pattern Recognition",
                 role="Pattern AI",
-                content="Key patterns: 30% use bar charts, 25% use line graphs, 45% use combinations.",
+                content=(
+                    "Key patterns: 30% use bar charts, 25% use line graphs, 45% use combinations."
+                ),
                 model_used="claude-3",
                 timestamp=datetime.now(),
                 duration_ms=1800,
@@ -354,9 +363,7 @@ class TestVisualizationGenerator:
         # Check duration data
         assert timeline.data["datasets"][0]["data"][0] == 1.5  # 1500ms = 1.5s
 
-    def test_parse_content_for_viz_with_list(
-        self, generator: VisualizationGenerator
-    ) -> None:
+    def test_parse_content_for_viz_with_list(self, generator: VisualizationGenerator) -> None:
         """Test parsing content with numbered list."""
         content = """Key points:
 1. First important point
@@ -388,9 +395,7 @@ class TestVisualizationGenerator:
         assert viz.viz_type == VisualizationType.PIE
         assert 35.0 in viz.data["datasets"][0]["data"]
 
-    def test_parse_content_for_viz_no_match(
-        self, generator: VisualizationGenerator
-    ) -> None:
+    def test_parse_content_for_viz_no_match(self, generator: VisualizationGenerator) -> None:
         """Test parsing content without extractable data."""
         content = "This is just plain text without any structured data."
 
@@ -412,9 +417,7 @@ class TestVisualizationGenerator:
         # Should have topic node plus stage nodes
         assert len(graph.data["nodes"]) >= len(mock_session.results) + 1
 
-    def test_parse_visualization_output_with_json(
-        self, generator: VisualizationGenerator
-    ) -> None:
+    def test_parse_visualization_output_with_json(self, generator: VisualizationGenerator) -> None:
         """Test parsing output with embedded JSON."""
         content = """
         Analysis results:

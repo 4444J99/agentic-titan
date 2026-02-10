@@ -9,7 +9,7 @@ from __future__ import annotations
 import logging
 import re
 from dataclasses import dataclass, field
-from enum import Enum
+from enum import StrEnum
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
@@ -18,23 +18,23 @@ if TYPE_CHECKING:
 logger = logging.getLogger("titan.costs.router")
 
 
-class ModelTier(str, Enum):
+class ModelTier(StrEnum):
     """Model tiers by capability/cost."""
 
-    ECONOMY = "economy"      # Cheapest, simple tasks
-    STANDARD = "standard"    # Balanced price/performance
-    PREMIUM = "premium"      # High capability
-    FLAGSHIP = "flagship"    # Best available
+    ECONOMY = "economy"  # Cheapest, simple tasks
+    STANDARD = "standard"  # Balanced price/performance
+    PREMIUM = "premium"  # High capability
+    FLAGSHIP = "flagship"  # Best available
 
 
-class TaskComplexity(str, Enum):
+class TaskComplexity(StrEnum):
     """Complexity levels for tasks."""
 
-    TRIVIAL = "trivial"      # Simple lookups, formatting
-    SIMPLE = "simple"        # Basic transformations
-    MODERATE = "moderate"    # Standard tasks
-    COMPLEX = "complex"      # Multi-step reasoning
-    EXPERT = "expert"        # Challenging tasks
+    TRIVIAL = "trivial"  # Simple lookups, formatting
+    SIMPLE = "simple"  # Basic transformations
+    MODERATE = "moderate"  # Standard tasks
+    COMPLEX = "complex"  # Multi-step reasoning
+    EXPERT = "expert"  # Challenging tasks
 
 
 @dataclass
@@ -48,7 +48,7 @@ class ModelInfo:
     output_cost_per_1k: float
     context_window: int
     quality_rating: float  # 0-1
-    speed_rating: float    # 0-1
+    speed_rating: float  # 0-1
     supports_tools: bool = True
     supports_vision: bool = False
 
@@ -61,16 +61,38 @@ class ModelInfo:
 # Default model catalog
 DEFAULT_MODELS: list[ModelInfo] = [
     # Anthropic
-    ModelInfo("claude-3-opus-20240229", "anthropic", ModelTier.FLAGSHIP, 0.015, 0.075, 200000, 0.95, 0.6),
-    ModelInfo("claude-3-5-sonnet-20241022", "anthropic", ModelTier.PREMIUM, 0.003, 0.015, 200000, 0.90, 0.8),
-    ModelInfo("claude-3-haiku-20240307", "anthropic", ModelTier.ECONOMY, 0.00025, 0.00125, 200000, 0.75, 0.95),
+    ModelInfo(
+        "claude-3-opus-20240229", "anthropic", ModelTier.FLAGSHIP, 0.015, 0.075, 200000, 0.95, 0.6
+    ),
+    ModelInfo(
+        "claude-3-5-sonnet-20241022",
+        "anthropic",
+        ModelTier.PREMIUM,
+        0.003,
+        0.015,
+        200000,
+        0.90,
+        0.8,
+    ),
+    ModelInfo(
+        "claude-3-haiku-20240307",
+        "anthropic",
+        ModelTier.ECONOMY,
+        0.00025,
+        0.00125,
+        200000,
+        0.75,
+        0.95,
+    ),
     # OpenAI
     ModelInfo("gpt-4-turbo", "openai", ModelTier.PREMIUM, 0.01, 0.03, 128000, 0.88, 0.7),
     ModelInfo("gpt-4o", "openai", ModelTier.PREMIUM, 0.005, 0.015, 128000, 0.87, 0.8),
     ModelInfo("gpt-4o-mini", "openai", ModelTier.STANDARD, 0.00015, 0.0006, 128000, 0.80, 0.9),
     ModelInfo("gpt-3.5-turbo", "openai", ModelTier.ECONOMY, 0.0005, 0.0015, 16000, 0.70, 0.95),
     # Groq
-    ModelInfo("llama-3.1-70b-versatile", "groq", ModelTier.STANDARD, 0.0007, 0.0008, 131072, 0.78, 0.98),
+    ModelInfo(
+        "llama-3.1-70b-versatile", "groq", ModelTier.STANDARD, 0.0007, 0.0008, 131072, 0.78, 0.98
+    ),
     ModelInfo("mixtral-8x7b-32768", "groq", ModelTier.ECONOMY, 0.0005, 0.0005, 32768, 0.72, 0.98),
 ]
 
@@ -198,12 +220,10 @@ class TaskComplexityAnalyzer:
 
         # Check for special requirements
         requires_tools = any(
-            kw in task_lower
-            for kw in ["execute", "run", "call", "api", "search", "fetch"]
+            kw in task_lower for kw in ["execute", "run", "call", "api", "search", "fetch"]
         )
         requires_vision = any(
-            kw in task_lower
-            for kw in ["image", "picture", "screenshot", "visual", "diagram"]
+            kw in task_lower for kw in ["image", "picture", "screenshot", "visual", "diagram"]
         )
 
         # Check for long context needs
@@ -318,21 +338,23 @@ class CostAwareRouter:
             constraints.append("Relaxed requirements - no matching models")
 
         # Sort by preference and cost
-        candidates.sort(key=lambda m: (
-            self._preferred_providers.index(m.provider)
-            if m.provider in self._preferred_providers else 99,
-            m.avg_cost_per_1k,
-            -m.quality_rating,
-        ))
+        candidates.sort(
+            key=lambda m: (
+                self._preferred_providers.index(m.provider)
+                if m.provider in self._preferred_providers
+                else 99,
+                m.avg_cost_per_1k,
+                -m.quality_rating,
+            )
+        )
 
         # Select best model within budget
         selected = None
         alternatives = []
 
         for model in candidates:
-            estimated_cost = (
-                (analysis.estimated_input_tokens / 1000 * model.input_cost_per_1k) +
-                (analysis.estimated_output_tokens / 1000 * model.output_cost_per_1k)
+            estimated_cost = (analysis.estimated_input_tokens / 1000 * model.input_cost_per_1k) + (
+                analysis.estimated_output_tokens / 1000 * model.output_cost_per_1k
             )
 
             if estimated_cost <= remaining_budget:
@@ -341,7 +363,9 @@ class CostAwareRouter:
                 else:
                     alternatives.append(model.model_id)
             else:
-                constraints.append(f"Budget constraint: ${estimated_cost:.4f} > ${remaining_budget:.4f}")
+                constraints.append(
+                    f"Budget constraint: ${estimated_cost:.4f} > ${remaining_budget:.4f}"
+                )
 
         # If no model fits budget, pick cheapest
         if selected is None:
@@ -350,9 +374,8 @@ class CostAwareRouter:
             constraints.append("Selected cheapest model due to budget")
 
         # Calculate estimated cost
-        estimated_cost = (
-            (analysis.estimated_input_tokens / 1000 * selected.input_cost_per_1k) +
-            (analysis.estimated_output_tokens / 1000 * selected.output_cost_per_1k)
+        estimated_cost = (analysis.estimated_input_tokens / 1000 * selected.input_cost_per_1k) + (
+            analysis.estimated_output_tokens / 1000 * selected.output_cost_per_1k
         )
 
         reasoning = (

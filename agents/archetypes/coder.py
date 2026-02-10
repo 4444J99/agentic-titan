@@ -14,10 +14,10 @@ import logging
 from dataclasses import dataclass, field
 from typing import Any
 
-from agents.framework.base_agent import BaseAgent
-from agents.personas import CODER, say, think
 from adapters.base import LLMMessage
 from adapters.router import get_router
+from agents.framework.base_agent import BaseAgent
+from agents.personas import CODER, say, think
 
 logger = logging.getLogger("titan.agents.coder")
 
@@ -141,7 +141,10 @@ class CoderAgent(BaseAgent):
         # Store code patterns in Hive Mind
         if self._hive_mind and self.task and self.task.code_output:
             await self.remember(
-                content=f"Code for {self.task.description}:\n\n```{self.language}\n{self.task.code_output[:500]}...\n```",
+                content=(
+                    f"Code for {self.task.description}:\n\n"
+                    f"```{self.language}\n{self.task.code_output[:500]}...\n```"
+                ),
                 importance=0.6,
                 tags=["code", self.language, "pattern"],
                 metadata={
@@ -272,7 +275,7 @@ List only actual issues, one per line. If no issues, say "No issues found".""",
 
         response = await self._router.complete(
             messages,
-            system=f"You are a code reviewer. Be thorough but fair.",
+            system="You are a code reviewer. Be thorough but fair.",
             max_tokens=500,
         )
 
@@ -289,7 +292,7 @@ List only actual issues, one per line. If no issues, say "No issues found".""",
                 content=f"""Fix these issues in the {self.language} code:
 
 Issues:
-{chr(10).join(f'- {issue}' for issue in issues)}
+{chr(10).join(f"- {issue}" for issue in issues)}
 
 Code:
 ```{self.language}

@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -32,24 +31,40 @@ def mock_llm_router():
 
     # Make it return different responses based on content
     def smart_complete(messages, **kwargs):
-        system = kwargs.get("system", "")
+        kwargs.get("system", "")
         content = messages[0].content if messages else ""
 
         # Generate appropriate mock responses
         if "plan" in content.lower():
-            return MockLLMResponse(content="1. Analyze requirements\n2. Design solution\n3. Implement")
+            return MockLLMResponse(
+                content="1. Analyze requirements\n2. Design solution\n3. Implement"
+            )
         elif "code" in content.lower() or "write" in content.lower():
-            return MockLLMResponse(content="```python\ndef example():\n    return 'Hello, World!'\n```")
+            return MockLLMResponse(
+                content="```python\ndef example():\n    return 'Hello, World!'\n```"
+            )
         elif "test" in content.lower():
-            return MockLLMResponse(content="```python\ndef test_example():\n    assert example() == 'Hello, World!'\n```")
+            return MockLLMResponse(
+                content=(
+                    "```python\ndef test_example():\n    assert example() == 'Hello, World!'\n```"
+                )
+            )
         elif "review" in content.lower():
             return MockLLMResponse(content="No issues found. Code looks good.")
         elif "research" in content.lower() or "question" in content.lower():
             return MockLLMResponse(content="Research finding: The topic is complex but manageable.")
         elif "synthesize" in content.lower() or "summary" in content.lower():
-            return MockLLMResponse(content="Summary: All findings have been analyzed and synthesized.")
+            return MockLLMResponse(
+                content="Summary: All findings have been analyzed and synthesized."
+            )
         elif "decompose" in content.lower() or "subtask" in content.lower():
-            return MockLLMResponse(content="SUBTASK: Research requirements\nAGENT: researcher\nDEPENDS: none\n---\nSUBTASK: Write code\nAGENT: coder\nDEPENDS: st-0")
+            return MockLLMResponse(
+                content=(
+                    "SUBTASK: Research requirements\nAGENT: researcher\n"
+                    "DEPENDS: none\n---\nSUBTASK: Write code\n"
+                    "AGENT: coder\nDEPENDS: st-0"
+                )
+            )
         elif "topology" in content.lower():
             return MockLLMResponse(content="Recommended topology: pipeline")
         elif "aggregate" in content.lower():

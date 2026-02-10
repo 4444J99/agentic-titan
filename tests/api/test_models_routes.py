@@ -8,9 +8,6 @@ from __future__ import annotations
 
 import pytest
 
-from titan.workflows.cognitive_router import CognitiveTaskType, MODEL_RANKINGS
-
-
 # =============================================================================
 # Model Signatures Tests
 # =============================================================================

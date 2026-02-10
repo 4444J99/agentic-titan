@@ -19,7 +19,7 @@ import logging
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 logger = logging.getLogger("titan.learning.episodic")
@@ -30,7 +30,7 @@ logger = logging.getLogger("titan.learning.episodic")
 # ============================================================================
 
 
-class EpisodeOutcome(str, Enum):
+class EpisodeOutcome(StrEnum):
     """Outcome classification for episodes."""
 
     SUCCESS = "success"  # Task completed successfully
@@ -148,11 +148,13 @@ class Episode:
 
     def add_action(self, action_type: str, details: dict[str, Any]) -> None:
         """Record an action taken."""
-        self.actions.append({
-            "type": action_type,
-            "timestamp": datetime.now().isoformat(),
-            **details,
-        })
+        self.actions.append(
+            {
+                "type": action_type,
+                "timestamp": datetime.now().isoformat(),
+                **details,
+            }
+        )
 
     def add_tool_call(self, tool_name: str) -> None:
         """Record a tool call."""
@@ -288,15 +290,15 @@ class EpisodicMemory:
         self._use_hive_mind = use_hive_mind
         self._collection: Any = None
         self._local_cache: dict[str, Episode] = {}
+        self._hive_mind: Any | None = None
 
     async def initialize(self) -> None:
         """Initialize the memory store."""
         if self._use_hive_mind:
             try:
-                from hive.memory import HiveMind, get_hive_mind
-
-                hive = get_hive_mind()
-                await hive.connect()
+                hive = await self._get_hive_mind()
+                if hive is None:
+                    raise RuntimeError("Hive Mind unavailable")
 
                 # Use hive mind's ChromaDB collection
                 # Episodes stored as memories with special type
@@ -320,14 +322,16 @@ class EpisodicMemory:
         # Try to store in Hive Mind
         if self._use_hive_mind:
             try:
-                from hive.memory import get_hive_mind, Memory
+                hive = await self._get_hive_mind()
+                if hive is None:
+                    raise RuntimeError("Hive Mind unavailable")
 
-                hive = get_hive_mind()
-
-                # Create memory from episode
-                memory = Memory(
+                # Use task as embedding text for semantic search
+                memory_id = await hive.remember(
+                    agent_id=episode.agent_type or "episodic_memory",
                     content=json.dumps(episode.to_dict()),
                     importance=self._calculate_importance(episode),
+                    tags=["episode", episode.task_type, episode.outcome.value],
                     metadata={
                         "type": "episode",
                         "task_type": episode.task_type,
@@ -335,12 +339,6 @@ class EpisodicMemory:
                         "outcome": episode.outcome.value,
                         "episode_id": episode.id,
                     },
-                )
-
-                # Use task as embedding text for semantic search
-                memory_id = await hive.remember(
-                    f"{episode.task} {episode.task_type}",
-                    importance=memory.importance,
                 )
 
                 logger.debug(f"Stored episode {episode.id} in Hive Mind: {memory_id}")
@@ -375,26 +373,32 @@ class EpisodicMemory:
         # Try Hive Mind first
         if self._use_hive_mind:
             try:
-                from hive.memory import get_hive_mind
-
-                hive = get_hive_mind()
+                hive = await self._get_hive_mind()
+                if hive is None:
+                    raise RuntimeError("Hive Mind unavailable")
                 memories = await hive.recall(query, k=limit * 2)  # Get extra for filtering
 
                 for mem in memories:
-                    if mem.metadata.get("type") == "episode":
-                        episode_data = json.loads(mem.content)
-                        episode = Episode.from_dict(episode_data)
+                    content = mem.get("content")
+                    if not isinstance(content, str):
+                        continue
 
-                        # Apply filters
-                        if task_type and episode.task_type != task_type:
-                            continue
-                        if episode.signal and episode.signal.repeat_confidence < min_confidence:
-                            continue
+                    episode_data = json.loads(content)
+                    if not isinstance(episode_data, dict):
+                        continue
 
-                        episodes.append(episode)
+                    episode = Episode.from_dict(episode_data)
 
-                        if len(episodes) >= limit:
-                            break
+                    # Apply filters
+                    if task_type and episode.task_type != task_type:
+                        continue
+                    if episode.signal and episode.signal.repeat_confidence < min_confidence:
+                        continue
+
+                    episodes.append(episode)
+
+                    if len(episodes) >= limit:
+                        break
 
             except Exception as e:
                 logger.warning(f"Hive Mind recall failed: {e}")
@@ -439,13 +443,15 @@ class EpisodicMemory:
 
         for episode in episodes:
             if episode.outcome == EpisodeOutcome.SUCCESS and episode.signal:
-                patterns.append({
-                    "tools_used": list(set(episode.tool_calls)),
-                    "duration": episode.duration_seconds,
-                    "llm_calls": episode.llm_calls,
-                    "positive_factors": episode.signal.positive_factors,
-                    "lessons": episode.signal.lessons,
-                })
+                patterns.append(
+                    {
+                        "tools_used": list(set(episode.tool_calls)),
+                        "duration": episode.duration_seconds,
+                        "llm_calls": episode.llm_calls,
+                        "positive_factors": episode.signal.positive_factors,
+                        "lessons": episode.signal.lessons,
+                    }
+                )
 
         return patterns
 
@@ -495,8 +501,8 @@ class EpisodicMemory:
         """Get memory statistics."""
         total = len(self._local_cache)
 
-        outcomes = {}
-        task_types = {}
+        outcomes: dict[str, int] = {}
+        task_types: dict[str, int] = {}
 
         for episode in self._local_cache.values():
             # Count outcomes
@@ -513,3 +519,15 @@ class EpisodicMemory:
             "task_types": task_types,
             "using_hive_mind": self._use_hive_mind,
         }
+
+    async def _get_hive_mind(self) -> Any | None:
+        """Get or initialize the Hive Mind client used for episodic storage."""
+        if not self._use_hive_mind:
+            return None
+        if self._hive_mind is None:
+            from hive.memory import HiveMind, MemoryConfig
+
+            hive = HiveMind(MemoryConfig())
+            await hive.initialize()
+            self._hive_mind = hive
+        return self._hive_mind

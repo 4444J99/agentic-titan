@@ -9,6 +9,8 @@ Based on research:
 - 2-3 examples per task type is optimal
 """
 
+# ruff: noqa: E501
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -325,10 +327,12 @@ class ExampleBank:
         if task_type not in self._examples:
             self._examples[task_type] = []
 
-        self._examples[task_type].append({
-            "input": input_text,
-            "output": output_text,
-        })
+        self._examples[task_type].append(
+            {
+                "input": input_text,
+                "output": output_text,
+            }
+        )
 
     def list_task_types(self) -> list[str]:
         """List all available task types."""

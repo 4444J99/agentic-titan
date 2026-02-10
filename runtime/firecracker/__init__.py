@@ -18,6 +18,23 @@ import logging
 import os
 import platform
 
+from runtime.firecracker.config import FirecrackerConfig, VMState
+from runtime.firecracker.guest_agent import (
+    CommandResult,
+    GuestAgentProtocol,
+    GuestConnection,
+    VMMetrics,
+)
+from runtime.firecracker.image_builder import (
+    ImageBuilder,
+    ImageConfig,
+    ImageInfo,
+    get_image_builder,
+)
+from runtime.firecracker.network import FirecrackerNetwork, get_network_manager
+from runtime.firecracker.runtime import FirecrackerRuntime
+from runtime.firecracker.vm import ExecutionResult, MicroVM, MicroVMManager, get_vm_manager
+
 logger = logging.getLogger("titan.runtime.firecracker")
 
 # Check platform availability
@@ -28,19 +45,6 @@ if not FIRECRACKER_AVAILABLE:
     logger.info("Firecracker requires Linux - not available on this platform")
 elif not KVM_AVAILABLE:
     logger.warning("KVM not available - Firecracker will not work")
-
-# Always import config (works on all platforms)
-from runtime.firecracker.config import FirecrackerConfig, VMState
-from runtime.firecracker.vm import MicroVM, MicroVMManager, ExecutionResult, get_vm_manager
-from runtime.firecracker.network import FirecrackerNetwork, get_network_manager
-from runtime.firecracker.guest_agent import (
-    GuestAgentProtocol,
-    GuestConnection,
-    CommandResult,
-    VMMetrics,
-)
-from runtime.firecracker.runtime import FirecrackerRuntime
-from runtime.firecracker.image_builder import ImageBuilder, ImageConfig, ImageInfo, get_image_builder
 
 __all__ = [
     # Availability flags

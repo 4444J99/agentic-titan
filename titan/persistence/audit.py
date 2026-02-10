@@ -9,16 +9,17 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, AsyncIterator
-from uuid import UUID, uuid4
+from typing import Any
+from uuid import UUID
 
 from titan.persistence.models import (
+    AgentDecision,
     AuditEvent,
     AuditEventType,
-    AgentDecision,
     DecisionType,
 )
 from titan.persistence.postgres import PostgresClient, get_postgres_client

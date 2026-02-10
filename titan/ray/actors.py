@@ -5,9 +5,8 @@ Provides Ray actors for managing distributed state and coordination.
 
 from __future__ import annotations
 
-import asyncio
 import logging
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 from titan.ray import RAY_AVAILABLE
 
@@ -15,12 +14,13 @@ if RAY_AVAILABLE:
     import ray
 
 if TYPE_CHECKING:
-    from titan.batch.orchestrator import BatchOrchestrator
+    pass
 
 logger = logging.getLogger("titan.ray.actors")
 
 
 if RAY_AVAILABLE:
+
     @ray.remote
     class StateManagerActor:
         """Ray actor for managing distributed state.
@@ -29,7 +29,7 @@ if RAY_AVAILABLE:
         across multiple Ray workers.
         """
 
-        def __init__(self):
+        def __init__(self) -> None:
             """Initialize the state manager."""
             self._batches: dict[str, dict[str, Any]] = {}
             self._sessions: dict[str, dict[str, Any]] = {}
@@ -144,7 +144,6 @@ if RAY_AVAILABLE:
             """
             return dict(self._metrics)
 
-
     @ray.remote
     class WorkerPoolActor:
         """Ray actor for managing a pool of inquiry workers.
@@ -167,8 +166,10 @@ if RAY_AVAILABLE:
         async def initialize(self) -> None:
             """Initialize worker actors."""
             from titan.ray.actors import InquiryWorkerActor
+
             for i in range(self._num_workers):
-                worker = InquiryWorkerActor.remote()
+                worker_cls = cast(Any, InquiryWorkerActor)
+                worker = worker_cls.remote()
                 self._workers.append(worker)
             logger.info(f"Initialized {len(self._workers)} worker actors")
 
@@ -213,7 +214,6 @@ if RAY_AVAILABLE:
             """
             return len(self._workers)
 
-
     @ray.remote
     class InquiryWorkerActor:
         """Ray actor for executing inquiry stages.
@@ -221,9 +221,10 @@ if RAY_AVAILABLE:
         Runs inquiry stages in isolation with its own engine instance.
         """
 
-        def __init__(self):
+        def __init__(self) -> None:
             """Initialize the inquiry worker."""
             from titan.workflows.inquiry_engine import InquiryEngine
+
             self.engine = InquiryEngine()
             self._tasks_completed = 0
             logger.info("InquiryWorkerActor initialized")
@@ -243,7 +244,30 @@ if RAY_AVAILABLE:
                 Stage result as dictionary
             """
             try:
-                result = await self.engine.run_stage(session_id, stage_name)
+                session = self.engine.get_session(session_id)
+                if session is None:
+                    return {
+                        "success": False,
+                        "error": f"Session not found: {session_id}",
+                        "stage_name": stage_name,
+                    }
+
+                stage_index = next(
+                    (
+                        idx
+                        for idx, stage in enumerate(session.workflow.stages)
+                        if stage.name == stage_name
+                    ),
+                    None,
+                )
+                if stage_index is None:
+                    return {
+                        "success": False,
+                        "error": f"Stage not found: {stage_name}",
+                        "stage_name": stage_name,
+                    }
+
+                result = await self.engine.run_stage(session, stage_index)
                 self._tasks_completed += 1
                 return result.to_dict()
             except Exception as e:
@@ -272,7 +296,8 @@ def create_state_manager() -> Any:
     """
     if not RAY_AVAILABLE:
         raise ImportError("Ray is not installed")
-    return StateManagerActor.remote()
+    state_manager_cls = cast(Any, StateManagerActor)
+    return state_manager_cls.remote()
 
 
 def create_worker_pool(num_workers: int = 4) -> Any:
@@ -286,4 +311,5 @@ def create_worker_pool(num_workers: int = 4) -> Any:
     """
     if not RAY_AVAILABLE:
         raise ImportError("Ray is not installed")
-    return WorkerPoolActor.remote(num_workers)
+    worker_pool_cls = cast(Any, WorkerPoolActor)
+    return worker_pool_cls.remote(num_workers)

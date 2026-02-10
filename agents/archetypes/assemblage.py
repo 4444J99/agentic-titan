@@ -14,25 +14,25 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
-from enum import Enum
+from datetime import UTC, datetime
+from enum import StrEnum
 from typing import Any
 
-from agents.framework.base_agent import BaseAgent, AgentState
+from agents.framework.base_agent import AgentState, BaseAgent
 
 logger = logging.getLogger("titan.agents.assemblage")
 
 
-class ComponentType(str, Enum):
+class ComponentType(StrEnum):
     """Types of components in an assemblage."""
 
-    MATERIAL = "material"      # Physical/computational resources
+    MATERIAL = "material"  # Physical/computational resources
     EXPRESSIVE = "expressive"  # Symbols, communications, interfaces
-    MACHINIC = "machinic"      # Functional processes
+    MACHINIC = "machinic"  # Functional processes
     ENUNCIATIVE = "enunciative"  # Language, statements, rules
 
 
-class TerritorialState(str, Enum):
+class TerritorialState(StrEnum):
     """Territorial state of the assemblage."""
 
     DETERRITORIALIZED = "deterritorialized"  # Fluid, escaping
@@ -126,12 +126,15 @@ class AssemblageAgent(BaseAgent):
             **kwargs: Base agent arguments.
         """
         kwargs.setdefault("name", "assemblage")
-        kwargs.setdefault("capabilities", [
-            "heterogeneous_composition",
-            "territorialization",
-            "deterritorialization",
-            "functional_cohesion",
-        ])
+        kwargs.setdefault(
+            "capabilities",
+            [
+                "heterogeneous_composition",
+                "territorialization",
+                "deterritorialization",
+                "functional_cohesion",
+            ],
+        )
         super().__init__(**kwargs)
 
         self._state_data = AssemblageState(territorial_state=initial_state)
@@ -160,11 +163,12 @@ class AssemblageAgent(BaseAgent):
 
     async def work(self) -> dict[str, Any]:
         """Perform assemblage work cycle."""
-        result = {
+        actions: list[str] = []
+        result: dict[str, Any] = {
             "territorial_state": self._state_data.territorial_state.value,
             "cohesion": self._state_data.cohesion,
             "component_count": len(self._components),
-            "actions": [],
+            "actions": actions,
         }
 
         # Update state based on composition
@@ -173,18 +177,18 @@ class AssemblageAgent(BaseAgent):
         # Check for state transitions
         transition = await self._check_transitions()
         if transition:
-            result["actions"].append(f"transitioned_to_{transition}")
+            actions.append(f"transitioned_to_{transition}")
 
         # Process any lines of flight
         flights = await self._process_lines_of_flight()
         if flights:
-            result["actions"].append(f"processed_{len(flights)}_lines_of_flight")
+            actions.append(f"processed_{len(flights)}_lines_of_flight")
             result["lines_of_flight"] = flights
 
         # Maintain cohesion
         if self._state_data.cohesion < self.COHESION_CRITICAL:
             await self._reinforce_connections()
-            result["actions"].append("reinforced_connections")
+            actions.append("reinforced_connections")
 
         return result
 
@@ -249,7 +253,8 @@ class AssemblageAgent(BaseAgent):
 
         # Remove relations involving this component
         self._relations = [
-            r for r in self._relations
+            r
+            for r in self._relations
             if r.from_component != component_id and r.to_component != component_id
         ]
 
@@ -317,10 +322,7 @@ class AssemblageAgent(BaseAgent):
         Returns:
             List of matching components.
         """
-        return [
-            c for c in self._components.values()
-            if c.component_type == component_type
-        ]
+        return [c for c in self._components.values() if c.component_type == component_type]
 
     def get_component_by_function(self, function: str) -> list[AssemblageComponent]:
         """Get components by their function.
@@ -332,10 +334,7 @@ class AssemblageAgent(BaseAgent):
             List of components with matching function.
         """
         function_lower = function.lower()
-        return [
-            c for c in self._components.values()
-            if function_lower in c.function.lower()
-        ]
+        return [c for c in self._components.values() if function_lower in c.function.lower()]
 
     # =========================================================================
     # Territorialization Dynamics
@@ -366,11 +365,14 @@ class AssemblageAgent(BaseAgent):
             self._state_data.stability += 0.1
             self._state_data.coding_level += 0.1
 
-            self._record_event("territorialized", {
-                "from": current.value,
-                "to": self._state_data.territorial_state.value,
-                "reason": reason,
-            })
+            self._record_event(
+                "territorialized",
+                {
+                    "from": current.value,
+                    "to": self._state_data.territorial_state.value,
+                    "reason": reason,
+                },
+            )
 
             return True
 
@@ -401,11 +403,14 @@ class AssemblageAgent(BaseAgent):
             self._state_data.stability = max(0.0, self._state_data.stability - 0.1)
             self._state_data.coding_level = max(0.0, self._state_data.coding_level - 0.1)
 
-            self._record_event("deterritorialized", {
-                "from": current.value,
-                "to": self._state_data.territorial_state.value,
-                "reason": reason,
-            })
+            self._record_event(
+                "deterritorialized",
+                {
+                    "from": current.value,
+                    "to": self._state_data.territorial_state.value,
+                    "reason": reason,
+                },
+            )
 
             return True
 
@@ -437,7 +442,7 @@ class AssemblageAgent(BaseAgent):
             "component_id": component_id,
             "direction": direction,
             "intensity": intensity,
-            "initiated_at": datetime.now(timezone.utc).isoformat(),
+            "initiated_at": datetime.now(UTC).isoformat(),
             "status": "active",
         }
 
@@ -467,6 +472,7 @@ class AssemblageAgent(BaseAgent):
 
             # Lines of flight can lead to transformation or recapture
             import random
+
             if random.random() < 0.3:  # 30% chance of transformation
                 flight["status"] = "transformed"
                 flight["result"] = "new_assemblage_potential"
@@ -500,16 +506,16 @@ class AssemblageAgent(BaseAgent):
         """
         # Auto-territorialize if very stable
         if (
-            self._state_data.stability > self.STABILITY_HIGH and
-            self._state_data.territorial_state != TerritorialState.STRATIFIED
+            self._state_data.stability > self.STABILITY_HIGH
+            and self._state_data.territorial_state != TerritorialState.STRATIFIED
         ):
             await self.territorialize("high_stability")
             return self._state_data.territorial_state.value
 
         # Auto-deterritorialize if unstable
         if (
-            self._state_data.stability < self.STABILITY_LOW and
-            self._state_data.territorial_state != TerritorialState.DETERRITORIALIZED
+            self._state_data.stability < self.STABILITY_LOW
+            and self._state_data.territorial_state != TerritorialState.DETERRITORIALIZED
         ):
             await self.deterritorialize("low_stability")
             return self._state_data.territorial_state.value
@@ -541,11 +547,13 @@ class AssemblageAgent(BaseAgent):
 
     def _record_event(self, event_type: str, data: dict[str, Any]) -> None:
         """Record an event in history."""
-        self._history.append({
-            "event_type": event_type,
-            "data": data,
-            "timestamp": datetime.now(timezone.utc).isoformat(),
-        })
+        self._history.append(
+            {
+                "event_type": event_type,
+                "data": data,
+                "timestamp": datetime.now(UTC).isoformat(),
+            }
+        )
 
         # Keep only recent history
         if len(self._history) > 100:
@@ -565,7 +573,9 @@ class AssemblageAgent(BaseAgent):
             "total_components": len(self._components),
             "by_type": by_type,
             "total_relations": len(self._relations),
-            "active_lines_of_flight": len([f for f in self._lines_of_flight if f["status"] == "active"]),
+            "active_lines_of_flight": len(
+                [f for f in self._lines_of_flight if f["status"] == "active"]
+            ),
             "state": {
                 "territorial": self._state_data.territorial_state.value,
                 "cohesion": self._state_data.cohesion,

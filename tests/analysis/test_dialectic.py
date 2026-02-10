@@ -6,9 +6,9 @@ Tests the DialecticSynthesizer and related data structures.
 
 from __future__ import annotations
 
-import pytest
-from datetime import datetime
 from unittest.mock import AsyncMock
+
+import pytest
 
 from titan.analysis.contradictions import (
     Contradiction,
@@ -23,7 +23,6 @@ from titan.analysis.dialectic import (
     SynthesisStrategy,
     get_dialectic_synthesizer,
 )
-
 
 # =============================================================================
 # SynthesisResult Tests
@@ -229,7 +228,9 @@ class TestDialecticSynthesizer:
         )
         result = await synthesizer.synthesize_contradiction(c)
 
-        assert "integration" in result.strategy.value or "contextualization" in result.strategy.value
+        assert (
+            "integration" in result.strategy.value or "contextualization" in result.strategy.value
+        )
         assert result.confidence == 0.5  # Heuristic confidence
         assert "heuristic_synthesis" in result.metadata.get("source", "")
 
@@ -243,7 +244,7 @@ class TestDialecticSynthesizer:
         result = await synthesizer.synthesize_contradiction(contradiction)
 
         # Should have insights based on key terms
-        all_text = " ".join(result.key_insights)
+        " ".join(result.key_insights)
         # At least some insights should be generated
         assert len(result.key_insights) >= 0
 

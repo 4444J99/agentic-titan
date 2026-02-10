@@ -12,16 +12,15 @@ from __future__ import annotations
 
 import asyncio
 import logging
-import uuid
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
-from datetime import datetime
-from typing import Any, Callable, Awaitable
+from typing import Any
 
 from hive.decision.voting import (
     Vote,
+    VotingResult,
     VotingSession,
     VotingStrategy,
-    VotingResult,
 )
 
 logger = logging.getLogger("titan.decision.consensus")
@@ -223,8 +222,7 @@ class ConsensusEngine:
             # Check if consensus is strong enough
             if result.reached and result.strength >= cfg.min_consensus_strength:
                 logger.info(
-                    f"Consensus reached: '{result.decision}' "
-                    f"(strength={result.strength:.2f})"
+                    f"Consensus reached: '{result.decision}' (strength={result.strength:.2f})"
                 )
                 self._history.append(result)
                 return result
@@ -282,7 +280,7 @@ class ConsensusEngine:
                 elif isinstance(result, Exception):
                     logger.warning(f"Vote request failed: {result}")
 
-        except asyncio.TimeoutError:
+        except TimeoutError:
             logger.warning("Vote gathering timed out")
 
         return session.get_votes()
@@ -297,7 +295,7 @@ class ConsensusEngine:
         """Request a vote from a single voter."""
         try:
             # Build context for voter
-            context = {
+            context: dict[str, Any] = {
                 "question": session.question,
                 "choices": session.choices,
                 "strategy": session.strategy.value,
@@ -363,9 +361,7 @@ class ConsensusEngine:
         # Create special vote requesters that include weights
         original_requesters = dict(self._vote_requesters)
 
-        async def weighted_vote_wrapper(
-            q: str, c: list[str], ctx: dict[str, Any]
-        ) -> Vote:
+        async def weighted_vote_wrapper(q: str, c: list[str], ctx: dict[str, Any]) -> Vote:
             voter_id = ctx.get("voter_id", "")
             callback = original_requesters.get(voter_id)
             if callback:

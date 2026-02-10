@@ -12,6 +12,7 @@ Reference: vendor/cli/aionui/ multi-conversation patterns
 
 from __future__ import annotations
 
+import builtins
 import logging
 import uuid
 from dataclasses import dataclass, field
@@ -247,7 +248,9 @@ class ConversationManager:
 
             # Update active if needed
             if self._active_id == conversation_id:
-                self._active_id = list(self._conversations.keys())[0] if self._conversations else None
+                self._active_id = (
+                    list(self._conversations.keys())[0] if self._conversations else None
+                )
 
             logger.info(f"Deleted conversation: {conversation_id}")
             return True
@@ -287,7 +290,7 @@ class ConversationManager:
 
         return pinned + unpinned
 
-    def search(self, query: str, max_results: int = 10) -> list[Conversation]:
+    def search(self, query: str, max_results: int = 10) -> builtins.list[Conversation]:
         """
         Search conversations by content.
 
@@ -351,7 +354,7 @@ class ConversationManager:
         self,
         conversation_id: str,
         limit: int | None = None,
-    ) -> list[Message]:
+    ) -> builtins.list[Message]:
         """Get messages from a conversation."""
         conv = self.get(conversation_id)
         if conv:
@@ -377,7 +380,7 @@ class ConversationManager:
             return conv.to_dict_full()
         return None
 
-    def export_all(self) -> list[dict[str, Any]]:
+    def export_all(self) -> builtins.list[dict[str, Any]]:
         """Export all conversations."""
         return [c.to_dict_full() for c in self._conversations.values()]
 
@@ -398,15 +401,19 @@ class ConversationManager:
 
             # Import messages
             for msg_data in data.get("messages", []):
-                conv.messages.append(Message(
-                    id=msg_data.get("id", f"msg-{uuid.uuid4().hex[:8]}"),
-                    role=msg_data["role"],
-                    content=msg_data["content"],
-                    timestamp=datetime.fromisoformat(msg_data["timestamp"]) if msg_data.get("timestamp") else datetime.now(),
-                    metadata=msg_data.get("metadata", {}),
-                    tool_calls=msg_data.get("tool_calls"),
-                    tool_results=msg_data.get("tool_results"),
-                ))
+                conv.messages.append(
+                    Message(
+                        id=msg_data.get("id", f"msg-{uuid.uuid4().hex[:8]}"),
+                        role=msg_data["role"],
+                        content=msg_data["content"],
+                        timestamp=datetime.fromisoformat(msg_data["timestamp"])
+                        if msg_data.get("timestamp")
+                        else datetime.now(),
+                        metadata=msg_data.get("metadata", {}),
+                        tool_calls=msg_data.get("tool_calls"),
+                        tool_results=msg_data.get("tool_results"),
+                    )
+                )
 
             self._conversations[conv.id] = conv
             return conv

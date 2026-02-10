@@ -1,6 +1,5 @@
 """Tests for fission-fusion dynamics (Phase 16B)."""
 
-import asyncio
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest

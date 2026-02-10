@@ -11,9 +11,9 @@ Modules:
 """
 
 from titan.analysis.contradictions import (
-    ContradictionType,
     Contradiction,
     ContradictionSeverity,
+    ContradictionType,
 )
 from titan.analysis.detector import ContradictionDetector
 from titan.analysis.dialectic import DialecticSynthesizer, SynthesisResult

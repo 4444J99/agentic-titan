@@ -8,10 +8,10 @@ from __future__ import annotations
 
 import asyncio
 import logging
-import os
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
-from typing import Any, AsyncGenerator
+from typing import Any
 
 logger = logging.getLogger("titan.runtime.firecracker.network")
 
@@ -114,9 +114,7 @@ class FirecrackerNetwork:
                 config = self._allocate_network_config(name)
 
                 # Configure host side IP
-                await self._run_command(
-                    f"ip addr add {config.host_ip}/{24} dev {name}"
-                )
+                await self._run_command(f"ip addr add {config.host_ip}/{24} dev {name}")
 
                 # Track the device
                 tap = TAPDevice(name=name, vm_id=vm_id, config=config)
@@ -189,8 +187,7 @@ class FirecrackerNetwork:
                 if tap.config:
                     try:
                         await self._run_command(
-                            f"iptables -t nat -D POSTROUTING "
-                            f"-s {tap.config.cidr} -j MASQUERADE",
+                            f"iptables -t nat -D POSTROUTING -s {tap.config.cidr} -j MASQUERADE",
                             check=False,
                         )
                     except Exception as exc:
@@ -236,9 +233,7 @@ class FirecrackerNetwork:
             veth_host = f"veth-{vm_id[:6]}-h"
             veth_guest = f"veth-{vm_id[:6]}-g"
 
-            await self._run_command(
-                f"ip link add {veth_host} type veth peer name {veth_guest}"
-            )
+            await self._run_command(f"ip link add {veth_host} type veth peer name {veth_guest}")
 
             # Move guest end to namespace
             await self._run_command(f"ip link set {veth_guest} netns {ns_name}")
@@ -277,8 +272,7 @@ class FirecrackerNetwork:
 
             # Assign IP to bridge
             await self._run_command(
-                f"ip addr add {self._ip_pool_start.rsplit('.', 1)[0]}.1/24 "
-                f"dev {self._bridge_name}"
+                f"ip addr add {self._ip_pool_start.rsplit('.', 1)[0]}.1/24 dev {self._bridge_name}"
             )
 
             logger.info(f"Created bridge {self._bridge_name}")
@@ -290,9 +284,7 @@ class FirecrackerNetwork:
     async def add_to_bridge(self, tap_device: str) -> None:
         """Add a TAP device to the bridge."""
         try:
-            await self._run_command(
-                f"ip link set {tap_device} master {self._bridge_name}"
-            )
+            await self._run_command(f"ip link set {tap_device} master {self._bridge_name}")
             logger.info(f"Added {tap_device} to bridge {self._bridge_name}")
         except Exception as e:
             logger.error(f"Failed to add {tap_device} to bridge: {e}")
@@ -340,9 +332,7 @@ class FirecrackerNetwork:
         stdout, stderr = await proc.communicate()
 
         if check and proc.returncode != 0:
-            raise RuntimeError(
-                f"Command failed: {cmd}\nStderr: {stderr.decode()}"
-            )
+            raise RuntimeError(f"Command failed: {cmd}\nStderr: {stderr.decode()}")
 
         # Attach output to process for inspection
         proc.stdout_text = stdout.decode() if stdout else ""  # type: ignore

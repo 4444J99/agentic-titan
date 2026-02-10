@@ -7,14 +7,13 @@ Provides authentication dependencies for FastAPI endpoints.
 from __future__ import annotations
 
 import logging
-from functools import wraps
-from typing import Any, Callable
-from uuid import UUID
+from collections.abc import Callable, Coroutine
+from typing import Any
 
 from fastapi import Depends, HTTPException, Request, status
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials, APIKeyHeader
+from fastapi.security import APIKeyHeader, HTTPAuthorizationCredentials, HTTPBearer
 
-from titan.auth.models import User, UserRole, TokenData
+from titan.auth.models import User, UserRole
 
 logger = logging.getLogger("titan.auth.middleware")
 
@@ -46,7 +45,7 @@ class AuthorizationError(HTTPException):
 
 async def _authenticate_jwt(token: str) -> User:  # allow-secret
     """Authenticate using JWT token."""
-    from titan.auth.jwt import verify_token, JWTError
+    from titan.auth.jwt import JWTError, verify_token
     from titan.auth.storage import get_auth_storage
 
     try:
@@ -165,7 +164,9 @@ async def get_current_user_optional(
         return None
 
 
-def require_role(allowed_roles: list[UserRole]):
+def require_role(
+    allowed_roles: list[UserRole],
+) -> Callable[..., Coroutine[Any, Any, User]]:
     """
     Dependency factory for role-based access control.
 
@@ -180,13 +181,13 @@ def require_role(allowed_roles: list[UserRole]):
         async def admin_endpoint(user: User = Depends(require_role([UserRole.ADMIN]))):
             ...
     """
+
     async def role_checker(
         user: User = Depends(get_current_user),
     ) -> User:
         if user.role not in allowed_roles:
             raise AuthorizationError(
-                f"This endpoint requires one of these roles: "
-                f"{[r.value for r in allowed_roles]}"
+                f"This endpoint requires one of these roles: {[r.value for r in allowed_roles]}"
             )
         return user
 
@@ -215,7 +216,9 @@ async def require_active_user(user: User = Depends(get_current_user)) -> User:
     return user
 
 
-def scope_required(required_scope: str):
+def scope_required(
+    required_scope: str,
+) -> Callable[..., Coroutine[Any, Any, User]]:
     """
     Dependency factory for scope-based access control (for API keys).
 
@@ -225,6 +228,7 @@ def scope_required(required_scope: str):
     Returns:
         A dependency function that verifies the API key has the required scope
     """
+
     async def scope_checker(
         request: Request,
         bearer_token: HTTPAuthorizationCredentials | None = Depends(http_bearer),  # allow-secret

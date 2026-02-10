@@ -6,11 +6,10 @@ Covers task execution, retry logic, and fault tolerance.
 
 from __future__ import annotations
 
-import asyncio
-import pytest
-from datetime import datetime
-from unittest.mock import AsyncMock, MagicMock, patch, PropertyMock
+from unittest.mock import MagicMock
 from uuid import uuid4
+
+import pytest
 
 from titan.batch.models import (
     BatchJob,
@@ -21,7 +20,8 @@ from titan.batch.models import (
 
 # Check if celery is available
 try:
-    import celery
+    import celery  # noqa: F401
+
     CELERY_AVAILABLE = True
 except ImportError:
     CELERY_AVAILABLE = False
@@ -30,6 +30,7 @@ except ImportError:
 # =============================================================================
 # Fixtures
 # =============================================================================
+
 
 @pytest.fixture
 def sample_session_data():
@@ -47,6 +48,7 @@ def sample_session_data():
 # =============================================================================
 # Model Tests (No Celery Required)
 # =============================================================================
+
 
 class TestBatchModelsIntegration:
     """Integration tests for batch models."""
@@ -101,6 +103,7 @@ class TestBatchModelsIntegration:
 # Celery Configuration Tests
 # =============================================================================
 
+
 class TestCeleryConfig:
     """Tests for Celery configuration."""
 
@@ -108,10 +111,9 @@ class TestCeleryConfig:
         """Test configuration values are set correctly."""
         from titan.batch.celery_config import (
             CELERY_TASK_ACKS_LATE,
+            CELERY_TASK_MAX_RETRIES,
             CELERY_TASK_REJECT_ON_WORKER_LOST,
             CELERY_TASK_TIME_LIMIT,
-            CELERY_TASK_MAX_RETRIES,
-            get_celery_config,
         )
 
         assert CELERY_TASK_ACKS_LATE is True
@@ -133,7 +135,8 @@ class TestCeleryConfig:
         from titan.batch.celery_config import CELERY_TASK_ROUTES
 
         assert "titan.batch.worker.run_inquiry_session_task" in CELERY_TASK_ROUTES
-        assert CELERY_TASK_ROUTES["titan.batch.worker.run_inquiry_session_task"]["queue"] == "titan.batch.inquiry"
+        route = CELERY_TASK_ROUTES["titan.batch.worker.run_inquiry_session_task"]
+        assert route["queue"] == "titan.batch.inquiry"
 
     def test_broker_urls(self):
         """Test broker URL getters."""
@@ -149,6 +152,7 @@ class TestCeleryConfig:
 # =============================================================================
 # Worker Tests (Celery Required)
 # =============================================================================
+
 
 @pytest.mark.skipif(not CELERY_AVAILABLE, reason="Celery not installed")
 class TestCeleryApp:
@@ -248,12 +252,13 @@ class TestMaintenanceTasks:
 # Scheduler Tests (No Celery Required)
 # =============================================================================
 
+
 class TestBatchScheduler:
     """Tests for batch scheduler."""
 
     def test_system_load_detection(self):
         """Test system load detection."""
-        from titan.batch.scheduler import get_system_load, SystemLoad, LoadLevel
+        from titan.batch.scheduler import LoadLevel, SystemLoad, get_system_load
 
         load = get_system_load()
 
@@ -264,7 +269,7 @@ class TestBatchScheduler:
 
     def test_load_level_classification(self):
         """Test load level classification."""
-        from titan.batch.scheduler import SystemLoad, LoadLevel
+        from titan.batch.scheduler import LoadLevel, SystemLoad
 
         # Low load
         low = SystemLoad(cpu_percent=30, memory_percent=40)
@@ -316,30 +321,34 @@ class TestBatchScheduler:
 
     def test_scheduling_strategies(self):
         """Test different scheduling strategies."""
+        from titan.batch.models import BatchJob
         from titan.batch.scheduler import (
             BatchScheduler,
             SchedulingStrategy,
             WorkerStatus,
         )
-        from titan.batch.models import QueuedSession, BatchJob
 
         scheduler = BatchScheduler(strategy=SchedulingStrategy.PREFER_LOCAL)
 
         # Register workers
-        scheduler.register_worker(WorkerStatus(
-            worker_id="local-1",
-            hostname="localhost",
-            runtime_type="local",
-            concurrency=2,
-            available_slots=2,
-        ))
-        scheduler.register_worker(WorkerStatus(
-            worker_id="docker-1",
-            hostname="docker-host",
-            runtime_type="docker",
-            concurrency=4,
-            available_slots=4,
-        ))
+        scheduler.register_worker(
+            WorkerStatus(
+                worker_id="local-1",
+                hostname="localhost",
+                runtime_type="local",
+                concurrency=2,
+                available_slots=2,
+            )
+        )
+        scheduler.register_worker(
+            WorkerStatus(
+                worker_id="docker-1",
+                hostname="docker-host",
+                runtime_type="docker",
+                concurrency=4,
+                available_slots=4,
+            )
+        )
 
         # Create test session and batch
         batch = BatchJob(topics=["test"])
@@ -353,6 +362,7 @@ class TestBatchScheduler:
 # =============================================================================
 # Artifact Store Tests (No Celery Required)
 # =============================================================================
+
 
 class TestArtifactStore:
     """Tests for artifact storage."""
@@ -403,7 +413,7 @@ class TestArtifactStore:
     @pytest.mark.asyncio
     async def test_artifact_store_factory(self):
         """Test artifact store factory function."""
-        from titan.batch.artifact_store import get_artifact_store, FilesystemArtifactStore
+        from titan.batch.artifact_store import FilesystemArtifactStore, get_artifact_store
 
         store = get_artifact_store()
 
@@ -414,6 +424,7 @@ class TestArtifactStore:
 # =============================================================================
 # Synthesizer Tests (No Celery Required)
 # =============================================================================
+
 
 class TestBatchSynthesizer:
     """Tests for batch synthesizer."""
@@ -504,12 +515,13 @@ Some results here.
 # Runtime Selector Load-Awareness Tests
 # =============================================================================
 
+
 class TestRuntimeSelectorLoadAwareness:
     """Tests for load-aware runtime selection."""
 
     def test_get_system_load(self):
         """Test getting system load."""
-        from runtime.selector import get_system_load, SystemLoad
+        from runtime.selector import SystemLoad, get_system_load
 
         load = get_system_load()
 
@@ -538,8 +550,8 @@ class TestRuntimeSelectorLoadAwareness:
         """Test load-aware runtime selection."""
         from runtime.selector import (
             RuntimeSelector,
-            SelectionStrategy,
             RuntimeType,
+            SelectionStrategy,
         )
 
         selector = RuntimeSelector(strategy=SelectionStrategy.LOAD_AWARE)

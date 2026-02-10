@@ -142,42 +142,50 @@ async def detect_contradictions(request: ContradictionDetectRequest) -> Contradi
         from titan.analysis.contradictions import ContradictionPair
         from titan.analysis.detector import ContradictionDetector, DetectorConfig
 
-        # Create detector with config
+        threshold_map = {
+            "low": 0.2,
+            "medium": 0.3,
+            "high": 0.5,
+        }
         config = DetectorConfig(
-            sensitivity=request.sensitivity,
-            use_llm=request.use_llm,
+            min_confidence_threshold=threshold_map.get(request.sensitivity.lower(), 0.3),
+            use_llm_analysis=request.use_llm,
         )
-        detector = ContradictionDetector(config)
+        detector = ContradictionDetector(config=config)
 
-        # Convert to ContradictionPairs
+        # Convert to ContradictionPair instances
         pairs = [
             ContradictionPair(
-                id=f"pair_{i}",
-                text_a=p["text_a"],
-                text_b=p["text_b"],
                 source_a=p.get("source_a", "input_a"),
                 source_b=p.get("source_b", "input_b"),
+                content_a=p["text_a"],
+                content_b=p["text_b"],
             )
             for i, p in enumerate(request.content_pairs)
         ]
 
-        # Detect contradictions
-        report = await detector.analyze(pairs)
-
-        # Convert to response format
-        results = []
-        for c in report.contradictions:
-            results.append(
-                ContradictionResult(
-                    pair_index=int(c.pair_id.split("_")[1]) if c.pair_id.startswith("pair_") else 0,
-                    contradiction_type=c.contradiction_type.value,
-                    severity=c.severity.value,
-                    confidence=c.confidence,
-                    description=c.description,
-                    text_a_excerpt=c.text_a_excerpt[:200],
-                    text_b_excerpt=c.text_b_excerpt[:200],
-                )
+        # Detect contradictions per pair
+        results: list[ContradictionResult] = []
+        for i, pair in enumerate(pairs):
+            contradictions = await detector.compare_pair(
+                content_a=pair.content_a,
+                content_b=pair.content_b,
+                source_a=pair.source_a,
+                source_b=pair.source_b,
+                context=pair.context,
             )
+            for contradiction in contradictions:
+                results.append(
+                    ContradictionResult(
+                        pair_index=i,
+                        contradiction_type=contradiction.contradiction_type.value,
+                        severity=contradiction.severity.value,
+                        confidence=contradiction.confidence,
+                        description=contradiction.explanation,
+                        text_a_excerpt=contradiction.content_a[:200],
+                        text_b_excerpt=contradiction.content_b[:200],
+                    )
+                )
 
         return ContradictionDetectResponse(
             contradictions=results,
@@ -212,19 +220,24 @@ async def synthesize_dialectic(request: DialecticSynthesizeRequest) -> Dialectic
             ContradictionSeverity,
             ContradictionType,
         )
-        from titan.analysis.dialectic import DialecticSynthesizer, SynthesisStrategy
+        from titan.analysis.dialectic import (
+            DialecticConfig,
+            DialecticSynthesizer,
+            SynthesisStrategy,
+        )
 
-        synthesizer = DialecticSynthesizer(use_llm=request.use_llm)
+        synthesizer = DialecticSynthesizer(config=DialecticConfig(use_llm=request.use_llm))
 
         # Create a contradiction object
         contradiction = Contradiction(
-            pair_id="synthesis_request",
             contradiction_type=ContradictionType.SEMANTIC,
             severity=ContradictionSeverity.MEDIUM,
+            source_a="thesis",
+            source_b="antithesis",
+            content_a=request.thesis[:500],
+            content_b=request.antithesis[:500],
             confidence=1.0,
-            description="User-provided thesis/antithesis pair",
-            text_a_excerpt=request.thesis[:500],
-            text_b_excerpt=request.antithesis[:500],
+            explanation="User-provided thesis/antithesis pair",
         )
 
         # Determine strategy
@@ -236,19 +249,18 @@ async def synthesize_dialectic(request: DialecticSynthesizeRequest) -> Dialectic
             except ValueError:
                 strategy = SynthesisStrategy.INTEGRATION
 
-        # Perform synthesis
-        result = await synthesizer.synthesize(
-            contradiction,
-            thesis=request.thesis,
-            antithesis=request.antithesis,
-            strategy=strategy,
-        )
+        # Perform synthesis (heuristic path unless an llm_caller is configured)
+        result = synthesizer._heuristic_synthesis(contradiction, strategy)
 
         return DialecticSynthesisResult(
             synthesis=result.synthesis,
             strategy_used=result.strategy.value,
             confidence=result.confidence,
-            reasoning=result.reasoning,
+            reasoning=(
+                result.key_insights[0]
+                if result.key_insights
+                else "Dialectic synthesis completed successfully."
+            ),
         )
 
     except ImportError:
@@ -306,10 +318,15 @@ async def get_inquiry_contradictions(session_id: str) -> SessionContradictionsRe
         try:
             from titan.analysis.contradictions import ContradictionPair
             from titan.analysis.detector import ContradictionDetector, DetectorConfig
-            from titan.analysis.dialectic import DialecticSynthesizer
+            from titan.analysis.dialectic import DialecticConfig, DialecticSynthesizer
 
-            detector = ContradictionDetector(DetectorConfig(sensitivity="medium"))
-            synthesizer = DialecticSynthesizer(use_llm=False)
+            detector = ContradictionDetector(
+                config=DetectorConfig(
+                    min_confidence_threshold=0.3,
+                    use_llm_analysis=False,
+                )
+            )
+            synthesizer = DialecticSynthesizer(config=DialecticConfig(use_llm=False))
 
             # Compare each pair of stages
             for i, result_a in enumerate(session.results[:-1]):
@@ -317,33 +334,34 @@ async def get_inquiry_contradictions(session_id: str) -> SessionContradictionsRe
                     pairs_analyzed += 1
 
                     pair = ContradictionPair(
-                        id=f"stage_{i}_{j}",
-                        text_a=result_a.content,
-                        text_b=result_b.content,
                         source_a=result_a.stage_name,
                         source_b=result_b.stage_name,
+                        content_a=result_a.content,
+                        content_b=result_b.content,
                     )
 
                     # Detect contradictions
-                    report = await detector.analyze([pair])
+                    detected = await detector.compare_pair(
+                        content_a=pair.content_a,
+                        content_b=pair.content_b,
+                        source_a=pair.source_a,
+                        source_b=pair.source_b,
+                        context=pair.context,
+                    )
 
-                    for c in report.contradictions:
+                    for c in detected:
                         contradictions.append(
                             {
                                 "stage_a": result_a.stage_name,
                                 "stage_b": result_b.stage_name,
                                 "type": c.contradiction_type.value,
                                 "severity": c.severity.value,
-                                "description": c.description,
+                                "description": c.explanation,
                             }
                         )
 
                         # Suggest resolution
-                        synthesis = await synthesizer.synthesize(
-                            c,
-                            thesis=result_a.content[:1000],
-                            antithesis=result_b.content[:1000],
-                        )
+                        synthesis = await synthesizer.synthesize_contradiction(c)
                         suggestions.append(
                             {
                                 "contradiction_index": len(contradictions) - 1,

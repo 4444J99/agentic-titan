@@ -11,24 +11,24 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
-from agents.framework.base_agent import BaseAgent
-from agents.personas import REVIEWER, say, think
 from adapters.base import LLMMessage
 from adapters.router import get_router
+from agents.framework.base_agent import BaseAgent
+from agents.personas import REVIEWER, say, think
 
 logger = logging.getLogger("titan.agents.reviewer")
 
 
-class ReviewSeverity(str, Enum):
+class ReviewSeverity(StrEnum):
     """Review comment severity levels."""
 
-    CRITICAL = "critical"    # Must fix
+    CRITICAL = "critical"  # Must fix
     SUGGESTION = "suggestion"  # Should consider
-    NITPICK = "nitpick"       # Minor preference
-    PRAISE = "praise"         # Good pattern to highlight
+    NITPICK = "nitpick"  # Minor preference
+    PRAISE = "praise"  # Good pattern to highlight
 
 
 @dataclass
@@ -138,9 +138,14 @@ class ReviewerAgent(BaseAgent):
             tags=["review", self.review_type],
         )
 
-        status = "[green]APPROVED[/green]" if self.result.approved else "[red]CHANGES REQUESTED[/red]"
+        status = (
+            "[green]APPROVED[/green]" if self.result.approved else "[red]CHANGES REQUESTED[/red]"
+        )
         say(REVIEWER, f"Review complete: {status}")
-        say(REVIEWER, f"Critical: {self.result.critical_count}, Suggestions: {self.result.suggestion_count}")
+        say(
+            REVIEWER,
+            f"Critical: {self.result.critical_count}, Suggestions: {self.result.suggestion_count}",
+        )
 
         return self.result
 
@@ -229,7 +234,7 @@ SEVERITY: message""",
             for severity in ReviewSeverity:
                 prefix = f"{severity.value.upper()}:"
                 if line.upper().startswith(prefix):
-                    message = line[len(prefix):].strip()
+                    message = line[len(prefix) :].strip()
                     comments.append(ReviewComment(severity=severity, message=message))
                     break
 

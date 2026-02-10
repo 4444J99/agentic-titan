@@ -10,14 +10,14 @@ from __future__ import annotations
 import hashlib
 import logging
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
-from enum import Enum
+from datetime import UTC, datetime
+from enum import StrEnum
 from typing import Any
 
 logger = logging.getLogger("titan.knowledge.lexicon")
 
 
-class LexiconCategory(str, Enum):
+class LexiconCategory(StrEnum):
     """Categories of assembly bodies in the lexicon."""
 
     INORGANIC_PHYSICS = "inorganic_physics"
@@ -43,7 +43,7 @@ class LexiconCategory(str, Enum):
         return mapping.get(category_id, cls.INORGANIC_PHYSICS)
 
 
-class InteractionType(str, Enum):
+class InteractionType(StrEnum):
     """Types of internal interaction mechanisms."""
 
     GRAVITATIONAL = "gravitational"
@@ -118,8 +118,8 @@ class BodyEntry:
     links: list[str] = field(default_factory=list)
     interaction_rules: list[InteractionRule] = field(default_factory=list)
     embedding: list[float] | None = None
-    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
-    updated_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+    updated_at: datetime = field(default_factory=lambda: datetime.now(UTC))
     source: str = "seed"  # seed, learned, user
 
     def __post_init__(self) -> None:
@@ -188,17 +188,16 @@ class BodyEntry:
         if isinstance(created_at, str):
             created_at = datetime.fromisoformat(created_at)
         elif created_at is None:
-            created_at = datetime.now(timezone.utc)
+            created_at = datetime.now(UTC)
 
         updated_at = data.get("updated_at")
         if isinstance(updated_at, str):
             updated_at = datetime.fromisoformat(updated_at)
         elif updated_at is None:
-            updated_at = datetime.now(timezone.utc)
+            updated_at = datetime.now(UTC)
 
         interaction_rules = [
-            InteractionRule.from_dict(r)
-            for r in data.get("interaction_rules", [])
+            InteractionRule.from_dict(r) for r in data.get("interaction_rules", [])
         ]
 
         return cls(
@@ -373,7 +372,11 @@ CATEGORY_INTERACTION_RULES: dict[LexiconCategory, list[InteractionRule]] = {
             constraint_mechanism="Code enforces rules automatically",
             communication_mechanism="Proposals and votes on-chain",
             selection_mechanism="Token-weighted governance, oligarchy risks",
-            examples=["decentralized_autonomous_organization", "smart_contract", "blockchain_governance"],
+            examples=[
+                "decentralized_autonomous_organization",
+                "smart_contract",
+                "blockchain_governance",
+            ],
         ),
     ],
     LexiconCategory.ASSEMBLY_THEORY: [

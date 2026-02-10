@@ -6,21 +6,21 @@ Runtime implementation for executing agent tasks in Firecracker microVMs.
 
 from __future__ import annotations
 
-import asyncio
+import json
 import logging
 import os
 from datetime import datetime
 from typing import Any
 
 from runtime.base import (
-    Runtime,
-    RuntimeType,
-    RuntimeConfig,
     AgentProcess,
     ProcessState,
+    Runtime,
+    RuntimeConfig,
+    RuntimeType,
 )
 from runtime.firecracker.config import FirecrackerConfig, VMState
-from runtime.firecracker.vm import MicroVM, MicroVMManager, ExecutionResult
+from runtime.firecracker.vm import ExecutionResult, MicroVM, MicroVMManager
 
 logger = logging.getLogger("titan.runtime.firecracker")
 
@@ -328,16 +328,18 @@ if __name__ == "__main__":
         # Add Firecracker-specific health info
         from runtime.firecracker import FIRECRACKER_AVAILABLE, KVM_AVAILABLE
 
-        base_health.update({
-            "firecracker_available": FIRECRACKER_AVAILABLE,
-            "kvm_available": KVM_AVAILABLE,
-            "binary_path": self._fc_config.firecracker_path,
-            "binary_exists": os.path.exists(self._fc_config.firecracker_path),
-            "kernel_exists": os.path.exists(self._fc_config.kernel_path),
-            "rootfs_exists": os.path.exists(self._fc_config.rootfs_path),
-            "active_vms": len(self._active_vms),
-            "pool_size": self._pool_size,
-        })
+        base_health.update(
+            {
+                "firecracker_available": FIRECRACKER_AVAILABLE,
+                "kvm_available": KVM_AVAILABLE,
+                "binary_path": self._fc_config.firecracker_path,
+                "binary_exists": os.path.exists(self._fc_config.firecracker_path),
+                "kernel_exists": os.path.exists(self._fc_config.kernel_path),
+                "rootfs_exists": os.path.exists(self._fc_config.rootfs_path),
+                "active_vms": len(self._active_vms),
+                "pool_size": self._pool_size,
+            }
+        )
 
         return base_health
 

@@ -16,16 +16,15 @@ import hashlib
 import json
 import logging
 import re
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from datetime import datetime
-from enum import Enum
-from functools import lru_cache
-from typing import Any, Callable
+from enum import StrEnum
+from typing import Any
 
 logger = logging.getLogger("titan.prompts.token_optimizer")
 
 
-class CompressionStrategy(str, Enum):
+class CompressionStrategy(StrEnum):
     """Strategies for context compression."""
 
     EXTRACTIVE = "extractive"  # Extract key sentences
@@ -318,11 +317,13 @@ class TokenOptimizer:
             # Extract key findings using extractive summarization
             summary = self._extract_key_findings(content, max_tokens_per_stage)
 
-            compressed_stages.append({
-                "stage": stage_name,
-                "key_insights": summary["findings"],
-                "summary": summary["summary"],
-            })
+            compressed_stages.append(
+                {
+                    "stage": stage_name,
+                    "key_insights": summary["findings"],
+                    "summary": summary["summary"],
+                }
+            )
 
         return json.dumps(compressed_stages, indent=1)
 
@@ -350,7 +351,7 @@ class TokenOptimizer:
         """Compress JSON-structured context (stage results)."""
         if not isinstance(data, dict):
             return {
-                "text": json.dumps(data)[:max_tokens * 4],
+                "text": json.dumps(data)[: max_tokens * 4],
                 "key_findings": [],
             }
 
@@ -363,7 +364,7 @@ class TokenOptimizer:
         if not stages:
             # Not stage data, just truncate
             return {
-                "text": json.dumps(data)[:max_tokens * 4],
+                "text": json.dumps(data)[: max_tokens * 4],
                 "key_findings": [],
             }
 
@@ -375,7 +376,7 @@ class TokenOptimizer:
         to_compress = stages[:-preserve_recent] if preserve_recent > 0 else stages
 
         compressed_data = {}
-        key_findings = []
+        key_findings: list[str] = []
 
         # Compress older stages
         for key, value in to_compress:
@@ -430,7 +431,7 @@ class TokenOptimizer:
         # Take top sentences until token limit
         selected = []
         current_tokens = 0
-        key_findings = []
+        key_findings: list[str] = []
 
         for score, sentence in scored:
             tokens = self.estimate_tokens(sentence).estimated_tokens
@@ -492,7 +493,7 @@ class TokenOptimizer:
             key_findings = []
             tokens_used = 0
 
-            for key, value in stages[:preserve_recent + 1]:
+            for key, value in stages[: preserve_recent + 1]:
                 content = value.get("content", "")
                 tokens = self.estimate_tokens(json.dumps({key: value})).estimated_tokens
 
@@ -542,7 +543,7 @@ class TokenOptimizer:
         # Create brief summary
         sentences = re.split(r"(?<=[.!?])\s+", content)
         summary_sentences = [s for s in sentences[:3] if len(s) > 20]
-        summary = " ".join(summary_sentences)[:max_tokens * 4]
+        summary = " ".join(summary_sentences)[: max_tokens * 4]
 
         return {
             "findings": findings[:5],
@@ -566,9 +567,21 @@ class TokenOptimizer:
 
         # Key phrase indicators
         key_phrases = [
-            "key", "important", "critical", "essential", "main",
-            "primary", "core", "fundamental", "insight", "finding",
-            "conclusion", "result", "therefore", "thus", "in summary",
+            "key",
+            "important",
+            "critical",
+            "essential",
+            "main",
+            "primary",
+            "core",
+            "fundamental",
+            "insight",
+            "finding",
+            "conclusion",
+            "result",
+            "therefore",
+            "thus",
+            "in summary",
         ]
         for phrase in key_phrases:
             if phrase in sentence.lower():

@@ -15,20 +15,24 @@ from __future__ import annotations
 
 import asyncio
 import logging
-import sys
+from datetime import datetime
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING
 
 import typer
 from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
 
-from agents.personas import say, ORCHESTRATOR, report_success, report_error
-from hive.memory import HiveMind, MemoryConfig
-from hive.topology import TopologyEngine, TopologyType
-from titan.spec import AgentSpec, SpecRegistry, get_spec_registry
-from adapters.router import LLMRouter, RoutingStrategy, get_router
+from adapters.base import LLMMessage
+from adapters.router import get_router
+from agents.personas import ORCHESTRATOR, report_error, report_success, say
+from hive.memory import HiveMind
+from hive.topology import TopologyEngine
+from titan.spec import AgentSpec, get_spec_registry
+
+if TYPE_CHECKING:
+    from adapters.router import LLMRouter
 
 # Initialize
 app = typer.Typer(
@@ -145,13 +149,15 @@ def run(
         spec = AgentSpec.from_file(spec_path)
         say(ORCHESTRATOR, f"Loaded agent: {spec.name}")
 
-        console.print(Panel(
-            f"[green]Agent loaded successfully![/green]\n\n"
-            f"Name: {spec.name}\n"
-            f"Capabilities: {', '.join(spec.capabilities)}\n"
-            f"LLM: {spec.llm.get('preferred', 'default')}",
-            title="Agent Spec",
-        ))
+        console.print(
+            Panel(
+                f"[green]Agent loaded successfully![/green]\n\n"
+                f"Name: {spec.name}\n"
+                f"Capabilities: {', '.join(spec.capabilities)}\n"
+                f"LLM: {spec.llm.get('preferred', 'default')}",
+                title="Agent Spec",
+            )
+        )
 
         if not prompt:
             say(ORCHESTRATOR, "No prompt provided. Use --prompt to run a task.")
@@ -161,10 +167,10 @@ def run(
 
         # Create agent based on spec type
         from agents.archetypes import (
-            ResearcherAgent,
             CoderAgent,
-            ReviewerAgent,
             OrchestratorAgent,
+            ResearcherAgent,
+            ReviewerAgent,
         )
 
         # Map spec names to agent classes
@@ -202,20 +208,24 @@ def run(
             result = await agent.run(prompt)
 
             # Display result
-            console.print(Panel(
-                f"[green]Agent completed![/green]\n\n"
-                f"Status: {result.state.value}\n"
-                f"Turns: {result.turns_taken}\n"
-                f"Duration: {result.execution_time_ms / 1000:.2f}s",
-                title="Result",
-            ))
+            console.print(
+                Panel(
+                    f"[green]Agent completed![/green]\n\n"
+                    f"Status: {result.state.value}\n"
+                    f"Turns: {result.turns_taken}\n"
+                    f"Duration: {result.execution_time_ms / 1000:.2f}s",
+                    title="Result",
+                )
+            )
 
             if result.result:
                 output_str = str(result.result)
-                console.print(Panel(
-                    output_str[:2000] + ("..." if len(output_str) > 2000 else ""),
-                    title="Output",
-                ))
+                console.print(
+                    Panel(
+                        output_str[:2000] + ("..." if len(output_str) > 2000 else ""),
+                        title="Output",
+                    )
+                )
 
         finally:
             await hive.shutdown()
@@ -244,12 +254,12 @@ def swarm(
 
     async def run_swarm() -> None:
         from agents.archetypes import (
-            ResearcherAgent,
             CoderAgent,
-            ReviewerAgent,
-            OrchestratorAgent,
             DataEngineerAgent,
+            OrchestratorAgent,
             ProductManagerAgent,
+            ResearcherAgent,
+            ReviewerAgent,
             SecurityAnalystAgent,
         )
 
@@ -279,14 +289,16 @@ def swarm(
         await router.initialize()
         providers = router.list_available_providers()
 
-        console.print(Panel(
-            f"Task: {task}\n"
-            f"Topology: {selected}\n"
-            f"Agents: {agents}\n"
-            f"Max Tokens: {max_tokens}\n"
-            f"LLM Providers: {', '.join(p.value for p in providers)}",
-            title="Swarm Configuration",
-        ))
+        console.print(
+            Panel(
+                f"Task: {task}\n"
+                f"Topology: {selected}\n"
+                f"Agents: {agents}\n"
+                f"Max Tokens: {max_tokens}\n"
+                f"LLM Providers: {', '.join(p.value for p in providers)}",
+                title="Swarm Configuration",
+            )
+        )
 
         # Analyze task to determine agent mix
         agent_mix = await _analyze_task_for_agents(task, router)
@@ -311,7 +323,7 @@ def swarm(
         created_agents = []
         for i, archetype_name in enumerate(agent_mix[:agents]):
             archetype_class = archetype_map.get(archetype_name.lower(), ResearcherAgent)
-            agent_name = f"{archetype_name}-{i+1}"
+            agent_name = f"{archetype_name}-{i + 1}"
 
             # Create agent with appropriate initialization
             if archetype_class == ResearcherAgent:
@@ -345,7 +357,7 @@ def swarm(
                 )
 
             created_agents.append(agent)
-            topo.add_agent(agent)
+            topo.add_agent(agent.agent_id, agent.name, list(agent.capabilities))
             say(ORCHESTRATOR, f"{agent_name} ready ({archetype_name})")
 
         # Run the swarm
@@ -371,12 +383,14 @@ def swarm(
                 # Initialize and run agent
                 await agent.initialize()
                 result = await agent.run(task)
-                results.append({
-                    "agent": agent.name,
-                    "state": result.state.value,
-                    "turns": result.turns_taken,
-                    "duration_ms": result.execution_time_ms,
-                })
+                results.append(
+                    {
+                        "agent": agent.name,
+                        "state": result.state.value,
+                        "turns": result.turns_taken,
+                        "duration_ms": result.execution_time_ms,
+                    }
+                )
 
                 # Estimate tokens (rough)
                 total_tokens += result.turns_taken * 2000
@@ -385,24 +399,28 @@ def swarm(
 
             except Exception as e:
                 logger.error(f"Agent {agent.name} failed: {e}")
-                results.append({
-                    "agent": agent.name,
-                    "state": "failed",
-                    "error": str(e),
-                })
+                results.append(
+                    {
+                        "agent": agent.name,
+                        "state": "failed",
+                        "error": str(e),
+                    }
+                )
 
         # Display results
         successful = sum(1 for r in results if r.get("state") != "failed")
         total_duration = int((asyncio.get_event_loop().time() - start_time) * 1000)
 
-        console.print(Panel(
-            f"Agents: {len(created_agents)}\n"
-            f"Successful: {successful}\n"
-            f"Estimated Tokens: {total_tokens}\n"
-            f"Duration: {total_duration / 1000:.2f}s",
-            title="Swarm Result",
-            border_style="green" if successful == len(created_agents) else "yellow",
-        ))
+        console.print(
+            Panel(
+                f"Agents: {len(created_agents)}\n"
+                f"Successful: {successful}\n"
+                f"Estimated Tokens: {total_tokens}\n"
+                f"Duration: {total_duration / 1000:.2f}s",
+                title="Swarm Result",
+                border_style="green" if successful == len(created_agents) else "yellow",
+            )
+        )
 
         # Show per-agent results
         table = Table(title="Agent Results")
@@ -427,7 +445,7 @@ def swarm(
     asyncio.run(run_swarm())
 
 
-async def _analyze_task_for_agents(task: str, router) -> list[str]:
+async def _analyze_task_for_agents(task: str, router: LLMRouter) -> list[str]:
     """
     Analyze task to determine optimal agent archetypes.
 
@@ -451,21 +469,20 @@ Task: {task}
 
 Return ONLY the archetype names in a comma-separated list, nothing else."""
 
-        response = await router.generate(
-            messages=[{"role": "user", "content": prompt}],
+        response = await router.complete(
+            messages=[LLMMessage(role="user", content=prompt)],
             max_tokens=100,
         )
 
         # Parse response
         archetypes = [
-            a.strip().lower().replace("-", "_")
-            for a in response.content.split(",")
-            if a.strip()
+            a.strip().lower().replace("-", "_") for a in response.content.split(",") if a.strip()
         ]
 
         # Validate and deduplicate
         valid_archetypes = [
-            a for a in archetypes
+            a
+            for a in archetypes
             if a in ["researcher", "coder", "reviewer", "analyst", "planner", "executor"]
         ]
 
@@ -563,6 +580,7 @@ def list_agents(
 @app.command()
 def health() -> None:
     """Health check all services."""
+
     async def run_health() -> None:
         say(ORCHESTRATOR, "Running health checks...")
 
@@ -580,15 +598,15 @@ def health() -> None:
 
         # LLM Router
         router = get_router()
+        llm_health: dict[str, bool] = {}
+        llm_error: str | None = None
         try:
             await router.initialize()
             llm_health = await router.health_check()
         except Exception as e:
-            llm_health = {"error": str(e)}
+            llm_error = str(e)
 
-        all_healthy = all(infra.values()) and all(
-            v for k, v in llm_health.items() if k != "error"
-        )
+        all_healthy = all(infra.values()) and all(llm_health.values()) and llm_error is None
 
         if all_healthy:
             report_success(ORCHESTRATOR, "All systems operational")
@@ -596,7 +614,10 @@ def health() -> None:
             report_error(ORCHESTRATOR, "Some systems unhealthy", "Health check")
             console.print(f"Infrastructure: {infra}")
             console.print(f"Hive Mind: {hive_health}")
-            console.print(f"LLM: {llm_health}")
+            if llm_error:
+                console.print(f"LLM: {{'error': {llm_error!r}}}")
+            else:
+                console.print(f"LLM: {llm_health}")
 
     asyncio.run(run_health())
 
@@ -614,7 +635,7 @@ def init(
     (dir_path / "agents").mkdir(exist_ok=True)
 
     # Create example spec
-    example_spec = '''apiVersion: titan/v1
+    example_spec = """apiVersion: titan/v1
 kind: Agent
 metadata:
   name: researcher
@@ -647,14 +668,14 @@ spec:
 
   maxTurns: 20
   timeoutMs: 300000
-'''
+"""
 
     spec_file = dir_path / "specs" / "researcher.titan.yaml"
     if not spec_file.exists():
         spec_file.write_text(example_spec)
 
     console.print(f"[green]Initialized Titan project in {directory}[/green]")
-    console.print(f"Created: specs/researcher.titan.yaml")
+    console.print("Created: specs/researcher.titan.yaml")
     console.print("\nNext steps:")
     console.print("  1. Start infrastructure: docker compose up -d redis chromadb")
     console.print("  2. Check status: titan status")
@@ -669,14 +690,15 @@ def topology(
     engine = TopologyEngine()
     suggestion = engine.suggest_topology(task)
 
-    console.print(Panel(
-        f"[bold]Recommended: {suggestion['recommended']}[/bold]\n\n"
-        f"Reasons:\n" + "\n".join(f"  • {r}" for r in suggestion["reasons"]) + "\n\n"
-        f"Task Profile:\n" + "\n".join(
-            f"  • {k}: {v}" for k, v in suggestion["profile"].items()
-        ),
-        title="Topology Suggestion",
-    ))
+    console.print(
+        Panel(
+            f"[bold]Recommended: {suggestion['recommended']}[/bold]\n\n"
+            f"Reasons:\n" + "\n".join(f"  • {r}" for r in suggestion["reasons"]) + "\n\n"
+            "Task Profile:\n"
+            + "\n".join(f"  • {k}: {v}" for k, v in suggestion["profile"].items()),
+            title="Topology Suggestion",
+        )
+    )
 
 
 @app.command()
@@ -689,7 +711,7 @@ def runtime(
     """Manage runtime environments."""
 
     async def run_runtime() -> None:
-        from runtime import RuntimeSelector, RuntimeConstraints, RuntimeType
+        from runtime import RuntimeConstraints, RuntimeSelector, RuntimeType
 
         selector = RuntimeSelector()
         await selector.initialize()
@@ -698,12 +720,14 @@ def runtime(
             if action == "status":
                 # Show runtime health
                 health = await selector.health_check()
-                console.print(Panel(
-                    f"[bold]Strategy:[/bold] {health['strategy']}\n"
-                    f"[bold]Initialized:[/bold] {health['initialized']}\n\n"
-                    f"[bold]Runtimes:[/bold]",
-                    title="Runtime Status",
-                ))
+                console.print(
+                    Panel(
+                        f"[bold]Strategy:[/bold] {health['strategy']}\n"
+                        f"[bold]Initialized:[/bold] {health['initialized']}\n\n"
+                        f"[bold]Runtimes:[/bold]",
+                        title="Runtime Status",
+                    )
+                )
 
                 for rt_name, rt_health in health["runtimes"].items():
                     status = "[green]✓[/green]" if rt_health.get("initialized") else "[red]✗[/red]"
@@ -724,18 +748,20 @@ def runtime(
                         constraints.needs_isolation = True
 
                 suggestion = selector.suggest(constraints)
-                console.print(Panel(
-                    f"[bold]Recommended:[/bold] {suggestion['recommended']}\n"
-                    f"[bold]Score:[/bold] {suggestion['score']:.1f}\n\n"
-                    f"[bold]Reasons:[/bold]\n" +
-                    "\n".join(f"  • {r}" for r in suggestion["reasons"]) + "\n\n"
-                    f"[bold]Alternatives:[/bold]\n" +
-                    "\n".join(
-                        f"  • {a['type']}: {a['score']:.1f}"
-                        for a in suggestion["alternatives"]
-                    ),
-                    title="Runtime Suggestion",
-                ))
+                console.print(
+                    Panel(
+                        f"[bold]Recommended:[/bold] {suggestion['recommended']}\n"
+                        f"[bold]Score:[/bold] {suggestion['score']:.1f}\n\n"
+                        f"[bold]Reasons:[/bold]\n"
+                        + "\n".join(f"  • {r}" for r in suggestion["reasons"])
+                        + "\n\n"
+                        "[bold]Alternatives:[/bold]\n"
+                        + "\n".join(
+                            f"  • {a['type']}: {a['score']:.1f}" for a in suggestion["alternatives"]
+                        ),
+                        title="Runtime Suggestion",
+                    )
+                )
 
             elif action == "spawn":
                 if not spec:
@@ -754,13 +780,15 @@ def runtime(
                     runtime_type=rt,
                 )
 
-                console.print(Panel(
-                    f"[bold]Process ID:[/bold] {process.process_id}\n"
-                    f"[bold]Agent:[/bold] {process.agent_id}\n"
-                    f"[bold]Runtime:[/bold] {process.runtime_type.value}\n"
-                    f"[bold]State:[/bold] {process.state.value}",
-                    title="Agent Spawned",
-                ))
+                console.print(
+                    Panel(
+                        f"[bold]Process ID:[/bold] {process.process_id}\n"
+                        f"[bold]Agent:[/bold] {process.agent_id}\n"
+                        f"[bold]Runtime:[/bold] {process.runtime_type.value}\n"
+                        f"[bold]State:[/bold] {process.state.value}",
+                        title="Agent Spawned",
+                    )
+                )
 
             else:
                 console.print(f"[red]Unknown action: {action}[/red]")
@@ -781,8 +809,8 @@ def analyze(
 
     async def run_analysis() -> None:
         from hive.analyzer import TaskAnalyzer
-        from hive.learning import get_episodic_learner
         from hive.events import get_event_bus
+        from hive.learning import get_episodic_learner
 
         say(ORCHESTRATOR, f"Analyzing task: {task[:50]}...")
 
@@ -811,14 +839,17 @@ def analyze(
         selected, analysis = await engine.analyze_and_select(task, use_llm=use_llm)
 
         # Display results
-        console.print(Panel(
-            f"[bold green]Recommended Topology: {analysis['recommended_topology'].upper()}[/bold green]\n\n"
-            f"[bold]Confidence:[/bold] {analysis.get('confidence', 0.5):.0%}\n"
-            f"[bold]Reasoning:[/bold] {analysis.get('reasoning', 'N/A')}\n\n"
-            f"[bold]Task Profile:[/bold]\n" +
-            "\n".join(f"  • {k}: {v}" for k, v in analysis.get('profile', {}).items()),
-            title="🔬 Task Analysis",
-        ))
+        recommended = analysis.get("recommended_topology", "").upper()
+        profile_lines = "\n".join(f"  • {k}: {v}" for k, v in analysis.get("profile", {}).items())
+        console.print(
+            Panel(
+                f"[bold green]Recommended Topology: {recommended}[/bold green]\n\n"
+                f"[bold]Confidence:[/bold] {analysis.get('confidence', 0.5):.0%}\n"
+                f"[bold]Reasoning:[/bold] {analysis.get('reasoning', 'N/A')}\n\n"
+                f"[bold]Task Profile:[/bold]\n{profile_lines}",
+                title="🔬 Task Analysis",
+            )
+        )
 
         # Show learning stats if available
         stats = learner.get_statistics()
@@ -834,8 +865,9 @@ def learning(
     output: str = typer.Option(None, "--output", "-o", help="Output file for export"),
 ) -> None:
     """Manage episodic learning system."""
-    from hive.learning import get_episodic_learner
     import json
+
+    from hive.learning import get_episodic_learner
 
     learner = get_episodic_learner()
 
@@ -903,7 +935,7 @@ def events(
     limit: int = typer.Option(20, "--limit", "-n", help="Number of events to show"),
 ) -> None:
     """View event history."""
-    from hive.events import get_event_bus, EventType
+    from hive.events import EventType, get_event_bus
 
     event_bus = get_event_bus()
 
@@ -931,7 +963,8 @@ def events(
         table.add_column("Payload", max_width=50)
 
         for event in events_list:
-            payload_str = str(event.payload)[:47] + "..." if len(str(event.payload)) > 50 else str(event.payload)
+            payload_text = str(event.payload)
+            payload_str = payload_text[:47] + "..." if len(payload_text) > 50 else payload_text
             table.add_row(
                 event.timestamp.strftime("%H:%M:%S"),
                 event.event_type.value,
@@ -957,16 +990,24 @@ def events(
 
 @app.command()
 def stress(
-    scenario: str = typer.Argument("swarm", help="Scenario: swarm, pipeline, hierarchy, chaos, scale"),
+    scenario: str = typer.Argument(
+        "swarm",
+        help="Scenario: swarm, pipeline, hierarchy, chaos, scale",
+    ),
     agents: int = typer.Option(50, "--agents", "-a", help="Number of agents"),
     duration: int = typer.Option(60, "--duration", "-d", help="Duration in seconds"),
     max_concurrent: int = typer.Option(20, "--concurrent", "-c", help="Max concurrent agents"),
-    failure_rate: float = typer.Option(0.0, "--failure-rate", "-f", help="Failure injection rate (0-1)"),
+    failure_rate: float = typer.Option(
+        0.0,
+        "--failure-rate",
+        "-f",
+        help="Failure injection rate (0-1)",
+    ),
     output: str = typer.Option(None, "--output", "-o", help="Output file for results"),
     verbose: bool = typer.Option(False, "--verbose", "-v", help="Verbose output"),
 ) -> None:
     """Run stress tests against the agent swarm."""
-    from titan.stress import StressTestRunner, StressTestConfig
+    from titan.stress import StressTestConfig, StressTestRunner
     from titan.stress.scenarios import list_scenarios
 
     if verbose:
@@ -1006,14 +1047,16 @@ def stress(
             verbose=verbose,
         )
 
-        console.print(Panel(
-            f"[bold]Scenario:[/bold] {scenario}\n"
-            f"[bold]Target Agents:[/bold] {agents}\n"
-            f"[bold]Duration:[/bold] {duration}s\n"
-            f"[bold]Max Concurrent:[/bold] {max_concurrent}\n"
-            f"[bold]Failure Rate:[/bold] {failure_rate:.0%}",
-            title="Stress Test Configuration",
-        ))
+        console.print(
+            Panel(
+                f"[bold]Scenario:[/bold] {scenario}\n"
+                f"[bold]Target Agents:[/bold] {agents}\n"
+                f"[bold]Duration:[/bold] {duration}s\n"
+                f"[bold]Max Concurrent:[/bold] {max_concurrent}\n"
+                f"[bold]Failure Rate:[/bold] {failure_rate:.0%}",
+                title="Stress Test Configuration",
+            )
+        )
 
         # Run test
         runner = StressTestRunner(config, hive_mind=hive)
@@ -1069,27 +1112,29 @@ def metrics(
 ) -> None:
     """Manage Prometheus metrics."""
     from titan.metrics import (
-        start_metrics_server,
         get_metrics_text,
-        get_metrics,
-        PROMETHEUS_AVAILABLE,
+        start_metrics_server,
     )
 
-    if not PROMETHEUS_AVAILABLE:
-        console.print("[red]prometheus_client not installed[/red]")
-        console.print("Install with: pip install prometheus-client")
-        return
+    metrics_available = not get_metrics_text().startswith("# prometheus_client not installed")
 
     if action == "serve":
+        if not metrics_available:
+            console.print("[red]prometheus_client not installed[/red]")
+            console.print("Install with: pip install prometheus-client")
+            return
         say(ORCHESTRATOR, f"Starting metrics server on http://{host}:{port}/metrics")
         console.print("\nScrape configuration for Prometheus:")
-        console.print(f"  - job_name: 'titan'\n    static_configs:\n      - targets: ['{host}:{port}']")
+        console.print(
+            f"  - job_name: 'titan'\n    static_configs:\n      - targets: ['{host}:{port}']"
+        )
         console.print("\nPress Ctrl+C to stop\n")
 
         try:
             start_metrics_server(port=port, host=host)
             # Keep the server running
             import time
+
             while True:
                 time.sleep(1)
         except KeyboardInterrupt:
@@ -1111,7 +1156,6 @@ def observe(
 ) -> None:
     """Start observability stack (Prometheus + Grafana)."""
     import subprocess
-    import os
 
     deploy_dir = Path(__file__).parent.parent / "deploy"
 
@@ -1182,7 +1226,7 @@ def mcp(
         run  - Start the MCP server on stdio
         test - Run a quick self-test
     """
-    from mcp.server import run_server, create_server
+    from mcp.server import create_server, run_server
 
     if action == "run":
         say(ORCHESTRATOR, "Starting Titan MCP Server...")
@@ -1205,10 +1249,12 @@ def mcp(
 
         async def run_test() -> None:
             import json
+
             server = create_server()
 
             # Test initialize
             from mcp.server import MCPRequest
+
             init_req = MCPRequest(
                 jsonrpc="2.0",
                 id=1,
@@ -1295,7 +1341,12 @@ app.add_typer(inquiry_app, name="inquiry")
 @inquiry_app.command("start")
 def inquiry_start(
     topic: str = typer.Argument(..., help="Topic to explore"),
-    workflow: str = typer.Option("expansive", "--workflow", "-w", help="Workflow: expansive, quick, creative"),
+    workflow: str = typer.Option(
+        "expansive",
+        "--workflow",
+        "-w",
+        help="Workflow: expansive, quick, creative",
+    ),
     run: bool = typer.Option(False, "--run", "-r", help="Run immediately"),
     verbose: bool = typer.Option(False, "--verbose", "-v", help="Verbose output"),
 ) -> None:
@@ -1303,8 +1354,8 @@ def inquiry_start(
     if verbose:
         logging.getLogger().setLevel(logging.DEBUG)
 
-    from titan.workflows.inquiry_engine import get_inquiry_engine, InquiryStatus
     from titan.workflows.inquiry_config import get_workflow
+    from titan.workflows.inquiry_engine import InquiryStatus, get_inquiry_engine
 
     async def run_inquiry() -> None:
         wf = get_workflow(workflow)
@@ -1316,13 +1367,15 @@ def inquiry_start(
         engine = get_inquiry_engine()
         session = await engine.start_inquiry(topic, wf)
 
-        console.print(Panel(
-            f"[bold]Session ID:[/bold] {session.id}\n"
-            f"[bold]Topic:[/bold] {topic}\n"
-            f"[bold]Workflow:[/bold] {wf.name}\n"
-            f"[bold]Stages:[/bold] {session.total_stages}",
-            title="Inquiry Session Created",
-        ))
+        console.print(
+            Panel(
+                f"[bold]Session ID:[/bold] {session.id}\n"
+                f"[bold]Topic:[/bold] {topic}\n"
+                f"[bold]Workflow:[/bold] {wf.name}\n"
+                f"[bold]Stages:[/bold] {session.total_stages}",
+                title="Inquiry Session Created",
+            )
+        )
 
         if run:
             say(ORCHESTRATOR, "Running inquiry workflow...")
@@ -1332,14 +1385,16 @@ def inquiry_start(
 
                 if event_type == "stage_started":
                     stage_name = event.get("stage_name", "")
-                    console.print(f"  [cyan]Stage {event.get('stage_index', 0) + 1}:[/cyan] {stage_name}...")
+                    stage_idx = event.get("stage_index", 0) + 1
+                    console.print(f"  [cyan]Stage {stage_idx}:[/cyan] {stage_name}...")
 
                 elif event_type == "stage_completed":
                     result = event.get("result", {})
                     console.print(f"    [green]✓[/green] {result.get('stage_name', '')} completed")
 
                 elif event_type == "session_completed":
-                    console.print(f"\n[green]Inquiry completed![/green] {event.get('results_count', 0)} stages")
+                    results_count = event.get("results_count", 0)
+                    console.print(f"\n[green]Inquiry completed![/green] {results_count} stages")
 
                 elif event_type == "session_failed":
                     console.print(f"[red]Inquiry failed: {event.get('error', '')}[/red]")
@@ -1391,14 +1446,17 @@ def inquiry_status(
         "cancelled": "dim",
     }.get(session.status.value, "white")
 
-    console.print(Panel(
-        f"[bold]Session:[/bold] {session.id}\n"
-        f"[bold]Topic:[/bold] {session.topic}\n"
-        f"[bold]Workflow:[/bold] {session.workflow.name}\n"
-        f"[bold]Status:[/bold] [{status_color}]{session.status.value}[/{status_color}]\n"
-        f"[bold]Progress:[/bold] {session.progress:.0f}% ({len(session.results)}/{session.total_stages} stages)",
-        title="Inquiry Session Status",
-    ))
+    progress = f"{session.progress:.0f}% ({len(session.results)}/{session.total_stages} stages)"
+    console.print(
+        Panel(
+            f"[bold]Session:[/bold] {session.id}\n"
+            f"[bold]Topic:[/bold] {session.topic}\n"
+            f"[bold]Workflow:[/bold] {session.workflow.name}\n"
+            f"[bold]Status:[/bold] [{status_color}]{session.status.value}[/{status_color}]\n"
+            f"[bold]Progress:[/bold] {progress}",
+            title="Inquiry Session Status",
+        )
+    )
 
     if session.results:
         table = Table(title="Completed Stages")
@@ -1419,7 +1477,7 @@ def inquiry_list(
     limit: int = typer.Option(20, "--limit", "-n", help="Max sessions to show"),
 ) -> None:
     """List inquiry sessions."""
-    from titan.workflows.inquiry_engine import get_inquiry_engine, InquiryStatus
+    from titan.workflows.inquiry_engine import InquiryStatus, get_inquiry_engine
 
     engine = get_inquiry_engine()
 
@@ -1470,8 +1528,9 @@ def inquiry_compare(
     format_output: str = typer.Option("table", "--format", "-f", help="Output format: table, json"),
 ) -> None:
     """Compare two inquiry sessions."""
-    from titan.workflows.inquiry_engine import get_inquiry_engine
     import json
+
+    from titan.workflows.inquiry_engine import get_inquiry_engine
 
     engine = get_inquiry_engine()
     session1 = engine.get_session(id1)
@@ -1512,7 +1571,11 @@ def inquiry_compare(
         table.add_row("Topic", session1.topic[:30], session2.topic[:30])
         table.add_row("Workflow", session1.workflow.name, session2.workflow.name)
         table.add_row("Status", session1.status.value, session2.status.value)
-        table.add_row("Stages", f"{len(session1.results)}/{session1.total_stages}", f"{len(session2.results)}/{session2.total_stages}")
+        table.add_row(
+            "Stages",
+            f"{len(session1.results)}/{session1.total_stages}",
+            f"{len(session2.results)}/{session2.total_stages}",
+        )
 
         console.print(table)
 
@@ -1521,11 +1584,17 @@ def inquiry_compare(
 def inquiry_export(
     session_id: str = typer.Argument(..., help="Session ID to export"),
     output: str = typer.Option(None, "--output", "-o", help="Output file path"),
-    format_output: str = typer.Option("markdown", "--format", "-f", help="Output format: markdown, json"),
+    format_output: str = typer.Option(
+        "markdown",
+        "--format",
+        "-f",
+        help="Output format: markdown, json",
+    ),
 ) -> None:
     """Export inquiry session results."""
-    from titan.workflows.inquiry_engine import get_inquiry_engine
     import json
+
+    from titan.workflows.inquiry_engine import get_inquiry_engine
 
     engine = get_inquiry_engine()
     session = engine.get_session(session_id)
@@ -1551,17 +1620,19 @@ def inquiry_export(
         ]
 
         for result in session.results:
-            lines.extend([
-                f"## {result.stage_name}",
-                "",
-                f"**Role:** {result.role}",
-                f"**Model:** {result.model_used}",
-                "",
-                result.content,
-                "",
-                "---",
-                "",
-            ])
+            lines.extend(
+                [
+                    f"## {result.stage_name}",
+                    "",
+                    f"**Role:** {result.role}",
+                    f"**Model:** {result.model_used}",
+                    "",
+                    result.content,
+                    "",
+                    "---",
+                    "",
+                ]
+            )
 
         content = "\n".join(lines)
 
@@ -1598,22 +1669,25 @@ def knowledge_search(
 
         try:
             # Search using HiveMind's memory
-            results = await hive.search(query, limit=limit)
+            tag_filter = [tag] if tag else None
+            results = await hive.recall(query, k=limit, tags=tag_filter)
 
             if not results:
                 console.print("[dim]No results found[/dim]")
                 return
 
             table = Table(title=f"Search Results ({len(results)})")
-            table.add_column("Key", style="cyan")
+            table.add_column("Memory ID", style="cyan")
             table.add_column("Preview", max_width=50)
-            table.add_column("Score")
+            table.add_column("Distance/Score")
 
             for r in results:
-                key = r.get("key", "")
-                content = str(r.get("value", ""))[:47] + "..."
-                score = r.get("score", 0.0)
-                table.add_row(key, content, f"{score:.2f}")
+                memory_id = str(r.get("id", ""))
+                content = str(r.get("content", ""))
+                preview = content[:47] + "..." if len(content) > 47 else content
+                metric = r.get("score", r.get("distance", 0.0))
+                metric_text = f"{metric:.2f}" if isinstance(metric, int | float) else "-"
+                table.add_row(memory_id, preview, metric_text)
 
             console.print(table)
 
@@ -1626,6 +1700,7 @@ def knowledge_search(
 @knowledge_app.command("stats")
 def knowledge_stats() -> None:
     """Show knowledge base statistics."""
+
     async def show_stats() -> None:
         hive = HiveMind()
         await hive.initialize()
@@ -1633,11 +1708,13 @@ def knowledge_stats() -> None:
         try:
             health = await hive.health_check()
 
-            console.print(Panel(
-                f"[bold]Redis:[/bold] {'✓' if health.get('redis') else '✗'}\n"
-                f"[bold]ChromaDB:[/bold] {'✓' if health.get('chroma') else '✗'}",
-                title="Knowledge Base Status",
-            ))
+            console.print(
+                Panel(
+                    f"[bold]Redis:[/bold] {'✓' if health.get('redis') else '✗'}\n"
+                    f"[bold]ChromaDB:[/bold] {'✓' if health.get('chroma') else '✗'}",
+                    title="Knowledge Base Status",
+                )
+            )
 
         finally:
             await hive.shutdown()
@@ -1705,12 +1782,17 @@ def workflow_list() -> None:
 def workflow_execute(
     name: str = typer.Argument(..., help="Workflow name"),
     topic: str = typer.Option(..., "--topic", "-t", help="Topic to explore"),
-    mode: str = typer.Option("staged", "--mode", "-m", help="Execution mode: sequential, parallel, staged"),
+    mode: str = typer.Option(
+        "staged",
+        "--mode",
+        "-m",
+        help="Execution mode: sequential, parallel, staged",
+    ),
 ) -> None:
     """Execute a workflow."""
-    from titan.workflows.inquiry_engine import get_inquiry_engine
     from titan.workflows.inquiry_config import get_workflow
     from titan.workflows.inquiry_dag import ExecutionMode
+    from titan.workflows.inquiry_engine import get_inquiry_engine
 
     wf = get_workflow(name)
     if not wf:
@@ -1742,7 +1824,12 @@ def workflow_execute(
 @workflow_app.command("visualize")
 def workflow_visualize(
     name: str = typer.Argument(..., help="Workflow name"),
-    format_output: str = typer.Option("mermaid", "--format", "-f", help="Output format: mermaid, text"),
+    format_output: str = typer.Option(
+        "mermaid",
+        "--format",
+        "-f",
+        help="Output format: mermaid, text",
+    ),
 ) -> None:
     """Visualize a workflow structure."""
     from titan.workflows.inquiry_config import get_workflow
@@ -1765,7 +1852,7 @@ def workflow_visualize(
                     lines.append(f"    S{dep} --> {node_id}")
             elif i > 0:
                 # Default sequential connection
-                lines.append(f"    S{i-1} --> {node_id}")
+                lines.append(f"    S{i - 1} --> {node_id}")
 
         lines.append("```")
         console.print("\n".join(lines))
@@ -1783,7 +1870,6 @@ def workflow_validate(
 ) -> None:
     """Validate a workflow configuration file."""
     import yaml
-    from titan.workflows.inquiry_config import InquiryWorkflow, InquiryStage, CognitiveStyle
 
     path = Path(file_path)
     if not path.exists():

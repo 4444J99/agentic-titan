@@ -215,10 +215,13 @@ class CheckpointManager:
         if is_pickle:
             if is_compressed:
                 with gzip.open(path, "rb") as f:
-                    checkpoint = pickle.load(f)
+                    loaded = pickle.load(f)
             else:
                 with open(path, "rb") as f:
-                    checkpoint = pickle.load(f)
+                    loaded = pickle.load(f)
+            if not isinstance(loaded, Checkpoint):
+                raise TypeError(f"Invalid checkpoint payload in {path}")
+            checkpoint = loaded
         else:
             if is_compressed:
                 with gzip.open(path, "rt", encoding="utf-8") as f:
@@ -258,17 +261,19 @@ class CheckpointManager:
                 if session_id and cp_session != session_id:
                     continue
 
-                checkpoints.append({
-                    "path": str(path),
-                    "session_id": cp_session,
-                    "timestamp": cp_timestamp,
-                    "size_bytes": path.stat().st_size,
-                    "format": "pickle" if ".pkl" in path.name else "json",
-                    "compressed": path.suffix == ".gz",
-                })
+                checkpoints.append(
+                    {
+                        "path": str(path),
+                        "session_id": cp_session,
+                        "timestamp": cp_timestamp,
+                        "size_bytes": path.stat().st_size,
+                        "format": "pickle" if ".pkl" in path.name else "json",
+                        "compressed": path.suffix == ".gz",
+                    }
+                )
 
         # Sort by timestamp descending
-        checkpoints.sort(key=lambda x: x["timestamp"], reverse=True)
+        checkpoints.sort(key=lambda x: str(x["timestamp"]), reverse=True)
         return checkpoints
 
     def get_latest(self, session_id: str) -> Checkpoint | None:
@@ -324,7 +329,7 @@ class CheckpointManager:
         checkpoints = self.list_checkpoints(session_id)
 
         if len(checkpoints) > self.max_checkpoints:
-            for cp in checkpoints[self.max_checkpoints:]:
+            for cp in checkpoints[self.max_checkpoints :]:
                 self.delete(cp["path"])
 
 
@@ -340,9 +345,7 @@ def get_manager(checkpoint_dir: str | Path | None = None) -> CheckpointManager:
     global _default_manager
 
     if _default_manager is None or checkpoint_dir:
-        _default_manager = CheckpointManager(
-            checkpoint_dir=checkpoint_dir or ".titan/checkpoints"
-        )
+        _default_manager = CheckpointManager(checkpoint_dir=checkpoint_dir or ".titan/checkpoints")
 
     return _default_manager
 

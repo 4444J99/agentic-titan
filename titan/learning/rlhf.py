@@ -10,8 +10,8 @@ import asyncio
 import json
 import logging
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
-from enum import Enum
+from datetime import UTC, datetime
+from enum import StrEnum
 from typing import TYPE_CHECKING, Any
 from uuid import UUID, uuid4
 
@@ -21,17 +21,17 @@ if TYPE_CHECKING:
 logger = logging.getLogger("titan.learning.rlhf")
 
 
-class FeedbackType(str, Enum):
+class FeedbackType(StrEnum):
     """Types of feedback signals."""
 
-    EXPLICIT_RATING = "explicit_rating"      # User gives 1-5 rating
-    THUMBS = "thumbs"                         # Thumbs up/down
-    CORRECTION = "correction"                 # User corrects output
-    ACCEPTANCE = "acceptance"                 # User accepts/rejects
-    IMPLICIT_SIGNAL = "implicit_signal"       # Derived from behavior
+    EXPLICIT_RATING = "explicit_rating"  # User gives 1-5 rating
+    THUMBS = "thumbs"  # Thumbs up/down
+    CORRECTION = "correction"  # User corrects output
+    ACCEPTANCE = "acceptance"  # User accepts/rejects
+    IMPLICIT_SIGNAL = "implicit_signal"  # Derived from behavior
 
 
-class ResponseQuality(str, Enum):
+class ResponseQuality(StrEnum):
     """Quality levels for responses."""
 
     EXCELLENT = "excellent"
@@ -50,7 +50,7 @@ class RLHFSample:
     """
 
     id: UUID = field(default_factory=uuid4)
-    timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    timestamp: datetime = field(default_factory=lambda: datetime.now(UTC))
 
     # Input/Output
     prompt: str = ""
@@ -258,7 +258,7 @@ class RLHFCollector:
         )
 
         tracking_id = str(sample.id)
-        self._pending_responses[tracking_id] = (sample, datetime.now(timezone.utc))
+        self._pending_responses[tracking_id] = (sample, datetime.now(UTC))
 
         logger.debug(f"Started tracking response: {tracking_id}")
         return tracking_id
@@ -291,7 +291,7 @@ class RLHFCollector:
         sample, start_time = self._pending_responses.pop(tracking_id)
 
         # Record timing
-        sample.time_to_accept_ms = int((datetime.now(timezone.utc) - start_time).total_seconds() * 1000)
+        sample.time_to_accept_ms = int((datetime.now(UTC) - start_time).total_seconds() * 1000)
 
         # Record feedback
         sample.human_rating = rating
@@ -466,19 +466,21 @@ class RLHFCollector:
             stats.quality_distribution[quality] = stats.quality_distribution.get(quality, 0) + 1
 
         # Average rating
-        rated_samples = [s for s in samples if s.human_rating]
+        rated_samples = [s.human_rating for s in samples if s.human_rating is not None]
         if rated_samples:
-            stats.average_rating = sum(s.human_rating for s in rated_samples) / len(rated_samples)
+            stats.average_rating = sum(rated_samples) / len(rated_samples)
 
         # Acceptance rate
         acceptance_samples = [s for s in samples if s.accepted is not None]
         if acceptance_samples:
-            stats.acceptance_rate = sum(1 for s in acceptance_samples if s.accepted) / len(acceptance_samples)
+            accepted = sum(1 for s in acceptance_samples if s.accepted)
+            stats.acceptance_rate = accepted / len(acceptance_samples)
 
         # Model distribution
         for sample in samples:
             if sample.model:
-                stats.model_distribution[sample.model] = stats.model_distribution.get(sample.model, 0) + 1
+                current_count = stats.model_distribution.get(sample.model, 0)
+                stats.model_distribution[sample.model] = current_count + 1
 
         return stats
 

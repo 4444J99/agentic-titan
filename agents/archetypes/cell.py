@@ -13,32 +13,30 @@ multicellular organisms.
 
 from __future__ import annotations
 
-import asyncio
 import logging
-import random
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
-from enum import Enum
+from datetime import UTC, datetime
+from enum import StrEnum
 from typing import TYPE_CHECKING, Any
 
-from agents.framework.base_agent import BaseAgent, AgentState
+from agents.framework.base_agent import AgentState, BaseAgent
 
 if TYPE_CHECKING:
-    from hive.neighborhood import TopologicalNeighborhood
+    pass
 
 logger = logging.getLogger("titan.agents.cell")
 
 
-class CellType(str, Enum):
+class CellType(StrEnum):
     """Types of cells in the multicellular organism."""
 
-    STEM = "stem"          # Can differentiate
-    SOMATIC = "somatic"    # Specialized, non-reproductive
+    STEM = "stem"  # Can differentiate
+    SOMATIC = "somatic"  # Specialized, non-reproductive
     GERMLINE = "germline"  # Reproductive lineage
     SIGNALING = "signaling"  # Coordination cells
 
 
-class CellState(str, Enum):
+class CellState(StrEnum):
     """States a cell can be in."""
 
     HEALTHY = "healthy"
@@ -48,15 +46,15 @@ class CellState(str, Enum):
     DEAD = "dead"
 
 
-class SignalType(str, Enum):
+class SignalType(StrEnum):
     """Types of cell signals."""
 
-    GROWTH = "growth"            # Promote growth/division
-    INHIBITION = "inhibition"    # Inhibit growth
-    APOPTOSIS = "apoptosis"      # Trigger cell death
+    GROWTH = "growth"  # Promote growth/division
+    INHIBITION = "inhibition"  # Inhibit growth
+    APOPTOSIS = "apoptosis"  # Trigger cell death
     DIFFERENTIATION = "differentiation"  # Trigger specialization
-    STRESS = "stress"            # Damage detected
-    SURVIVAL = "survival"        # Support survival
+    STRESS = "stress"  # Damage detected
+    SURVIVAL = "survival"  # Support survival
 
 
 @dataclass
@@ -68,7 +66,7 @@ class CellSignal:
     intensity: float = 1.0  # 0-1
     target: str | None = None  # Specific target or None for neighbors
     payload: dict[str, Any] = field(default_factory=dict)
-    sent_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    sent_at: datetime = field(default_factory=lambda: datetime.now(UTC))
 
 
 @dataclass
@@ -119,12 +117,15 @@ class CellAgent(BaseAgent):
             **kwargs: Base agent arguments.
         """
         kwargs.setdefault("name", f"cell_{cell_type.value}")
-        kwargs.setdefault("capabilities", [
-            "cell_signaling",
-            "apoptosis",
-            "differentiation",
-            "neighbor_coordination",
-        ])
+        kwargs.setdefault(
+            "capabilities",
+            [
+                "cell_signaling",
+                "apoptosis",
+                "differentiation",
+                "neighbor_coordination",
+            ],
+        )
         super().__init__(**kwargs)
 
         self._cell_type = cell_type
@@ -160,7 +161,7 @@ class CellAgent(BaseAgent):
         if not self.is_alive:
             return {"status": self._cell_state.value, "alive": False}
 
-        result = {
+        result: dict[str, Any] = {
             "cell_type": self._cell_type.value,
             "cell_state": self._cell_state.value,
             "actions": [],
@@ -210,8 +211,7 @@ class CellAgent(BaseAgent):
 
         # Check for differentiation signals
         diff_signals = [
-            s for s in self._memory.signals_received
-            if s.signal_type == SignalType.DIFFERENTIATION
+            s for s in self._memory.signals_received if s.signal_type == SignalType.DIFFERENTIATION
         ]
 
         if diff_signals:
@@ -257,8 +257,7 @@ class CellAgent(BaseAgent):
 
         # Check for division signals
         growth_signals = [
-            s for s in self._memory.signals_received
-            if s.signal_type == SignalType.GROWTH
+            s for s in self._memory.signals_received if s.signal_type == SignalType.GROWTH
         ]
 
         if growth_signals and self._memory.energy > 0.5:
@@ -270,12 +269,11 @@ class CellAgent(BaseAgent):
 
     async def _signaling_cell_work(self) -> dict[str, Any]:
         """Signaling cell behavior: coordinate other cells."""
-        result = {"role": "signaling", "signals_sent": 0}
+        result: dict[str, Any] = {"role": "signaling", "signals_sent": 0}
 
         # Aggregate information from neighbors
         stress_count = sum(
-            1 for s in self._memory.signals_received
-            if s.signal_type == SignalType.STRESS
+            1 for s in self._memory.signals_received if s.signal_type == SignalType.STRESS
         )
 
         # Coordinate response
@@ -344,8 +342,7 @@ class CellAgent(BaseAgent):
 
         # Received apoptosis signal
         apoptosis_signals = [
-            s for s in self._memory.signals_received
-            if s.signal_type == SignalType.APOPTOSIS
+            s for s in self._memory.signals_received if s.signal_type == SignalType.APOPTOSIS
         ]
         if apoptosis_signals:
             # Check if signal is strong enough
@@ -405,10 +402,12 @@ class CellAgent(BaseAgent):
         # Broadcast via hive mind if available
         if self._hive_mind:
             await self._hive_mind.broadcast(
-                content=f"Cell signal: {signal_type.value}",
+                source_agent_id=self.agent_id,
+                message={
+                    "content": f"Cell signal: {signal_type.value}",
+                    "importance": intensity * 0.5,
+                },
                 topic=f"cell_{signal_type.value}",
-                importance=intensity * 0.5,
-                sender_id=self.agent_id,
             )
 
         return signal

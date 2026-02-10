@@ -13,6 +13,7 @@ from typing import Any, Protocol
 
 logger = logging.getLogger("titan.auth.jwt")
 
+
 def _resolve_jwt_secret() -> str:
     secret = os.getenv("TITAN_JWT_SECRET")  # allow-secret
     if secret:
@@ -42,7 +43,9 @@ class JoseJWTModule(Protocol):
 
     def encode(self, payload: dict[str, Any], key: str, algorithm: str) -> str: ...
 
-    def decode(self, token: str, key: str, algorithms: list[str]) -> dict[str, Any]: ...  # allow-secret
+    def decode(
+        self, token: str, key: str, algorithms: list[str]  # allow-secret
+    ) -> dict[str, Any]: ...  # allow-secret
 
 
 def _get_jose() -> tuple[JoseJWTModule, type[Exception]]:

@@ -4,9 +4,10 @@ Tests for titan.auth.jwt module.
 Tests JWT token creation, verification, and refresh functionality.
 """
 
+from datetime import timedelta
+from unittest.mock import MagicMock, patch
+
 import pytest
-from datetime import datetime, timedelta, timezone
-from unittest.mock import patch, MagicMock
 
 # Mock jose before importing jwt module
 jose_mock = MagicMock()
@@ -123,7 +124,7 @@ class TestJWTBasics:
             mock_jwt.decode.side_effect = MockJWTError("Invalid token")
             mock_jose.return_value = (mock_jwt, MockJWTError)
 
-            from titan.auth.jwt import decode_token, JWTError
+            from titan.auth.jwt import JWTError, decode_token
 
             with pytest.raises(JWTError, match="Invalid token"):
                 decode_token("invalid_token")
@@ -155,7 +156,7 @@ class TestJWTBasics:
             }
             mock_jose.return_value = (mock_jwt, Exception)
 
-            from titan.auth.jwt import verify_token, JWTError
+            from titan.auth.jwt import JWTError, verify_token
 
             with pytest.raises(JWTError, match="Invalid token type"):
                 verify_token("refresh_token", expected_type="access")
@@ -213,7 +214,7 @@ class TestJWTBasics:
             }
             mock_jose.return_value = (mock_jwt, Exception)
 
-            from titan.auth.jwt import refresh_access_token, JWTError
+            from titan.auth.jwt import JWTError, refresh_access_token
 
             with pytest.raises(JWTError, match="Invalid refresh token payload"):
                 refresh_access_token("incomplete_refresh_token")
@@ -227,7 +228,7 @@ class TestJWTBasics:
 
             from titan.auth.jwt import create_access_token
 
-            token = create_access_token(  # allow-secret
+            create_access_token(  # allow-secret
                 user_id="user-123",
                 username="testuser",
                 role="user",

@@ -4,12 +4,15 @@ from __future__ import annotations
 
 import pytest
 
-from agents.archetypes.orchestrator import OrchestratorAgent, Subtask, DependencyGraph, ExecutionMode
-from agents.archetypes.researcher import ResearcherAgent, ResearchTask
 from agents.archetypes.coder import CoderAgent, CodeTask
-from agents.archetypes.reviewer import ReviewerAgent
+from agents.archetypes.orchestrator import (
+    DependencyGraph,
+    OrchestratorAgent,
+    Subtask,
+)
 from agents.archetypes.paper2code import Paper2CodeAgent
-from agents.framework.base_agent import AgentState
+from agents.archetypes.researcher import ResearcherAgent, ResearchTask
+from agents.archetypes.reviewer import ReviewerAgent
 
 
 class TestCoderAgent:
@@ -203,7 +206,9 @@ class TestOrchestratorAgent:
             Subtask(id="st-0", description="A", agent_type="researcher"),
             Subtask(id="st-1", description="B", agent_type="coder", dependencies=["st-0"]),
             Subtask(id="st-2", description="C", agent_type="coder", dependencies=["st-0"]),
-            Subtask(id="st-3", description="D", agent_type="reviewer", dependencies=["st-1", "st-2"]),
+            Subtask(
+                id="st-3", description="D", agent_type="reviewer", dependencies=["st-1", "st-2"]
+            ),
         ]
         graph = DependencyGraph.from_subtasks(subtasks)
         levels = graph.topological_sort()

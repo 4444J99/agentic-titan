@@ -7,12 +7,11 @@ system load, worker availability, and runtime characteristics.
 
 from __future__ import annotations
 
-import asyncio
 import logging
 import os
 from dataclasses import dataclass, field
 from datetime import datetime
-from enum import Enum
+from enum import StrEnum
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
@@ -25,7 +24,8 @@ logger = logging.getLogger("titan.batch.scheduler")
 # System Load Detection
 # =============================================================================
 
-class LoadLevel(str, Enum):
+
+class LoadLevel(StrEnum):
     """System load level classification."""
 
     LOW = "low"
@@ -121,6 +121,7 @@ def get_system_load() -> SystemLoad:
 # Worker Status
 # =============================================================================
 
+
 @dataclass
 class WorkerStatus:
     """Status of a Celery worker."""
@@ -170,7 +171,8 @@ class WorkerStatus:
 # Scheduling Strategy
 # =============================================================================
 
-class SchedulingStrategy(str, Enum):
+
+class SchedulingStrategy(StrEnum):
     """Task scheduling strategy."""
 
     ROUND_ROBIN = "round_robin"
@@ -206,6 +208,7 @@ class SchedulingDecision:
 # =============================================================================
 # Batch Scheduler
 # =============================================================================
+
 
 class BatchScheduler:
     """
@@ -335,8 +338,8 @@ class BatchScheduler:
 
     def schedule(
         self,
-        session: "QueuedSession",
-        batch: "BatchJob",
+        session: QueuedSession,
+        batch: BatchJob,
         strategy: SchedulingStrategy | None = None,
     ) -> SchedulingDecision:
         """
@@ -360,7 +363,10 @@ class BatchScheduler:
         local_workers = [w for w in workers if w.runtime_type == "local"]
 
         reasoning.append(f"System load: {system_load.level.value}")
-        reasoning.append(f"Available workers: {len(workers)} ({len(local_workers)} local, {len(remote_workers)} remote)")
+        reasoning.append(
+            f"Available workers: {len(workers)} "
+            f"({len(local_workers)} local, {len(remote_workers)} remote)"
+        )
 
         # Apply strategy
         if strategy == SchedulingStrategy.LOAD_AWARE:
@@ -376,13 +382,9 @@ class BatchScheduler:
                 system_load, remote_workers, local_workers, reasoning
             )
         elif strategy == SchedulingStrategy.LEAST_LOADED:
-            return self._schedule_least_loaded(
-                system_load, workers, reasoning
-            )
+            return self._schedule_least_loaded(system_load, workers, reasoning)
         else:  # ROUND_ROBIN
-            return self._schedule_round_robin(
-                system_load, workers, reasoning
-            )
+            return self._schedule_round_robin(system_load, workers, reasoning)
 
     def _schedule_load_aware(
         self,
@@ -397,7 +399,10 @@ class BatchScheduler:
             reasoning.append("High system load detected, preferring remote workers")
             if remote_workers:
                 worker = min(remote_workers, key=lambda w: w.utilization)
-                reasoning.append(f"Selected remote worker: {worker.worker_id} ({worker.utilization:.1f}% utilized)")
+                reasoning.append(
+                    f"Selected remote worker: {worker.worker_id} "
+                    f"({worker.utilization:.1f}% utilized)"
+                )
                 return SchedulingDecision(
                     worker_id=worker.worker_id,
                     runtime_type=worker.runtime_type,

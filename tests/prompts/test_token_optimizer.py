@@ -3,6 +3,7 @@ Tests for titan.prompts.token_optimizer module.
 """
 
 import json
+
 import pytest
 
 from titan.prompts.token_optimizer import (
@@ -140,18 +141,20 @@ class TestTokenOptimizer:
 
     def test_compress_context_json(self, optimizer):
         """Test compression of JSON context."""
-        context = json.dumps({
-            "scope_clarification": {
-                "role": "Scope AI",
-                "content": "This is a long analysis " * 100,
-                "stage_index": 0,
-            },
-            "logical_branching": {
-                "role": "Logic AI",
-                "content": "Another long analysis " * 100,
-                "stage_index": 1,
-            },
-        })
+        context = json.dumps(
+            {
+                "scope_clarification": {
+                    "role": "Scope AI",
+                    "content": "This is a long analysis " * 100,
+                    "stage_index": 0,
+                },
+                "logical_branching": {
+                    "role": "Logic AI",
+                    "content": "Another long analysis " * 100,
+                    "stage_index": 1,
+                },
+            }
+        )
 
         result = optimizer.compress_context(context, max_tokens=200)
 
@@ -163,11 +166,16 @@ class TestTokenOptimizer:
         results = [
             {
                 "stage_name": "scope_clarification",
-                "content": "**Core Restatement**: This is about AI.\n**Key Dimensions**: 1. Technology 2. Ethics",
+                "content": (
+                    "**Core Restatement**: This is about AI.\n"
+                    "**Key Dimensions**: 1. Technology 2. Ethics"
+                ),
             },
             {
                 "stage_name": "logical_branching",
-                "content": "**Primary Inquiry Lines**: 1. How does AI work?\n- Why: Neural networks",
+                "content": (
+                    "**Primary Inquiry Lines**: 1. How does AI work?\n- Why: Neural networks"
+                ),
             },
         ]
 
@@ -195,10 +203,9 @@ class TestTokenOptimizer:
 
     def test_hierarchical_compression(self, optimizer):
         """Test hierarchical compression strategy."""
-        context = json.dumps({
-            f"stage_{i}": {"content": "Analysis " * 200, "stage_index": i}
-            for i in range(5)
-        })
+        context = json.dumps(
+            {f"stage_{i}": {"content": "Analysis " * 200, "stage_index": i} for i in range(5)}
+        )
 
         result = optimizer.compress_context(
             context,

@@ -3,9 +3,6 @@ Tests for Firecracker MicroVM Manager (Phase 18B)
 """
 
 import pytest
-import asyncio
-from unittest.mock import AsyncMock, MagicMock, patch
-from datetime import datetime
 
 
 class TestMicroVM:
@@ -13,14 +10,15 @@ class TestMicroVM:
 
     def test_import(self):
         """Test that MicroVM can be imported."""
-        from runtime.firecracker.vm import MicroVM, ExecutionResult
+        from runtime.firecracker.vm import ExecutionResult, MicroVM
+
         assert MicroVM is not None
         assert ExecutionResult is not None
 
     def test_create_vm(self):
         """Test creating a MicroVM instance."""
-        from runtime.firecracker.vm import MicroVM
         from runtime.firecracker.config import FirecrackerConfig, VMState
+        from runtime.firecracker.vm import MicroVM
 
         config = FirecrackerConfig()
         vm = MicroVM(config=config)
@@ -89,8 +87,8 @@ class TestMicroVMManager:
 
     def test_create_manager(self):
         """Test creating a VM manager."""
-        from runtime.firecracker.vm import MicroVMManager
         from runtime.firecracker.config import FirecrackerConfig
+        from runtime.firecracker.vm import MicroVMManager
 
         config = FirecrackerConfig()
         manager = MicroVMManager(default_config=config)
@@ -108,8 +106,8 @@ class TestMicroVMManager:
     @pytest.mark.asyncio
     async def test_create_vm(self):
         """Test creating a VM through manager."""
-        from runtime.firecracker.vm import MicroVMManager, MicroVM
         from runtime.firecracker.config import VMState
+        from runtime.firecracker.vm import MicroVM, MicroVMManager
 
         manager = MicroVMManager()
         vm = await manager.create()
@@ -133,8 +131,8 @@ class TestMicroVMManager:
     @pytest.mark.asyncio
     async def test_start_vm_missing_binary(self):
         """Test starting VM when Firecracker binary is missing."""
-        from runtime.firecracker.vm import MicroVMManager
         from runtime.firecracker.config import FirecrackerConfig
+        from runtime.firecracker.vm import MicroVMManager
 
         config = FirecrackerConfig(firecracker_path="/nonexistent/firecracker")
         manager = MicroVMManager(default_config=config)
@@ -146,8 +144,8 @@ class TestMicroVMManager:
     @pytest.mark.asyncio
     async def test_stop_vm(self):
         """Test stopping a running VM."""
-        from runtime.firecracker.vm import MicroVMManager
         from runtime.firecracker.config import VMState
+        from runtime.firecracker.vm import MicroVMManager
 
         manager = MicroVMManager()
         vm = await manager.create()
@@ -173,8 +171,8 @@ class TestMicroVMManager:
     @pytest.mark.asyncio
     async def test_execute_on_stopped_vm(self):
         """Test executing on a stopped VM."""
-        from runtime.firecracker.vm import MicroVMManager
         from runtime.firecracker.config import VMState
+        from runtime.firecracker.vm import MicroVMManager
 
         manager = MicroVMManager()
         vm = await manager.create()
@@ -192,8 +190,8 @@ class TestVMManagerPool:
     @pytest.mark.asyncio
     async def test_return_to_pool(self):
         """Test returning VM to pool."""
-        from runtime.firecracker.vm import MicroVMManager
         from runtime.firecracker.config import VMState
+        from runtime.firecracker.vm import MicroVMManager
 
         manager = MicroVMManager(pool_size=2)
         vm = await manager.create()
@@ -206,8 +204,8 @@ class TestVMManagerPool:
     @pytest.mark.asyncio
     async def test_pool_full(self):
         """Test returning VM when pool is full."""
-        from runtime.firecracker.vm import MicroVMManager
         from runtime.firecracker.config import VMState
+        from runtime.firecracker.vm import MicroVMManager
 
         manager = MicroVMManager(pool_size=1)
 
@@ -225,8 +223,8 @@ class TestVMManagerPool:
     @pytest.mark.asyncio
     async def test_shutdown_clears_pool(self):
         """Test that shutdown clears the pool."""
-        from runtime.firecracker.vm import MicroVMManager
         from runtime.firecracker.config import VMState
+        from runtime.firecracker.vm import MicroVMManager
 
         manager = MicroVMManager(pool_size=2)
 
@@ -244,7 +242,7 @@ class TestGetVMManager:
 
     def test_get_vm_manager(self):
         """Test getting VM manager."""
-        from runtime.firecracker.vm import get_vm_manager, MicroVMManager
+        from runtime.firecracker.vm import MicroVMManager, get_vm_manager
 
         manager = get_vm_manager()
 

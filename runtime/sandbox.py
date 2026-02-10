@@ -21,8 +21,6 @@ import asyncio
 import logging
 import os
 import platform
-import shutil
-import subprocess
 import tempfile
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -268,7 +266,7 @@ class SandboxedRuntime(Runtime):
                 task.cancel()
                 try:
                     await asyncio.wait_for(task, timeout=self.config.shutdown_timeout)
-                except (asyncio.CancelledError, asyncio.TimeoutError):
+                except (TimeoutError, asyncio.CancelledError):
                     pass
 
         self._tasks.clear()
@@ -303,9 +301,7 @@ class SandboxedRuntime(Runtime):
         )
         self._tasks[process.process_id] = task
 
-        logger.info(
-            f"Spawned sandboxed agent {agent_id} as process {process.process_id}"
-        )
+        logger.info(f"Spawned sandboxed agent {agent_id} as process {process.process_id}")
         return process
 
     async def _execute_sandboxed(
@@ -315,7 +311,7 @@ class SandboxedRuntime(Runtime):
         prompt: str | None,
     ) -> None:
         """Execute agent in sandbox environment."""
-        self._log(process.process_id, f"Starting sandboxed execution")
+        self._log(process.process_id, "Starting sandboxed execution")
         process.mark_started()
 
         try:
@@ -384,7 +380,7 @@ class SandboxedRuntime(Runtime):
             process.completed_at = datetime.now()
             raise
 
-        except asyncio.TimeoutError:
+        except TimeoutError:
             self._log(process.process_id, "Agent timed out")
             process.mark_failed("Execution timeout", exit_code=124)
 
@@ -435,9 +431,7 @@ class SandboxedRuntime(Runtime):
         )
 
         # Write policy to temp file
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".sb", delete=False
-        ) as policy_file:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".sb", delete=False) as policy_file:
             policy_file.write(policy)
             policy_path = policy_file.name
 
@@ -580,7 +574,7 @@ class SandboxedRuntime(Runtime):
         try:
             timeout = 0 if force else self.config.shutdown_timeout
             await asyncio.wait_for(task, timeout=timeout)
-        except (asyncio.CancelledError, asyncio.TimeoutError):
+        except (TimeoutError, asyncio.CancelledError):
             pass
 
         process = self._processes.get(process_id)

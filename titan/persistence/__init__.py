@@ -8,6 +8,12 @@ Provides:
 - Session recovery
 """
 
+from titan.persistence.audit import (
+    AuditContext,
+    AuditLogger,
+    get_audit_logger,
+    init_audit_logger,
+)
 from titan.persistence.checkpoint import (
     Checkpoint,
     CheckpointManager,
@@ -15,8 +21,8 @@ from titan.persistence.checkpoint import (
     restore_checkpoint,
 )
 from titan.persistence.models import (
-    AuditEvent,
     AgentDecision,
+    AuditEvent,
     AuditEventType,
     DecisionType,
 )
@@ -25,12 +31,6 @@ from titan.persistence.postgres import (
     PostgresConfig,
     get_postgres_client,
     init_postgres,
-)
-from titan.persistence.audit import (
-    AuditLogger,
-    AuditContext,
-    get_audit_logger,
-    init_audit_logger,
 )
 
 __all__ = [

@@ -15,15 +15,16 @@ Supported Topologies:
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 from agents.framework.errors import InvalidTopologyError, TopologyError
+from hive.criticality import CriticalityMonitor, PhaseTransition
 from titan.metrics import get_metrics
-from hive.criticality import CriticalityMonitor, CriticalityState, PhaseTransition
 
 if TYPE_CHECKING:
     from hive.memory import HiveMind
@@ -34,12 +35,12 @@ logger = logging.getLogger("titan.hive.topology")
 class TopologyType(Enum):
     """Supported topology types."""
 
-    SWARM = "swarm"         # All-to-all, emergent
+    SWARM = "swarm"  # All-to-all, emergent
     HIERARCHY = "hierarchy"  # Tree structure
-    PIPELINE = "pipeline"    # DAG/sequential
-    MESH = "mesh"           # Resilient grid
-    RING = "ring"           # Token passing
-    STAR = "star"           # Hub and spoke
+    PIPELINE = "pipeline"  # DAG/sequential
+    MESH = "mesh"  # Resilient grid
+    RING = "ring"  # Token passing
+    STAR = "star"  # Hub and spoke
     RHIZOMATIC = "rhizomatic"  # Lateral, non-hierarchical
     FISSION_FUSION = "fission_fusion"  # Dynamic clustering
     STIGMERGIC = "stigmergic"  # Environment-mediated
@@ -115,7 +116,9 @@ class TaskProfile:
         complexity = "medium"
         if any(kw in description_lower for kw in ["simple", "basic", "easy", "trivial"]):
             complexity = "low"
-        elif any(kw in description_lower for kw in ["complex", "advanced", "sophisticated", "large"]):
+        elif any(
+            kw in description_lower for kw in ["complex", "advanced", "sophisticated", "large"]
+        ):
             complexity = "high"
 
         return cls(
@@ -140,7 +143,14 @@ class TaskProfile:
             ),
             is_lateral=any(
                 kw in description_lower
-                for kw in ["rhizomatic", "lateral", "grassroots", "decentralized", "peer-to-peer", "p2p"]
+                for kw in [
+                    "rhizomatic",
+                    "lateral",
+                    "grassroots",
+                    "decentralized",
+                    "peer-to-peer",
+                    "p2p",
+                ]
             ),
             is_modular=any(
                 kw in description_lower
@@ -430,7 +440,7 @@ class HierarchyTopology(BaseTopology):
     def _path_to_root(self, agent_id: str) -> list[str]:
         """Get path from agent to root."""
         path = []
-        current = agent_id
+        current: str | None = agent_id
         while current:
             path.append(current)
             node = self.nodes.get(current)
@@ -839,9 +849,7 @@ class StarTopology(BaseTopology):
                 new_hub = self.nodes[new_hub_id]
                 new_hub.role = "hub"
                 new_hub.parent_id = None
-                new_hub.child_ids = [
-                    cid for cid in node.child_ids if cid != new_hub_id
-                ]
+                new_hub.child_ids = [cid for cid in node.child_ids if cid != new_hub_id]
                 new_hub.neighbors = new_hub.child_ids.copy()
 
                 # Update all spokes
@@ -899,7 +907,7 @@ class StarTopology(BaseTopology):
 class RhizomaticTopology(BaseTopology):
     """
     Rhizomatic topology - Decentralized, lateral connections.
-    
+
     Any node can connect to any other node. No central root or hub.
     Resilient to disconnection and highly adaptive.
     """
@@ -923,6 +931,7 @@ class RhizomaticTopology(BaseTopology):
 
         # Connect to a random subset of existing nodes (lateral growth)
         import random
+
         existing = list(self.nodes.keys())
         if existing:
             # Connect to 1-3 random neighbors
@@ -991,7 +1000,7 @@ class RhizomaticTopology(BaseTopology):
 class FissionFusionTopology(BaseTopology):
     """
     Fission-Fusion topology - Dynamic clustering and splitting.
-    
+
     Agents form temporary groups (fusion) for sub-tasks and split (fission)
     when tasks complete or requirements change.
     """
@@ -1020,9 +1029,9 @@ class FissionFusionTopology(BaseTopology):
 
         if cluster_id not in self.clusters:
             self.clusters[cluster_id] = []
-        
+
         self.clusters[cluster_id].append(agent_id)
-        
+
         # Neighbors are others in the same cluster
         node.neighbors = [aid for aid in self.clusters[cluster_id] if aid != agent_id]
         for peer_id in node.neighbors:
@@ -1043,11 +1052,11 @@ class FissionFusionTopology(BaseTopology):
                 if new_cluster_id not in self.clusters:
                     self.clusters[new_cluster_id] = []
                 self.clusters[new_cluster_id].append(aid)
-                
+
                 # Update node metadata
                 node = self.nodes[aid]
                 node.metadata["cluster_id"] = new_cluster_id
-                
+
                 # Rebuild neighbors for this node and its old/new peers
                 self._rebuild_neighbors(aid)
 
@@ -1055,7 +1064,7 @@ class FissionFusionTopology(BaseTopology):
         """Merge one cluster into another."""
         if source_cluster_id not in self.clusters:
             return
-        
+
         agents = self.clusters.pop(source_cluster_id)
         for aid in agents:
             if target_cluster_id not in self.clusters:
@@ -1068,12 +1077,12 @@ class FissionFusionTopology(BaseTopology):
         """Update neighbor lists after fission/fusion."""
         node = self.nodes[agent_id]
         cluster_id = node.metadata["cluster_id"]
-        
+
         # Remove from old neighbors
         for other in self.nodes.values():
             if agent_id in other.neighbors:
                 other.neighbors.remove(agent_id)
-        
+
         # Connect to new peers
         node.neighbors = [aid for aid in self.clusters[cluster_id] if aid != agent_id]
         for peer_id in node.neighbors:
@@ -1083,15 +1092,15 @@ class FissionFusionTopology(BaseTopology):
         node = self.nodes.get(agent_id)
         if not node:
             return False
-        
+
         cluster_id = node.metadata.get("cluster_id")
         if cluster_id in self.clusters:
             self.clusters[cluster_id].remove(agent_id)
-        
+
         for peer_id in node.neighbors:
             if agent_id in self.nodes[peer_id].neighbors:
                 self.nodes[peer_id].neighbors.remove(agent_id)
-        
+
         del self.nodes[agent_id]
         return True
 
@@ -1103,7 +1112,7 @@ class FissionFusionTopology(BaseTopology):
         node = self.nodes.get(source_agent_id)
         if not node:
             return []
-        
+
         if message_type == "cluster":
             return node.neighbors.copy()
         else:
@@ -1119,7 +1128,7 @@ class FissionFusionTopology(BaseTopology):
         target = self.nodes.get(target_agent_id)
         if not source or not target:
             return []
-        
+
         if source.metadata["cluster_id"] == target.metadata["cluster_id"]:
             return [source_agent_id, target_agent_id]
         else:
@@ -1130,7 +1139,7 @@ class FissionFusionTopology(BaseTopology):
 class StigmergicTopology(BaseTopology):
     """
     Stigmergic topology - Environment-mediated coordination.
-    
+
     Agents do not communicate directly. Instead, they read and write to
     the shared "environment" (Hive Mind memory). Changes in the environment
     stimulate further actions from other agents.
@@ -1152,7 +1161,7 @@ class StigmergicTopology(BaseTopology):
             role="builder",
             metadata=kwargs,
         )
-        
+
         # No direct neighbors in pure stigmergy
         node.neighbors = []
         self.nodes[agent_id] = node
@@ -1230,9 +1239,7 @@ class TopologyEngine:
         self._transition_lock = False
 
         # Initialize criticality monitor
-        self._criticality_monitor = CriticalityMonitor(
-            event_bus=event_bus
-        )
+        self._criticality_monitor = CriticalityMonitor(event_bus=event_bus)
         self._criticality_monitor.on_transition(self._handle_phase_transition)
 
     def _handle_phase_transition(self, transition: PhaseTransition) -> None:
@@ -1280,7 +1287,7 @@ class TopologyEngine:
             try:
                 topology_type = TopologyType(topology_type)
             except ValueError as exc:
-                raise InvalidTopologyError(topology_type) from exc
+                raise InvalidTopologyError(str(topology_type)) from exc
 
         topology_class = self.TOPOLOGY_CLASSES.get(topology_type)
         if not topology_class:
@@ -1313,7 +1320,16 @@ class TopologyEngine:
         if self._episodic_learner:
             recommended, confidence = self._episodic_learner.get_recommendation(profile)
             if confidence > 0.6:  # High confidence from learning
-                logger.info(f"Using learned recommendation: {recommended.value} (confidence: {confidence:.2f})")
+                if not isinstance(recommended, TopologyType):
+                    try:
+                        recommended = TopologyType(str(recommended))
+                    except ValueError:
+                        recommended = TopologyType.SWARM
+                logger.info(
+                    "Using learned recommendation: %s (confidence: %.2f)",
+                    recommended.value,
+                    confidence,
+                )
                 return recommended
 
         # Rule-based selection
@@ -1414,6 +1430,10 @@ class TopologyEngine:
         learning_info = None
         if self._episodic_learner:
             recommended, confidence = self._episodic_learner.get_recommendation(profile)
+            profile_key = self._episodic_learner._profile_key(profile)
+            preference = self._episodic_learner._preferences.get(profile_key, {}).get(
+                recommended, {}
+            )
             learning_info = {
                 "learned_recommendation": recommended.value,
                 "confidence": confidence,
@@ -1421,7 +1441,7 @@ class TopologyEngine:
             }
             if learning_info["overrides_rules"]:
                 selected = recommended
-                reasons.append(f"Learned from {self._episodic_learner._preferences.get(self._episodic_learner._profile_key(profile), {}).get(recommended, {})}")
+                reasons.append(f"Learned from {preference}")
 
         return {
             "recommended": selected.value,
@@ -1470,6 +1490,7 @@ class TopologyEngine:
             # Emit TOPOLOGY_CHANGING event
             if self._event_bus:
                 from hive.events import emit_topology_changing
+
                 await emit_topology_changing(
                     self._event_bus,
                     old_type=old_type,
@@ -1479,18 +1500,21 @@ class TopologyEngine:
 
             if old_topology and migrate_agents:
                 agents_to_migrate = old_topology.list_agents()
-                self._topology_history.append({
-                    **old_topology.to_dict(),
-                    "reason": reason,
-                    "timestamp": time.time(),
-                })
+                self._topology_history.append(
+                    {
+                        **old_topology.to_dict(),
+                        "reason": reason,
+                        "timestamp": time.time(),
+                    }
+                )
 
             new_topology = self.create_topology(new_type)
 
             # Migrate agents with events
             for agent in agents_to_migrate:
                 if self._event_bus:
-                    from hive.events import emit_agent_migrating, emit_agent_migrated
+                    from hive.events import emit_agent_migrated, emit_agent_migrating
+
                     await emit_agent_migrating(
                         self._event_bus,
                         agent_id=agent.agent_id,
@@ -1527,6 +1551,7 @@ class TopologyEngine:
             # Emit TOPOLOGY_CHANGED event
             if self._event_bus:
                 from hive.events import emit_topology_changed
+
                 await emit_topology_changed(
                     self._event_bus,
                     old_type=old_type,
@@ -1585,6 +1610,7 @@ class TopologyEngine:
 
         if self._episodic_learner:
             from hive.learning import EpisodeOutcome
+
             outcome = EpisodeOutcome(
                 success=success,
                 completion_time_ms=completion_time_ms,
@@ -1601,7 +1627,7 @@ class TopologyEngine:
     def get_learning_stats(self) -> dict[str, Any] | None:
         """Get episodic learning statistics."""
         if self._episodic_learner:
-            return self._episodic_learner.get_statistics()
+            return cast(dict[str, Any], self._episodic_learner.get_statistics())
         return None
 
     # =========================================================================
@@ -1648,9 +1674,7 @@ class TopologyEngine:
 
             # Weighted utilization score
             utilization = (
-                task_ratio * 0.4 +
-                time_ratio * 0.4 +
-                min(token_ratio, 1.0) * 0.2  # Cap at 100%
+                task_ratio * 0.4 + time_ratio * 0.4 + min(token_ratio, 1.0) * 0.2  # Cap at 100%
             )
 
             per_agent[agent.agent_id] = {
@@ -1722,6 +1746,7 @@ class TopologyEngine:
         elif topology_type == TopologyType.HIERARCHY:
             # O(log n) for tree
             import math
+
             theoretical_min = int(math.log2(max(agent_count, 2))) * agent_count
         else:  # MESH
             # O(n) with multiple paths
@@ -1836,54 +1861,88 @@ class TopologyEngine:
 
         # Utilization metrics
         utilization = self.get_agent_utilization()
-        metrics.append((
-            "titan_agent_utilization_average",
-            "gauge",
-            utilization["average"],
-            {"topology": topology_type},
-        ))
+        metrics.append(
+            (
+                "titan_agent_utilization_average",
+                "gauge",
+                utilization["average"],
+                {"topology": topology_type},
+            )
+        )
 
         for agent_id, agent_metrics in utilization.get("per_agent", {}).items():
-            labels = {"agent_id": agent_id, "topology": topology_type, "role": agent_metrics.get("role", "unknown")}
-            metrics.append(("titan_agent_utilization", "gauge", agent_metrics["utilization"], labels))
-            metrics.append(("titan_agent_tasks_completed", "counter", agent_metrics["tasks_completed"], labels))
-            metrics.append(("titan_agent_tasks_assigned", "counter", agent_metrics["tasks_assigned"], labels))
-            metrics.append(("titan_agent_tokens_used", "counter", agent_metrics["tokens_used"], labels))
+            labels = {
+                "agent_id": agent_id,
+                "topology": topology_type,
+                "role": agent_metrics.get("role", "unknown"),
+            }
+            metrics.append(
+                ("titan_agent_utilization", "gauge", agent_metrics["utilization"], labels)
+            )
+            metrics.append(
+                (
+                    "titan_agent_tasks_completed",
+                    "counter",
+                    agent_metrics["tasks_completed"],
+                    labels,
+                )
+            )
+            metrics.append(
+                (
+                    "titan_agent_tasks_assigned",
+                    "counter",
+                    agent_metrics["tasks_assigned"],
+                    labels,
+                )
+            )
+            metrics.append(
+                ("titan_agent_tokens_used", "counter", agent_metrics["tokens_used"], labels)
+            )
 
         # Communication metrics
         comm = self.get_communication_overhead()
-        metrics.append((
-            "titan_communication_overhead_ratio",
-            "gauge",
-            comm["overhead_ratio"],
-            {"topology": topology_type},
-        ))
-        metrics.append((
-            "titan_messages_total",
-            "counter",
-            float(comm["total_messages"]),
-            {"topology": topology_type},
-        ))
-        metrics.append((
-            "titan_bytes_transferred_total",
-            "counter",
-            float(comm["bytes_transferred"]),
-            {"topology": topology_type},
-        ))
-        metrics.append((
-            "titan_topology_switches_total",
-            "counter",
-            float(comm["topology_switches"]),
-            {},
-        ))
+        metrics.append(
+            (
+                "titan_communication_overhead_ratio",
+                "gauge",
+                comm["overhead_ratio"],
+                {"topology": topology_type},
+            )
+        )
+        metrics.append(
+            (
+                "titan_messages_total",
+                "counter",
+                float(comm["total_messages"]),
+                {"topology": topology_type},
+            )
+        )
+        metrics.append(
+            (
+                "titan_bytes_transferred_total",
+                "counter",
+                float(comm["bytes_transferred"]),
+                {"topology": topology_type},
+            )
+        )
+        metrics.append(
+            (
+                "titan_topology_switches_total",
+                "counter",
+                float(comm["topology_switches"]),
+                {},
+            )
+        )
 
         # Topology info
-        metrics.append((
-            "titan_agent_count",
-            "gauge",
-            float(len(self._current_topology.nodes)),
-            {"topology": topology_type},
-        ))
+        metrics.append(
+            (
+                "titan_agent_count",
+                "gauge",
+                float(len(self._current_topology.nodes)),
+                {"topology": topology_type},
+            )
+        )
 
         return metrics
 

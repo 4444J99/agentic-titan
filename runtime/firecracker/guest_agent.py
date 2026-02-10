@@ -222,7 +222,7 @@ class GuestAgentProtocol:
                     error="No direct connection, use API-based execution",
                 )
 
-        except asyncio.TimeoutError:
+        except TimeoutError:
             return CommandResult(exit_code=-1, timed_out=True)
         except Exception as e:
             return CommandResult(exit_code=-1, error=str(e))
@@ -470,7 +470,7 @@ class GuestAgentProtocol:
             raise ValueError(f"Invalid magic: {header[:4]}")
 
         # Parse header
-        version = header[4]
+        header[4]
         msg_type = header[5]
         payload_len = struct.unpack(">I", header[6:10])[0]
 

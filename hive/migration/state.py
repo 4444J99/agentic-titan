@@ -61,14 +61,18 @@ class StateSnapshot:
 
     def _compute_checksum(self) -> str:
         """Compute checksum of state content."""
-        content = json.dumps({
-            "agent_id": self.agent_id,
-            "task": self.task,
-            "context": self.context,
-            "memory": self.memory,
-            "turn_number": self.turn_number,
-            "status": self.status,
-        }, sort_keys=True, default=str)
+        content = json.dumps(
+            {
+                "agent_id": self.agent_id,
+                "task": self.task,
+                "context": self.context,
+                "memory": self.memory,
+                "turn_number": self.turn_number,
+                "status": self.status,
+            },
+            sort_keys=True,
+            default=str,
+        )
         return hashlib.sha256(content.encode()).hexdigest()[:16]
 
     def verify(self) -> bool:
@@ -175,7 +179,7 @@ class AgentState:
 
         # Trim history
         if len(self._snapshots) > self._snapshot_limit:
-            self._snapshots = self._snapshots[-self._snapshot_limit:]
+            self._snapshots = self._snapshots[-self._snapshot_limit :]
 
         logger.debug(f"Created snapshot {snap.id} for agent {self.agent_id}")
         return snap
@@ -235,10 +239,12 @@ class AgentState:
 
     def add_memory(self, entry: dict[str, Any]) -> None:
         """Add a memory entry."""
-        self.memory.append({
-            "timestamp": datetime.now().isoformat(),
-            **entry,
-        })
+        self.memory.append(
+            {
+                "timestamp": datetime.now().isoformat(),
+                **entry,
+            }
+        )
 
     def to_dict(self) -> dict[str, Any]:
         """Serialize to dictionary."""

@@ -8,15 +8,16 @@ from __future__ import annotations
 
 import logging
 from abc import ABC, abstractmethod
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta, timezone
-from enum import Enum
-from typing import Any, Callable
+from datetime import UTC, datetime
+from enum import StrEnum
+from typing import Any
 
 logger = logging.getLogger("titan.orchestration.termination")
 
 
-class TerminationReason(str, Enum):
+class TerminationReason(StrEnum):
     """Reasons for workflow termination."""
 
     SUCCESS = "success"
@@ -65,7 +66,7 @@ class WorkflowState:
     @property
     def duration_seconds(self) -> float:
         """Get workflow duration in seconds."""
-        return (datetime.now(timezone.utc) - self.start_time).total_seconds()
+        return (datetime.now(UTC) - self.start_time).total_seconds()
 
     @property
     def failure_rate(self) -> float:
@@ -268,12 +269,14 @@ class DefaultTerminationConditions:
         max_cost_usd: float = 2.0,
     ) -> CompositeTerminationCondition:
         """Default conditions for agent execution."""
-        return CompositeTerminationCondition([
-            MaxIterationsCondition(max_turns),
-            TimeoutCondition(timeout_seconds),
-            MaxCostCondition(max_cost_usd),
-            FailureThresholdCondition(max_failure_rate=0.8, min_attempts=3),
-        ])
+        return CompositeTerminationCondition(
+            [
+                MaxIterationsCondition(max_turns),
+                TimeoutCondition(timeout_seconds),
+                MaxCostCondition(max_cost_usd),
+                FailureThresholdCondition(max_failure_rate=0.8, min_attempts=3),
+            ]
+        )
 
     @staticmethod
     def for_workflow(
@@ -282,13 +285,15 @@ class DefaultTerminationConditions:
         max_cost_usd: float = 50.0,
     ) -> CompositeTerminationCondition:
         """Default conditions for workflow execution."""
-        return CompositeTerminationCondition([
-            MaxIterationsCondition(max_iterations),
-            TimeoutCondition(timeout_seconds),
-            MaxCostCondition(max_cost_usd),
-            FailureThresholdCondition(max_failure_rate=0.5, min_attempts=5),
-            ResourceExhaustionCondition(max_memory_mb=2048),
-        ])
+        return CompositeTerminationCondition(
+            [
+                MaxIterationsCondition(max_iterations),
+                TimeoutCondition(timeout_seconds),
+                MaxCostCondition(max_cost_usd),
+                FailureThresholdCondition(max_failure_rate=0.5, min_attempts=5),
+                ResourceExhaustionCondition(max_memory_mb=2048),
+            ]
+        )
 
     @staticmethod
     def strict(
@@ -296,8 +301,10 @@ class DefaultTerminationConditions:
         timeout_seconds: float = 60,
     ) -> CompositeTerminationCondition:
         """Strict conditions for testing or limited operations."""
-        return CompositeTerminationCondition([
-            MaxIterationsCondition(max_iterations),
-            TimeoutCondition(timeout_seconds),
-            FailureThresholdCondition(max_failure_rate=0.3, min_attempts=2),
-        ])
+        return CompositeTerminationCondition(
+            [
+                MaxIterationsCondition(max_iterations),
+                TimeoutCondition(timeout_seconds),
+                FailureThresholdCondition(max_failure_rate=0.3, min_attempts=2),
+            ]
+        )

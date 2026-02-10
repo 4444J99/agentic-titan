@@ -1,0 +1,199 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.14.3, pytest-9.0.2, pluggy-1.6.0
+rootdir: /Users/4jp/world/realm/operate/org/liminal/repo/agentic-titan
+configfile: pyproject.toml
+plugins: anyio-4.12.1, asyncio-1.3.0
+asyncio: mode=Mode.AUTO, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collected 1327 items / 1 skipped
+
+tests/adversarial/test_prompt_injection.py ............................. [  2%]
+..                                                                       [  2%]
+tests/adversarial/test_resource_exhaustion.py .......................    [  4%]
+tests/adversarial/test_role_confusion.py ............................... [  6%]
+                                                                         [  6%]
+tests/analysis/test_contradictions.py ...........................        [  8%]
+tests/analysis/test_dialectic.py ......................                  [ 10%]
+tests/api/test_admin.py .................                                [ 11%]
+tests/api/test_models_routes.py ..................                       [ 12%]
+tests/api/test_rate_limit.py ...............                             [ 13%]
+tests/archetypes/test_biological.py .............                        [ 14%]
+tests/archetypes/test_core_agents.py ............................        [ 16%]
+tests/archetypes/test_digital.py ...........                             [ 17%]
+tests/archetypes/test_governance.py ...............                      [ 18%]
+tests/archetypes/test_philosophical.py .........                         [ 19%]
+tests/archetypes/test_professional.py ................                   [ 20%]
+tests/auth/test_api_keys.py ........................                     [ 22%]
+tests/auth/test_jwt.py ............                                      [ 23%]
+tests/auth/test_middleware.py ................                           [ 24%]
+tests/batch/test_cleanup.py s........                                    [ 25%]
+tests/batch/test_orchestrator.py ....................................... [ 28%]
+..                                                                       [ 28%]
+tests/batch/test_recovery.py ...............                             [ 29%]
+tests/batch/test_worker.py ......sssssss.............                    [ 31%]
+tests/chaos/test_fission_recovery.py .                                   [ 31%]
+tests/chaos/test_resilience.py ..................                        [ 33%]
+tests/e2e/test_rlhf_pipeline.py ...................................      [ 35%]
+tests/e2e/test_workflows.py ....................                         [ 37%]
+tests/evaluation/test_quality.py ............                            [ 38%]
+tests/integration/test_import_boundaries.py ............................ [ 40%]
+....                                                                     [ 40%]
+tests/integration/test_new_specs.py .                                    [ 40%]
+tests/integration/test_new_topologies.py ..                              [ 40%]
+tests/integration/test_quality_gates.py .                                [ 40%]
+tests/integration/test_remediations.py .EE                               [ 40%]
+tests/integration/test_safety_integration.py .............               [ 41%]
+tests/learning/test_dpo_trainer.py ....................                  [ 43%]
+tests/learning/test_eval_suite.py ....................                   [ 44%]
+tests/learning/test_pipeline.py .........................                [ 46%]
+tests/learning/test_preference_pairs.py .....................            [ 48%]
+tests/learning/test_reward_model.py .....................                [ 50%]
+tests/mcp/test_notifications.py .......................                  [ 51%]
+tests/mcp/test_prompts.py .........................                      [ 53%]
+tests/mcp/test_resources.py ...................                          [ 55%]
+tests/performance/test_load.py ..................                        [ 56%]
+tests/prompts/test_auto_prompt.py .........................              [ 58%]
+tests/prompts/test_examples.py ...................                       [ 59%]
+tests/prompts/test_metrics.py ......................                     [ 61%]
+tests/prompts/test_token_optimizer.py ...................                [ 62%]
+tests/ray/test_ray_integration.py ..................                     [ 64%]
+tests/runtime/test_firecracker_config.py .................               [ 65%]
+tests/runtime/test_firecracker_runtime.py ...........s............       [ 67%]
+tests/runtime/test_firecracker_vm.py ..................                  [ 68%]
+tests/test_decision.py .......................                           [ 70%]
+tests/test_hive/test_assembly_complete.py .............................. [ 72%]
+.                                                                        [ 72%]
+tests/test_hive/test_criticality.py ......................               [ 74%]
+tests/test_hive/test_fission_fusion.py .............................     [ 76%]
+tests/test_hive/test_information_center.py ............................. [ 78%]
+...                                                                      [ 78%]
+tests/test_hive/test_multi_scale_neighbors.py ...............            [ 80%]
+tests/test_hive/test_war_machine_complete.py ....................        [ 81%]
+tests/test_llm_live.py .FFFssssF                                         [ 82%]
+tests/test_mcp_server.py ................                                [ 83%]
+tests/test_migration.py ....................                             [ 85%]
+tests/workflows/test_conversational.py ........................          [ 86%]
+tests/workflows/test_inquiry_dag.py .........................            [ 88%]
+tests/workflows/test_inquiry_engine.py ................................. [ 91%]
+...................                                                      [ 92%]
+tests/workflows/test_narrative.py .....................                  [ 94%]
+tests/workflows/test_personality.py ............................         [ 96%]
+tests/workflows/test_temporal.py .......................                 [ 98%]
+tests/workflows/test_visualization.py ..........................         [100%]
+
+==================================== ERRORS ====================================
+____________________ ERROR at setup of test_mget_efficiency ____________________
+file /Users/4jp/world/realm/operate/org/liminal/repo/agentic-titan/tests/integration/test_remediations.py, line 15
+  @pytest.mark.asyncio
+  async def test_mget_efficiency(mocker):
+      hive = HiveMind()
+      mock_redis = mocker.AsyncMock()
+      mock_redis.keys.return_value = ["titan:agent:1", "titan:agent:2"]
+      mock_redis.mget.return_value = [json.dumps({"name": "agent1"}), json.dumps({"name": "agent2"})]
+      hive._redis = mock_redis
+      agents = await hive.list_agents()
+      assert len(agents) == 2
+      mock_redis.mget.assert_called_once()
+E       fixture 'mocker' not found
+>       available fixtures: _class_scoped_runner, _function_scoped_runner, _module_scoped_runner, _package_scoped_runner, _session_scoped_runner, anyio_backend, anyio_backend_name, anyio_backend_options, async_with_timeout, base_agent, cache, capfd, capfdbinary, caplog, capsys, capsysbinary, capteesys, doctest_namespace, event_loop, event_loop_policy, free_tcp_port, free_tcp_port_factory, free_udp_port, free_udp_port_factory, mock_hive_mind, mock_llm_router, mock_router, monkeypatch, orchestrator_agent, perf_tracker, pipeline_topology, pytestconfig, record_property, record_testsuite_property, record_xml_attribute, recwarn, researcher_agent, subtests, swarm_topology, temp_dir, test_config, timing, tmp_path, tmp_path_factory, tmpdir, tmpdir_factory, topology_engine, unused_tcp_port, unused_tcp_port_factory, unused_udp_port, unused_udp_port_factory
+>       use 'pytest --fixtures [testpath]' for help on them.
+
+/Users/4jp/world/realm/operate/org/liminal/repo/agentic-titan/tests/integration/test_remediations.py:15
+________________ ERROR at setup of test_embedding_async_offload ________________
+file /Users/4jp/world/realm/operate/org/liminal/repo/agentic-titan/tests/integration/test_remediations.py, line 26
+  @pytest.mark.asyncio
+  async def test_embedding_async_offload(mocker):
+      hive = HiveMind()
+      await hive.initialize()
+      loop = asyncio.get_running_loop()
+      spy = mocker.spy(loop, "run_in_executor")
+      await hive.remember("test-agent", "some content")
+      assert spy.call_count > 0
+E       fixture 'mocker' not found
+>       available fixtures: _class_scoped_runner, _function_scoped_runner, _module_scoped_runner, _package_scoped_runner, _session_scoped_runner, anyio_backend, anyio_backend_name, anyio_backend_options, async_with_timeout, base_agent, cache, capfd, capfdbinary, caplog, capsys, capsysbinary, capteesys, doctest_namespace, event_loop, event_loop_policy, free_tcp_port, free_tcp_port_factory, free_udp_port, free_udp_port_factory, mock_hive_mind, mock_llm_router, mock_router, monkeypatch, orchestrator_agent, perf_tracker, pipeline_topology, pytestconfig, record_property, record_testsuite_property, record_xml_attribute, recwarn, researcher_agent, subtests, swarm_topology, temp_dir, test_config, timing, tmp_path, tmp_path_factory, tmpdir, tmpdir_factory, topology_engine, unused_tcp_port, unused_tcp_port_factory, unused_udp_port, unused_udp_port_factory
+>       use 'pytest --fixtures [testpath]' for help on them.
+
+/Users/4jp/world/realm/operate/org/liminal/repo/agentic-titan/tests/integration/test_remediations.py:26
+=================================== FAILURES ===================================
+_______________________ TestRouter.test_router_complete ________________________
+/Users/4jp/Workspace/agentic-titan/tests/test_llm_live.py:89: in test_router_complete
+    ???
+adapters/router.py:384: in complete
+    raise LLMAdapterError(
+E   agents.framework.errors.LLMAdapterError: [LLM_ADAPTER_ERROR] All providers failed: Client error '400 Bad Request' for url 'http://localhost:11434/api/chat'
+E   For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/400
+------------------------------ Captured log call -------------------------------
+WARNING  titan.adapters.router:router.py:380 Provider ollama failed: Client error '400 Bad Request' for url 'http://localhost:11434/api/chat'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/400
+_______________________ TestOllama.test_ollama_complete ________________________
+/Users/4jp/Workspace/agentic-titan/tests/test_llm_live.py:126: in test_ollama_complete
+    ???
+adapters/base.py:318: in complete
+    response.raise_for_status()
+.venv/lib/python3.14/site-packages/httpx/_models.py:829: in raise_for_status
+    raise HTTPStatusError(message, request=request, response=self)
+E   httpx.HTTPStatusError: Client error '400 Bad Request' for url 'http://localhost:11434/api/chat'
+E   For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/400
+----------------------------- Captured stdout call -----------------------------
+
+=== Using Ollama model: nomic-embed-text:latest ===
+________________________ TestOllama.test_ollama_stream _________________________
+/Users/4jp/Workspace/agentic-titan/tests/test_llm_live.py:157: in test_ollama_stream
+    ???
+E   AssertionError: assert ''
+----------------------------- Captured stdout call -----------------------------
+
+=== Ollama Streaming (nomic-embed-text:latest) ===
+  
+____________________ TestIntegration.test_researcher_agent _____________________
+/Users/4jp/Workspace/agentic-titan/tests/test_llm_live.py:292: in test_researcher_agent
+    ???
+E   assert False
+E    +  where False = AgentResult(agent_id='researcher-595d2f84', session_id='5923395dffdb459b84858e901c57cb6e', state=<AgentState.FAILED: '...check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/400", turns_taken=0, execution_time_ms=10, metadata={}).success
+----------------------------- Captured stdout call -----------------------------
+18:44:56 [🔍 Researcher] Initializing research agent
+18:44:56 [🔍 Researcher] Beginning research on: Python type hints
+18:44:56 [🔍 Researcher]  Breaking down topic into key questions...
+18:44:56 [🔍 Researcher] Research agent shutting down
+
+=== Researcher Agent Result ===
+  Success: False
+  Turns: 0
+  Questions: 0
+------------------------------ Captured log call -------------------------------
+WARNING  titan.adapters.router:router.py:380 Provider ollama failed: Client error '400 Bad Request' for url 'http://localhost:11434/api/chat'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/400
+ERROR    titan.agent:base_agent.py:516 Agent 'researcher' failed: [LLM_ADAPTER_ERROR] All providers failed: Client error '400 Bad Request' for url 'http://localhost:11434/api/chat'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/400
+Traceback (most recent call last):
+  File "/Users/4jp/world/realm/operate/org/liminal/repo/agentic-titan/agents/framework/base_agent.py", line 439, in run
+    result = await asyncio.wait_for(
+             ^^^^^^^^^^^^^^^^^^^^^^^
+    ...<2 lines>...
+    )
+    ^
+  File "/opt/homebrew/Cellar/python@3.14/3.14.3_1/Frameworks/Python.framework/Versions/3.14/lib/python3.14/asyncio/tasks.py", line 488, in wait_for
+    return await fut
+           ^^^^^^^^^
+  File "/Users/4jp/world/realm/operate/org/liminal/repo/agentic-titan/agents/archetypes/researcher.py", line 94, in work
+    questions = await self._generate_questions()
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/4jp/world/realm/operate/org/liminal/repo/agentic-titan/agents/archetypes/researcher.py", line 158, in _generate_questions
+    response = await self._router.complete(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<3 lines>...
+    )
+    ^
+  File "/Users/4jp/world/realm/operate/org/liminal/repo/agentic-titan/adapters/router.py", line 384, in complete
+    raise LLMAdapterError(
+    ...<2 lines>...
+    )
+agents.framework.errors.LLMAdapterError: [LLM_ADAPTER_ERROR] All providers failed: Client error '400 Bad Request' for url 'http://localhost:11434/api/chat'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/400
+=========================== short test summary info ============================
+FAILED tests/test_llm_live.py::TestRouter::test_router_complete - agents.fram...
+FAILED tests/test_llm_live.py::TestOllama::test_ollama_complete - httpx.HTTPS...
+FAILED tests/test_llm_live.py::TestOllama::test_ollama_stream - AssertionErro...
+FAILED tests/test_llm_live.py::TestIntegration::test_researcher_agent - asser...
+ERROR tests/integration/test_remediations.py::test_mget_efficiency
+ERROR tests/integration/test_remediations.py::test_embedding_async_offload
+============ 4 failed, 1308 passed, 14 skipped, 2 errors in 14.42s =============

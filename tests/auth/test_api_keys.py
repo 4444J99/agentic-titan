@@ -4,18 +4,17 @@ Tests for titan.auth.api_keys module.
 Tests API key generation, hashing, and validation.
 """
 
-import pytest
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from titan.auth.api_keys import (
-    generate_api_key,
-    hash_api_key,
-    verify_api_key,
-    parse_api_key_header,
-    get_key_prefix,
-    calculate_expiry,
-    is_key_valid,
     API_KEY_PREFIX,
+    calculate_expiry,
+    generate_api_key,
+    get_key_prefix,
+    hash_api_key,
+    is_key_valid,
+    parse_api_key_header,
+    verify_api_key,
 )
 
 
@@ -176,7 +175,7 @@ class TestExpiryCalculation:
 
         assert expiry is not None
         # Should be approximately 30 days from now
-        expected = datetime.now(timezone.utc) + timedelta(days=30)
+        expected = datetime.now(UTC) + timedelta(days=30)
         assert abs((expiry - expected).total_seconds()) < 2
 
     def test_calculate_expiry_none(self):
@@ -223,7 +222,7 @@ class TestKeyValidation:
         full_key, key_hash, _ = generate_api_key()
         provided_hash = hash_api_key(full_key)
 
-        expired = datetime.now(timezone.utc) - timedelta(days=1)
+        expired = datetime.now(UTC) - timedelta(days=1)
 
         is_valid, error = is_key_valid(
             key_hash=provided_hash,
@@ -255,7 +254,7 @@ class TestKeyValidation:
         full_key, key_hash, _ = generate_api_key()
         provided_hash = hash_api_key(full_key)
 
-        future = datetime.now(timezone.utc) + timedelta(days=30)
+        future = datetime.now(UTC) + timedelta(days=30)
 
         is_valid, error = is_key_valid(
             key_hash=provided_hash,

@@ -4,18 +4,15 @@ Tests for Titan MCP Server.
 Tests JSON-RPC protocol handling and agent management.
 """
 
-import asyncio
 import json
+
 import pytest
 
 from mcp.server import (
-    TitanMCPServer,
-    MCPRequest,
-    MCPResponse,
     AgentManager,
-    MCPMethod,
+    MCPRequest,
+    TitanMCPServer,
 )
-
 
 # ============================================================================
 # Server Tests
@@ -338,49 +335,57 @@ class TestMCPIntegration:
     async def test_full_workflow(self, server: TitanMCPServer) -> None:
         """Test complete spawn → status → result workflow."""
         # Initialize
-        init_resp = await server.handle_request(MCPRequest(
-            jsonrpc="2.0",
-            id=100,
-            method="initialize",
-            params={},
-        ))
+        init_resp = await server.handle_request(
+            MCPRequest(
+                jsonrpc="2.0",
+                id=100,
+                method="initialize",
+                params={},
+            )
+        )
         assert init_resp.error is None
 
         # Spawn
-        spawn_resp = await server.handle_request(MCPRequest(
-            jsonrpc="2.0",
-            id=101,
-            method="tools/call",
-            params={
-                "name": "spawn_agent",
-                "arguments": {"agent_type": "simple", "task": "Quick test"},
-            },
-        ))
+        spawn_resp = await server.handle_request(
+            MCPRequest(
+                jsonrpc="2.0",
+                id=101,
+                method="tools/call",
+                params={
+                    "name": "spawn_agent",
+                    "arguments": {"agent_type": "simple", "task": "Quick test"},
+                },
+            )
+        )
         session_id = json.loads(spawn_resp.result["content"][0]["text"])["session_id"]
 
         # Check status
-        status_resp = await server.handle_request(MCPRequest(
-            jsonrpc="2.0",
-            id=102,
-            method="tools/call",
-            params={
-                "name": "agent_status",
-                "arguments": {"session_id": session_id},
-            },
-        ))
+        status_resp = await server.handle_request(
+            MCPRequest(
+                jsonrpc="2.0",
+                id=102,
+                method="tools/call",
+                params={
+                    "name": "agent_status",
+                    "arguments": {"session_id": session_id},
+                },
+            )
+        )
         status = json.loads(status_resp.result["content"][0]["text"])
         assert status["session_id"] == session_id
 
         # Get result (may be running still)
-        result_resp = await server.handle_request(MCPRequest(
-            jsonrpc="2.0",
-            id=103,
-            method="tools/call",
-            params={
-                "name": "agent_result",
-                "arguments": {"session_id": session_id},
-            },
-        ))
+        result_resp = await server.handle_request(
+            MCPRequest(
+                jsonrpc="2.0",
+                id=103,
+                method="tools/call",
+                params={
+                    "name": "agent_result",
+                    "arguments": {"session_id": session_id},
+                },
+            )
+        )
         assert result_resp.error is None
 
     @pytest.mark.asyncio

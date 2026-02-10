@@ -13,7 +13,6 @@ Reference: vendor/tools/memori/ SQL-native patterns
 
 from __future__ import annotations
 
-import hashlib
 import json
 import logging
 import uuid
@@ -289,10 +288,7 @@ class MemoriBackend(MemoryBackend):
 
             # Filter by tags if specified
             if tags:
-                results = [
-                    r for r in results
-                    if any(t in r.entry.tags for t in tags)
-                ]
+                results = [r for r in results if any(t in r.entry.tags for t in tags)]
 
             return results
 
@@ -395,7 +391,8 @@ class MemoriBackend(MemoryBackend):
         )
         await self._conn.commit()
 
-        return cursor.rowcount > 0
+        rowcount = cursor.rowcount
+        return isinstance(rowcount, int) and rowcount > 0
 
     async def update(
         self,
@@ -444,7 +441,8 @@ class MemoriBackend(MemoryBackend):
         )
         await self._conn.commit()
 
-        return cursor.rowcount > 0
+        rowcount = cursor.rowcount
+        return isinstance(rowcount, int) and rowcount > 0
 
     async def set_working(
         self,
@@ -505,7 +503,8 @@ class MemoriBackend(MemoryBackend):
         )
         await self._conn.commit()
 
-        return cursor.rowcount > 0
+        rowcount = cursor.rowcount
+        return isinstance(rowcount, int) and rowcount > 0
 
     async def count(
         self,
@@ -529,7 +528,10 @@ class MemoriBackend(MemoryBackend):
         cursor = await self._conn.execute(sql, params)
         row = await cursor.fetchone()
 
-        return row[0] if row else 0
+        if not row:
+            return 0
+        value = row[0]
+        return int(value) if isinstance(value, (int, float, str)) else 0
 
     async def clear(
         self,
@@ -553,16 +555,19 @@ class MemoriBackend(MemoryBackend):
         cursor = await self._conn.execute(sql, params)
         await self._conn.commit()
 
-        return cursor.rowcount
+        rowcount = cursor.rowcount
+        return rowcount if isinstance(rowcount, int) else 0
 
     async def health_check(self) -> dict[str, Any]:
         """Check backend health."""
         base = await super().health_check()
-        base.update({
-            "database_path": str(self._db_path) if self._db_path else None,
-            "connected": self._conn is not None,
-            "memory_count": await self.count() if self._conn else 0,
-        })
+        base.update(
+            {
+                "database_path": str(self._db_path) if self._db_path else None,
+                "connected": self._conn is not None,
+                "memory_count": await self.count() if self._conn else 0,
+            }
+        )
         return base
 
 

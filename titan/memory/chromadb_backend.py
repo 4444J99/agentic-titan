@@ -100,8 +100,7 @@ class ChromaDBBackend(MemoryBackend):
                 metadata={"hnsw:space": "cosine"},
             )
             logger.info(
-                f"Connected to ChromaDB at "
-                f"{self.config.chroma_host}:{self.config.chroma_port}"
+                f"Connected to ChromaDB at {self.config.chroma_host}:{self.config.chroma_port}"
             )
         except Exception as e:
             logger.warning(f"ChromaDB unavailable, using in-memory fallback: {e}")
@@ -231,11 +230,13 @@ class ChromaDBBackend(MemoryBackend):
                         user_id=meta.get("user_id", "default"),
                         session_id=meta.get("session_id", "default"),
                     )
-                    search_results.append(SearchResult(
-                        entry=entry,
-                        score=score,
-                        distance=distance,
-                    ))
+                    search_results.append(
+                        SearchResult(
+                            entry=entry,
+                            score=score,
+                            distance=distance,
+                        )
+                    )
 
             return search_results
 
@@ -263,10 +264,7 @@ class ChromaDBBackend(MemoryBackend):
         # Sort by similarity
         results.sort(key=lambda x: x[0], reverse=True)
 
-        return [
-            SearchResult(entry=entry, score=score)
-            for score, entry in results[:k]
-        ]
+        return [SearchResult(entry=entry, score=score) for score, entry in results[:k]]
 
     async def get(self, memory_id: str) -> MemoryEntry | None:
         """Get a specific memory by ID."""
@@ -389,7 +387,7 @@ class ChromaDBBackend(MemoryBackend):
         """Count memories."""
         if self._collection is not None:
             # ChromaDB doesn't have efficient count with filters
-            return self._collection.count()
+            return int(self._collection.count())
 
         count = 0
         for entry in self._memory_store.values():
@@ -407,7 +405,7 @@ class ChromaDBBackend(MemoryBackend):
     ) -> int:
         """Clear memories."""
         if self._collection is not None and not category and not agent_id:
-            count = self._collection.count()
+            count = int(self._collection.count())
             # Delete all - need to recreate collection
             self._client.delete_collection(self.config.collection_name)
             self._collection = self._client.create_collection(
@@ -433,11 +431,15 @@ class ChromaDBBackend(MemoryBackend):
     async def health_check(self) -> dict[str, Any]:
         """Check backend health."""
         base = await super().health_check()
-        base.update({
-            "chromadb_connected": self._collection is not None,
-            "memory_count": len(self._memory_store) if not self._collection else await self.count(),
-            "working_memory_count": len(self._working_memory),
-        })
+        base.update(
+            {
+                "chromadb_connected": self._collection is not None,
+                "memory_count": len(self._memory_store)
+                if not self._collection
+                else await self.count(),
+                "working_memory_count": len(self._working_memory),
+            }
+        )
         return base
 
 

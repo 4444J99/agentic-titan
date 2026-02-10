@@ -6,9 +6,9 @@ Tests the ContradictionDetector and related data structures.
 
 from __future__ import annotations
 
-import pytest
-from datetime import datetime
 from unittest.mock import AsyncMock
+
+import pytest
 
 from titan.analysis.contradictions import (
     Contradiction,
@@ -22,7 +22,6 @@ from titan.analysis.detector import (
     DetectorConfig,
     get_contradiction_detector,
 )
-
 
 # =============================================================================
 # Contradiction Data Structure Tests
@@ -268,7 +267,13 @@ class TestContradictionDetector:
         """Test basic contradiction detection."""
         outputs = [
             {"source": "A", "content": "The result is positive and the system works correctly."},
-            {"source": "B", "content": "The result is negative and the system does not work. It contradicts the other view."},
+            {
+                "source": "B",
+                "content": (
+                    "The result is negative and the system does not work. "
+                    "It contradicts the other view."
+                ),
+            },
         ]
         report = await detector.detect_contradictions(outputs)
         # Should detect something due to contradiction indicators
@@ -279,8 +284,16 @@ class TestContradictionDetector:
     async def test_detect_logical_contradiction(self, detector: ContradictionDetector) -> None:
         """Test detection of logical contradictions."""
         outputs = [
-            {"source": "A", "content": "It is impossible to have both conditions at the same time."},
-            {"source": "B", "content": "Both conditions can exist simultaneously, which contradicts the other view."},
+            {
+                "source": "A",
+                "content": "It is impossible to have both conditions at the same time.",
+            },
+            {
+                "source": "B",
+                "content": (
+                    "Both conditions can exist simultaneously, which contradicts the other view."
+                ),
+            },
         ]
         report = await detector.detect_contradictions(outputs)
         assert report.pairs_analyzed == 1
@@ -323,9 +336,24 @@ class TestContradictionDetector:
     async def test_multiple_outputs(self, detector: ContradictionDetector) -> None:
         """Test detection with multiple outputs."""
         outputs = [
-            {"source": "A", "content": "Position A text is relatively long to meet minimum length requirements."},
-            {"source": "B", "content": "Position B text is relatively long to meet minimum length requirements."},
-            {"source": "C", "content": "Position C text is relatively long to meet minimum length requirements."},
+            {
+                "source": "A",
+                "content": (
+                    "Position A text is relatively long to meet minimum length requirements."
+                ),
+            },
+            {
+                "source": "B",
+                "content": (
+                    "Position B text is relatively long to meet minimum length requirements."
+                ),
+            },
+            {
+                "source": "C",
+                "content": (
+                    "Position C text is relatively long to meet minimum length requirements."
+                ),
+            },
         ]
         report = await detector.detect_contradictions(outputs)
         # Should analyze 3 pairs: AB, AC, BC
@@ -383,8 +411,18 @@ class TestDetectorWithLLM:
     ) -> None:
         """Test LLM-based contradiction analysis."""
         outputs = [
-            {"source": "A", "content": "Long content A that meets the minimum length requirement for analysis."},
-            {"source": "B", "content": "Long content B that meets the minimum length requirement for analysis."},
+            {
+                "source": "A",
+                "content": (
+                    "Long content A that meets the minimum length requirement for analysis."
+                ),
+            },
+            {
+                "source": "B",
+                "content": (
+                    "Long content B that meets the minimum length requirement for analysis."
+                ),
+            },
         ]
         report = await detector_with_llm.detect_contradictions(outputs)
 

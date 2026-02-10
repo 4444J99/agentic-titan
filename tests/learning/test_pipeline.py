@@ -2,18 +2,18 @@
 
 from __future__ import annotations
 
+from unittest.mock import MagicMock
+
 import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
 
 from titan.learning.pipeline import (
-    LearningPipeline,
     FeedbackRequest,
     FeedbackResponse,
     LearningMetrics,
+    LearningPipeline,
     get_learning_pipeline,
     set_learning_pipeline,
 )
-from titan.learning.rlhf import FeedbackType
 
 
 class TestLearningPipeline:

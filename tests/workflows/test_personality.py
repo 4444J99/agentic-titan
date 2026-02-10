@@ -2,15 +2,13 @@
 
 from __future__ import annotations
 
-import pytest
-
 from titan.workflows.personality_modulator import (
-    PersonalityVector,
-    PersonalityModulator,
     PRESET_PERSONALITIES,
+    PersonalityModulator,
+    PersonalityVector,
+    get_personality_modulator,
     get_preset_personality,
     list_preset_personalities,
-    get_personality_modulator,
     modulate_prompt,
 )
 
@@ -95,8 +93,7 @@ class TestPersonalityVector:
         assert neutral.intensity() == 0.0
 
         extreme = PersonalityVector(
-            tone=1.0, abstraction=1.0, verbosity=1.0,
-            creativity=1.0, technicality=1.0
+            tone=1.0, abstraction=1.0, verbosity=1.0, creativity=1.0, technicality=1.0
         )
         assert extreme.intensity() == 1.0
 
@@ -207,7 +204,11 @@ class TestPersonalityModulator:
 
         result = modulator.modulate_prompt(original, verbose)
 
-        assert "comprehensive" in result.lower() or "thorough" in result.lower() or "detail" in result.lower()
+        assert (
+            "comprehensive" in result.lower()
+            or "thorough" in result.lower()
+            or "detail" in result.lower()
+        )
 
     def test_modulate_combined_traits(self) -> None:
         """Test modulation with multiple traits."""

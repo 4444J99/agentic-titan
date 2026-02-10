@@ -9,11 +9,11 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 from uuid import UUID, uuid4
 
-from titan.learning.rlhf import RLHFSample, ResponseQuality
+from titan.learning.rlhf import ResponseQuality, RLHFSample
 
 if TYPE_CHECKING:
     pass
@@ -35,7 +35,7 @@ class PreferencePair:
     rejected: str = ""  # Non-preferred response
     margin: float = 0.0  # Preference strength (0-1)
     source: str = "unknown"  # How the pair was created
-    timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    timestamp: datetime = field(default_factory=lambda: datetime.now(UTC))
     metadata: dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -63,7 +63,7 @@ class PreferencePair:
             source=data.get("source", "unknown"),
             timestamp=datetime.fromisoformat(data["timestamp"])
             if isinstance(data.get("timestamp"), str)
-            else datetime.now(timezone.utc),
+            else datetime.now(UTC),
             metadata=data.get("metadata", {}),
         )
 
@@ -78,7 +78,7 @@ class PreferencePairDataset:
 
     pairs: list[PreferencePair] = field(default_factory=list)
     name: str = "unnamed"
-    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
     source_count: dict[str, int] = field(default_factory=dict)
 
     def add(self, pair: PreferencePair) -> None:

@@ -8,15 +8,15 @@ Provides:
 """
 
 from titan.orchestration.termination import (
+    DefaultTerminationConditions,
     TerminationCondition,
     TerminationReason,
     TerminationResult,
-    DefaultTerminationConditions,
 )
 from titan.orchestration.watchdog import (
     ExecutionWatchdog,
-    WatchdogConfig,
     WatchdogAlert,
+    WatchdogConfig,
     get_watchdog,
 )
 

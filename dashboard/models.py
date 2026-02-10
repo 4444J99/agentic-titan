@@ -8,18 +8,17 @@ Enables automatic OpenAPI documentation generation.
 from __future__ import annotations
 
 from datetime import datetime
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 from pydantic import BaseModel, Field
-
 
 # ============================================================================
 # Enums
 # ============================================================================
 
 
-class TopologyTypeEnum(str, Enum):
+class TopologyTypeEnum(StrEnum):
     """Supported topology types."""
 
     SWARM = "swarm"
@@ -30,7 +29,7 @@ class TopologyTypeEnum(str, Enum):
     STAR = "star"
 
 
-class AgentStateEnum(str, Enum):
+class AgentStateEnum(StrEnum):
     """Agent execution states."""
 
     PENDING = "pending"
@@ -51,7 +50,14 @@ class ErrorResponse(BaseModel):
     detail: str = Field(..., description="Error message")
     code: str | None = Field(None, description="Error code for programmatic handling")
 
-    model_config = {"json_schema_extra": {"example": {"detail": "Agent not found", "code": "AGENT_NOT_FOUND"}}}
+    model_config = {
+        "json_schema_extra": {
+            "example": {
+                "detail": "Agent not found",
+                "code": "AGENT_NOT_FOUND",
+            }
+        }
+    }
 
 
 # ============================================================================
@@ -121,7 +127,14 @@ class AgentCancelResponse(BaseModel):
     status: str = Field(..., description="Cancellation status")
     agent_id: str = Field(..., description="ID of cancelled agent")
 
-    model_config = {"json_schema_extra": {"example": {"status": "cancelled", "agent_id": "agent_001"}}}
+    model_config = {
+        "json_schema_extra": {
+            "example": {
+                "status": "cancelled",
+                "agent_id": "agent_001",
+            }
+        }
+    }
 
 
 # ============================================================================
@@ -139,7 +152,11 @@ class TopologyAgentInfo(BaseModel):
 class TopologyHistoryEntry(BaseModel):
     """Topology history entry."""
 
-    from_type: TopologyTypeEnum | None = Field(None, alias="from", description="Previous topology type")
+    from_type: TopologyTypeEnum | None = Field(
+        None,
+        alias="from",
+        description="Previous topology type",
+    )
     to_type: TopologyTypeEnum = Field(..., alias="to", description="New topology type")
     timestamp: datetime = Field(..., description="When the switch occurred")
 
@@ -148,15 +165,30 @@ class TopologyResponse(BaseModel):
     """Current topology state response."""
 
     current: TopologyTypeEnum = Field(..., description="Current topology type")
-    agents: list[TopologyAgentInfo] = Field(default_factory=list, description="Agents in topology")
-    history: list[TopologyHistoryEntry] = Field(default_factory=list, description="Recent topology history")
+    agents: list[TopologyAgentInfo] = Field(
+        default_factory=list,
+        description="Agents in topology",
+    )
+    history: list[TopologyHistoryEntry] = Field(
+        default_factory=list,
+        description="Recent topology history",
+    )
 
     model_config = {
         "json_schema_extra": {
             "example": {
                 "current": "swarm",
-                "agents": [{"id": "agent_001", "role": "peer"}, {"id": "agent_002", "role": "peer"}],
-                "history": [{"from": "pipeline", "to": "swarm", "timestamp": "2024-01-19T12:00:00Z"}],
+                "agents": [
+                    {"id": "agent_001", "role": "peer"},
+                    {"id": "agent_002", "role": "peer"},
+                ],
+                "history": [
+                    {
+                        "from": "pipeline",
+                        "to": "swarm",
+                        "timestamp": "2024-01-19T12:00:00Z",
+                    }
+                ],
             }
         }
     }
@@ -172,7 +204,12 @@ class TopologySwitchResponse(BaseModel):
 
     model_config = {
         "json_schema_extra": {
-            "example": {"status": "success", "new_topology": "pipeline", "agent_count": 3, "duration_ms": 42.5}
+            "example": {
+                "status": "success",
+                "new_topology": "pipeline",
+                "agent_count": 3,
+                "duration_ms": 42.5,
+            }
         }
     }
 

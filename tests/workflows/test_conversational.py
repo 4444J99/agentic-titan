@@ -2,22 +2,17 @@
 
 from __future__ import annotations
 
-import asyncio
 from datetime import datetime
 
 import pytest
 
 from titan.workflows.inquiry_config import (
+    QUICK_INQUIRY_WORKFLOW,
     InfluenceMode,
     UserInterjection,
-    InquiryWorkflow,
-    InquiryStage,
-    CognitiveStyle,
-    QUICK_INQUIRY_WORKFLOW,
 )
 from titan.workflows.inquiry_engine import (
     InquiryEngine,
-    InquirySession,
     InquiryStatus,
 )
 
@@ -113,15 +108,9 @@ class TestSessionInterjections:
         session = await engine.start_inquiry("Test topic", QUICK_INQUIRY_WORKFLOW)
 
         # Add interjections
-        session.interjections.append(
-            UserInterjection("First", 0, processed=False)
-        )
-        session.interjections.append(
-            UserInterjection("Second", 1, processed=True)
-        )
-        session.interjections.append(
-            UserInterjection("Third", 1, processed=False)
-        )
+        session.interjections.append(UserInterjection("First", 0, processed=False))
+        session.interjections.append(UserInterjection("Second", 1, processed=True))
+        session.interjections.append(UserInterjection("Third", 1, processed=False))
 
         unprocessed = session.get_unprocessed_interjections()
 
@@ -299,9 +288,7 @@ class TestInterleavedWorkflow:
         session = await engine.start_inquiry("Test topic", QUICK_INQUIRY_WORKFLOW)
 
         # Add an interjection before starting
-        session.interjections.append(
-            UserInterjection("Focus on AI", 0, InfluenceMode.REDIRECT)
-        )
+        session.interjections.append(UserInterjection("Focus on AI", 0, InfluenceMode.REDIRECT))
 
         events = []
         async for event in engine.run_interleaved_workflow(session):
@@ -356,9 +343,7 @@ class TestInterjectionContext:
         assert context == ""
 
     @pytest.mark.asyncio
-    async def test_get_interjection_context_with_interjections(
-        self, engine: InquiryEngine
-    ) -> None:
+    async def test_get_interjection_context_with_interjections(self, engine: InquiryEngine) -> None:
         """Test context includes relevant interjections."""
         session = await engine.start_inquiry("Test topic", QUICK_INQUIRY_WORKFLOW)
         session.current_stage = 1
@@ -386,15 +371,11 @@ class TestSessionToDict:
         return InquiryEngine(llm_caller=None)
 
     @pytest.mark.asyncio
-    async def test_session_to_dict_includes_interjections(
-        self, engine: InquiryEngine
-    ) -> None:
+    async def test_session_to_dict_includes_interjections(self, engine: InquiryEngine) -> None:
         """Test session serialization includes interjections."""
         session = await engine.start_inquiry("Test topic", QUICK_INQUIRY_WORKFLOW)
 
-        session.interjections.append(
-            UserInterjection("Test content", 0, InfluenceMode.CONTEXT)
-        )
+        session.interjections.append(UserInterjection("Test content", 0, InfluenceMode.CONTEXT))
 
         d = session.to_dict()
 
@@ -403,9 +384,7 @@ class TestSessionToDict:
         assert d["interjections"][0]["content"] == "Test content"
 
     @pytest.mark.asyncio
-    async def test_session_to_dict_includes_temporal_fields(
-        self, engine: InquiryEngine
-    ) -> None:
+    async def test_session_to_dict_includes_temporal_fields(self, engine: InquiryEngine) -> None:
         """Test session serialization includes temporal fields."""
         session = await engine.start_inquiry("Test topic", QUICK_INQUIRY_WORKFLOW)
         session.parent_session_id = "parent-123"

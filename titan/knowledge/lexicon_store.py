@@ -12,8 +12,8 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from titan.knowledge.lexicon import (
-    BodyEntry,
     CATEGORY_INTERACTION_RULES,
+    BodyEntry,
     LexiconCategory,
 )
 
@@ -80,9 +80,7 @@ class LexiconStore:
                     embedding_function=self._embedding_function,
                     metadata={"description": "Body Lexicon entries for assembly patterns"},
                 )
-                logger.info(
-                    f"Initialized ChromaDB store at {self._persist_directory}"
-                )
+                logger.info(f"Initialized ChromaDB store at {self._persist_directory}")
             except Exception as e:
                 logger.warning(f"Failed to initialize ChromaDB: {e}, using in-memory")
                 self._client = None
@@ -125,29 +123,33 @@ class LexiconStore:
                     self._collection.update(
                         ids=[entry.id],
                         documents=[entry.searchable_text],
-                        metadatas=[{
-                            "category": entry.category.value,
-                            "aliases": json.dumps(entry.aliases),
-                            "referent": entry.referent,
-                            "notes": entry.notes,
-                            "links": json.dumps(entry.links),
-                            "source": entry.source,
-                            "content_hash": entry.content_hash,
-                        }],
+                        metadatas=[
+                            {
+                                "category": entry.category.value,
+                                "aliases": json.dumps(entry.aliases),
+                                "referent": entry.referent,
+                                "notes": entry.notes,
+                                "links": json.dumps(entry.links),
+                                "source": entry.source,
+                                "content_hash": entry.content_hash,
+                            }
+                        ],
                     )
                 else:
                     self._collection.add(
                         ids=[entry.id],
                         documents=[entry.searchable_text],
-                        metadatas=[{
-                            "category": entry.category.value,
-                            "aliases": json.dumps(entry.aliases),
-                            "referent": entry.referent,
-                            "notes": entry.notes,
-                            "links": json.dumps(entry.links),
-                            "source": entry.source,
-                            "content_hash": entry.content_hash,
-                        }],
+                        metadatas=[
+                            {
+                                "category": entry.category.value,
+                                "aliases": json.dumps(entry.aliases),
+                                "referent": entry.referent,
+                                "notes": entry.notes,
+                                "links": json.dumps(entry.links),
+                                "source": entry.source,
+                                "content_hash": entry.content_hash,
+                            }
+                        ],
                     )
                 logger.debug(f"Added entry to ChromaDB: {entry.id}")
             except Exception as e:
@@ -296,7 +298,11 @@ class LexiconStore:
                 if search_results and search_results["ids"]:
                     for i, entry_id in enumerate(search_results["ids"][0]):
                         metadata = search_results["metadatas"][0][i]
-                        distance = search_results["distances"][0][i] if search_results.get("distances") else 0.0
+                        distance = (
+                            search_results["distances"][0][i]
+                            if search_results.get("distances")
+                            else 0.0
+                        )
                         # Convert distance to similarity (ChromaDB returns L2 distance)
                         similarity = 1.0 / (1.0 + distance)
 
@@ -431,7 +437,7 @@ class LexiconStore:
 
         if self._collection is not None:
             try:
-                return self._collection.count()
+                return int(self._collection.count())
             except Exception as e:
                 logger.error(f"Failed to count: {e}")
 

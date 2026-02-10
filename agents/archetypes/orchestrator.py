@@ -17,19 +17,20 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import TYPE_CHECKING, Any
 
-from agents.framework.base_agent import BaseAgent, AgentResult, AgentState
-from agents.personas import ORCHESTRATOR, say, think, announce
 from adapters.base import LLMMessage
 from adapters.router import get_router
+from agents.framework.base_agent import BaseAgent
+from agents.personas import ORCHESTRATOR, announce, say, think
 
 if TYPE_CHECKING:
-    from hive.topology import TopologyEngine, BaseTopology
+    pass
 
 logger = logging.getLogger("titan.agents.orchestrator")
 
 
 class ExecutionMode(Enum):
     """Execution modes for subtasks."""
+
     SEQUENTIAL = "sequential"
     PARALLEL = "parallel"
     STAGED = "staged"  # Pipeline topology: stage by stage
@@ -49,6 +50,7 @@ class Subtask:
     priority: int = 0  # Higher priority executed first (within same dependency level)
     estimated_tokens: int = 0  # Estimated token usage
     assigned_agent_id: str | None = None  # Actual agent assigned
+    metadata: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
@@ -59,7 +61,7 @@ class DependencyGraph:
     adjacency: dict[str, list[str]]  # subtask_id -> dependent subtask ids
 
     @classmethod
-    def from_subtasks(cls, subtasks: list[Subtask]) -> "DependencyGraph":
+    def from_subtasks(cls, subtasks: list[Subtask]) -> DependencyGraph:
         """Build dependency graph from subtask list."""
         task_map = {st.id: st for st in subtasks}
         adjacency: dict[str, list[str]] = {st.id: [] for st in subtasks}
@@ -148,10 +150,14 @@ class OrchestratorAgent(BaseAgent):
 
     async def initialize(self) -> None:
         """Initialize the orchestrator."""
-        announce(ORCHESTRATOR, "Initializing", {
-            "Task": self.task[:50] if self.task else "None",
-            "Available Agents": ", ".join(self.available_agents),
-        })
+        announce(
+            ORCHESTRATOR,
+            "Initializing",
+            {
+                "Task": self.task[:50] if self.task else "None",
+                "Available Agents": ", ".join(self.available_agents),
+            },
+        )
 
         await self._router.initialize()
 
@@ -221,12 +227,13 @@ class OrchestratorAgent(BaseAgent):
 
     async def _select_topology(self) -> str:
         """Select appropriate topology for the task."""
+        task_text = self.task or ""
         if self._topology_engine:
-            suggestion = self._topology_engine.suggest_topology(self.task)
-            return suggestion["recommended"]
+            suggestion = self._topology_engine.suggest_topology(task_text)
+            return str(suggestion.get("recommended", "pipeline"))
 
         # Simple heuristic if no engine
-        task_lower = self.task.lower()
+        task_lower = task_text.lower()
 
         if any(kw in task_lower for kw in ["consensus", "agree", "brainstorm"]):
             return "swarm"
@@ -246,7 +253,7 @@ class OrchestratorAgent(BaseAgent):
 
 Task: {self.task}
 
-Available agent types: {', '.join(self.available_agents)}
+Available agent types: {", ".join(self.available_agents)}
 
 For each subtask, specify:
 1. Description
@@ -282,12 +289,14 @@ Create 2-5 subtasks.""",
 
             if line.startswith("SUBTASK:"):
                 if current:
-                    subtasks.append(Subtask(
-                        id=f"st-{subtask_id}",
-                        description=current.get("description", ""),
-                        agent_type=current.get("agent", "researcher"),
-                        dependencies=current.get("depends", []),
-                    ))
+                    subtasks.append(
+                        Subtask(
+                            id=f"st-{subtask_id}",
+                            description=current.get("description", ""),
+                            agent_type=current.get("agent", "researcher"),
+                            dependencies=current.get("depends", []),
+                        )
+                    )
                     subtask_id += 1
                 current = {"description": line[8:].strip()}
 
@@ -307,12 +316,14 @@ Create 2-5 subtasks.""",
 
         # Add last subtask
         if current:
-            subtasks.append(Subtask(
-                id=f"st-{subtask_id}",
-                description=current.get("description", ""),
-                agent_type=current.get("agent", "researcher"),
-                dependencies=current.get("depends", []),
-            ))
+            subtasks.append(
+                Subtask(
+                    id=f"st-{subtask_id}",
+                    description=current.get("description", ""),
+                    agent_type=current.get("agent", "researcher"),
+                    dependencies=current.get("depends", []),
+                )
+            )
 
         return subtasks
 
@@ -356,6 +367,9 @@ Create 2-5 subtasks.""",
 
     async def _execute_sequential(self, graph: DependencyGraph) -> None:
         """Execute subtasks sequentially in dependency order."""
+        if self.workflow is None:
+            return
+
         completed: set[str] = set()
 
         while len(completed) < len(self.workflow.subtasks):
@@ -371,6 +385,9 @@ Create 2-5 subtasks.""",
 
     async def _execute_parallel(self, graph: DependencyGraph) -> None:
         """Execute independent subtasks in parallel."""
+        if self.workflow is None:
+            return
+
         completed: set[str] = set()
 
         while len(completed) < len(self.workflow.subtasks):
@@ -389,8 +406,14 @@ Create 2-5 subtasks.""",
 
     async def _execute_staged(self, graph: DependencyGraph) -> None:
         """Execute subtasks in stages (levels) based on dependencies."""
+        if self.workflow is None:
+            return
+
         for level_idx, level_ids in enumerate(self.workflow.execution_levels):
-            say(ORCHESTRATOR, f"Executing stage {level_idx + 1}/{len(self.workflow.execution_levels)}")
+            say(
+                ORCHESTRATOR,
+                f"Executing stage {level_idx + 1}/{len(self.workflow.execution_levels)}",
+            )
 
             # Get subtasks for this level
             level_subtasks = [graph.subtasks[st_id] for st_id in level_ids]
@@ -405,6 +428,9 @@ Create 2-5 subtasks.""",
 
     async def _execute_broadcast(self, graph: DependencyGraph) -> None:
         """Execute using swarm/broadcast pattern - all agents collaborate."""
+        if self.workflow is None:
+            return
+
         # In broadcast mode, we send the task context to all available agents
         # and let them work together, aggregating their responses
 
@@ -416,7 +442,7 @@ Create 2-5 subtasks.""",
             by_agent_type.setdefault(subtask.agent_type, []).append(subtask)
 
         # Execute each agent type's tasks in parallel
-        all_tasks = []
+        all_tasks: list[Any] = []
         for agent_type, subtasks in by_agent_type.items():
             for subtask in subtasks:
                 # Include context from other agent types' tasks
@@ -441,6 +467,9 @@ Create 2-5 subtasks.""",
 
     async def _execute_subtask(self, subtask: Subtask) -> None:
         """Execute a single subtask."""
+        if self.workflow is None:
+            return
+
         say(ORCHESTRATOR, f"Executing: {subtask.description[:40]}...")
         self.increment_turn()
 
@@ -526,17 +555,17 @@ Create 2-5 subtasks.""",
             dep_results = []
             for dep_id in subtask.dependencies:
                 if dep_id in self.workflow.results:
-                    dep_results.append(
-                        f"[{dep_id}]: {str(self.workflow.results[dep_id])[:200]}"
-                    )
+                    dep_results.append(f"[{dep_id}]: {str(self.workflow.results[dep_id])[:200]}")
             if dep_results:
-                dep_context = f"\n\nPrior results from dependencies:\n" + "\n".join(dep_results)
+                dep_context = "\n\nPrior results from dependencies:\n" + "\n".join(dep_results)
 
         # Build swarm context if available
         swarm_context = ""
-        if hasattr(subtask, 'metadata') and subtask.metadata:
-            if 'swarm_context' in subtask.metadata:
-                swarm_context = f"\n\nContext from other agents:\n{subtask.metadata['swarm_context']}"
+        if hasattr(subtask, "metadata") and subtask.metadata:
+            if "swarm_context" in subtask.metadata:
+                swarm_context = (
+                    f"\n\nContext from other agents:\n{subtask.metadata['swarm_context']}"
+                )
 
         # Build role context
         role_context = ""
@@ -546,11 +575,12 @@ Create 2-5 subtasks.""",
         messages = [
             LLMMessage(
                 role="user",
-                content=f"""You are a {subtask.agent_type} agent.{role_context} Complete this subtask:
-
-{subtask.description}{dep_context}{swarm_context}
-
-Provide a brief result (under 100 words).""",
+                content=(
+                    f"You are a {subtask.agent_type} agent."
+                    f"{role_context} Complete this subtask:\n\n"
+                    f"{subtask.description}{dep_context}{swarm_context}\n\n"
+                    "Provide a brief result (under 100 words)."
+                ),
             )
         ]
 

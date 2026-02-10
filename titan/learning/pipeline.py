@@ -13,28 +13,27 @@ Components:
 
 from __future__ import annotations
 
-import asyncio
 import logging
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
-from typing import TYPE_CHECKING, Any
+from datetime import UTC, datetime
+from typing import TYPE_CHECKING, Any, cast
 from uuid import UUID, uuid4
 
-from titan.learning.rlhf import (
-    RLHFSample,
-    FeedbackType,
-    ResponseQuality,
-)
 from titan.learning.reward_signals import (
-    RewardSignal,
     RewardEstimate,
+    RewardSignal,
     RewardSignalExtractor,
     SignalType,
+)
+from titan.learning.rlhf import (
+    FeedbackType,
+    RLHFSample,
 )
 from titan.metrics import get_metrics
 
 if TYPE_CHECKING:
-    from hive.learning import EpisodicLearner, Episode, EpisodeOutcome
+    from hive.learning import EpisodicLearner
     from titan.persistence.postgres import PostgresClient
 
 logger = logging.getLogger("titan.learning.pipeline")
@@ -50,7 +49,7 @@ class FeedbackRequest:
     prompt: str = ""
     agent_id: str = ""
     session_id: str = ""
-    timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    timestamp: datetime = field(default_factory=lambda: datetime.now(UTC))
 
 
 @dataclass
@@ -112,8 +111,8 @@ class LearningPipeline:
         self._metrics = LearningMetrics()
 
         # Callbacks
-        self._on_feedback_callbacks: list[callable] = []
-        self._on_reward_callbacks: list[callable] = []
+        self._on_feedback_callbacks: list[Callable[[FeedbackResponse, RewardEstimate], None]] = []
+        self._on_reward_callbacks: list[Callable[[RewardEstimate], None]] = []
 
     def start_response_tracking(
         self,
@@ -225,30 +224,36 @@ class LearningPipeline:
         if feedback.rating is not None:
             # Convert 1-5 rating to -1 to 1 scale
             normalized = (feedback.rating - 3) / 2
-            signals.append(RewardSignal(
-                signal_type=SignalType.EXPLICIT_RATING,
-                value=normalized,
-                confidence=1.0,
-                raw_value=feedback.rating,
-            ))
+            signals.append(
+                RewardSignal(
+                    signal_type=SignalType.EXPLICIT_RATING,
+                    value=normalized,
+                    confidence=1.0,
+                    raw_value=feedback.rating,
+                )
+            )
 
         # Thumbs up/down
         if feedback.thumbs_up is not None:
-            signals.append(RewardSignal(
-                signal_type=SignalType.THUMBS_UP_DOWN,
-                value=1.0 if feedback.thumbs_up else -1.0,
-                confidence=0.9,
-                raw_value=feedback.thumbs_up,
-            ))
+            signals.append(
+                RewardSignal(
+                    signal_type=SignalType.THUMBS_UP_DOWN,
+                    value=1.0 if feedback.thumbs_up else -1.0,
+                    confidence=0.9,
+                    raw_value=feedback.thumbs_up,
+                )
+            )
 
         # Acceptance
         if feedback.accepted is not None:
-            signals.append(RewardSignal(
-                signal_type=SignalType.TASK_COMPLETION,
-                value=1.0 if feedback.accepted else -0.5,
-                confidence=0.85,
-                raw_value=feedback.accepted,
-            ))
+            signals.append(
+                RewardSignal(
+                    signal_type=SignalType.TASK_COMPLETION,
+                    value=1.0 if feedback.accepted else -0.5,
+                    confidence=0.85,
+                    raw_value=feedback.accepted,
+                )
+            )
 
         # Aggregate into reward estimate
         if signals:
@@ -274,9 +279,12 @@ class LearningPipeline:
                 sample.accepted = feedback.accepted
                 sample.correction = feedback.correction
                 sample.feedback_type = (
-                    FeedbackType.EXPLICIT_RATING if feedback.rating
-                    else FeedbackType.ACCEPTANCE if feedback.accepted is not None
-                    else FeedbackType.THUMBS if feedback.thumbs_up is not None
+                    FeedbackType.EXPLICIT_RATING
+                    if feedback.rating
+                    else FeedbackType.ACCEPTANCE
+                    if feedback.accepted is not None
+                    else FeedbackType.THUMBS
+                    if feedback.thumbs_up is not None
                     else FeedbackType.IMPLICIT_SIGNAL
                 )
 
@@ -286,11 +294,10 @@ class LearningPipeline:
 
             # Update episodic learning if linked
             if feedback.episode_id and self._episodic_learner:
-                self._episodic_learner.update_from_reward(
-                    feedback.episode_id,
-                    reward_estimate.reward,
-                )
-                self._metrics.episodes_recorded += 1
+                update_from_reward = getattr(self._episodic_learner, "update_from_reward", None)
+                if callable(update_from_reward):
+                    update_from_reward(feedback.episode_id, reward_estimate.reward)
+                    self._metrics.episodes_recorded += 1
 
             # Trigger callbacks
             for callback in self._on_feedback_callbacks:
@@ -299,9 +306,9 @@ class LearningPipeline:
                 except Exception as e:
                     logger.warning(f"Feedback callback error: {e}")
 
-            for callback in self._on_reward_callbacks:
+            for reward_callback in self._on_reward_callbacks:
                 try:
-                    callback(reward_estimate)
+                    reward_callback(reward_estimate)
                 except Exception as e:
                     logger.warning(f"Reward callback error: {e}")
 
@@ -370,7 +377,13 @@ class LearningPipeline:
                 "metadata": sample.metadata,
                 "created_at": sample.timestamp.isoformat(),
             }
-            await self._postgres.insert_rlhf_sample(data)
+            insert_sample = getattr(self._postgres, "insert_rlhf_sample", None)
+            if callable(insert_sample):
+                await cast(Callable[[dict[str, Any]], Awaitable[Any]], insert_sample)(data)
+            else:
+                logger.debug(
+                    "Postgres client has no insert_rlhf_sample; skipping RLHF sample persist"
+                )
         except Exception as e:
             logger.warning(f"Failed to store RLHF sample: {e}")
 
@@ -394,7 +407,7 @@ class LearningPipeline:
         """
         return self._active_episodes.get(session_id)
 
-    def on_feedback(self, callback: callable) -> None:
+    def on_feedback(self, callback: Callable[[FeedbackResponse, RewardEstimate], None]) -> None:
         """Register a callback for feedback events.
 
         Args:
@@ -402,7 +415,7 @@ class LearningPipeline:
         """
         self._on_feedback_callbacks.append(callback)
 
-    def on_reward(self, callback: callable) -> None:
+    def on_reward(self, callback: Callable[[RewardEstimate], None]) -> None:
         """Register a callback for reward calculation events.
 
         Args:

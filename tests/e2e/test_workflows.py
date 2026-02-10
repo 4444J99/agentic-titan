@@ -8,8 +8,9 @@ topology switching, and budget exhaustion handling.
 from __future__ import annotations
 
 import asyncio
+from unittest.mock import MagicMock
+
 import pytest
-from unittest.mock import AsyncMock, patch, MagicMock
 
 # Mark all tests in this module as e2e
 pytestmark = [pytest.mark.e2e, pytest.mark.asyncio]
@@ -214,7 +215,7 @@ class TestTopologySwitching:
         assert len(topology_engine.current_topology.nodes) == 3
 
         # Switch to pipeline
-        pipeline = await topology_engine.switch_topology(
+        await topology_engine.switch_topology(
             TopologyType.PIPELINE,
             migrate_agents=True,
             reason="Task requires sequential processing",
@@ -230,7 +231,6 @@ class TestTopologySwitching:
     ):
         """Test topology switch doesn't lose agents under load."""
         from hive.topology import TopologyType
-        import asyncio
 
         # Create topology with many agents
         mesh = topology_engine.create_topology(TopologyType.MESH)
@@ -256,7 +256,6 @@ class TestTopologySwitching:
 
     async def test_topology_selection_based_on_task(self, topology_engine):
         """Test appropriate topology is selected for task type."""
-        from hive.topology import TopologyType
 
         # Sequential task should select pipeline
         result = topology_engine.suggest_topology("Review the code, then deploy it")
@@ -299,14 +298,16 @@ class TestBudgetExhaustion:
                 return True
             return False
 
-        agent.add_stopping_condition(StoppingCondition(
-            reason=StoppingReason.BUDGET_EXHAUSTED,
-            check=check_budget,
-            message="Budget exhausted",
-            priority=100,
-        ))
+        agent.add_stopping_condition(
+            StoppingCondition(
+                reason=StoppingReason.BUDGET_EXHAUSTED,
+                check=check_budget,
+                message="Budget exhausted",
+                priority=100,
+            )
+        )
 
-        result = await agent.run()
+        await agent.run()
 
         # Agent should have stopped but may have partial results
         assert agent._context.turn_number <= 3
@@ -391,7 +392,7 @@ class TestWorkflowRecovery:
             hive_mind=mock_hive_mind,
         )
 
-        result = await agent.run()
+        await agent.run()
 
         # Workflow should complete even if some subtasks had issues
         assert agent.workflow is not None
@@ -561,11 +562,11 @@ class TestNewAgentArchetypes:
         await agent.initialize()
 
         # Scan code with potential vulnerabilities
-        code = '''
+        code = """
 import os
 password = "hardcoded_secret_123"  # allow-secret: test fixture
 cursor.execute("SELECT * FROM users WHERE id = " + user_id)
-'''
+"""
 
         vulns = await agent.scan_code(code, "python", "test.py")
 

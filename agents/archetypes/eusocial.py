@@ -13,41 +13,40 @@ sacrifice reproductive autonomy for collective benefit.
 
 from __future__ import annotations
 
-import asyncio
 import logging
 import random
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
-from enum import Enum
+from datetime import UTC, datetime
+from enum import StrEnum
 from typing import TYPE_CHECKING, Any
 
-from agents.framework.base_agent import BaseAgent, AgentState
+from agents.framework.base_agent import AgentState, BaseAgent
 
 if TYPE_CHECKING:
-    from hive.stigmergy import PheromoneField, TraceType
+    pass
 
 logger = logging.getLogger("titan.agents.eusocial")
 
 
-class CasteType(str, Enum):
+class CasteType(StrEnum):
     """Castes in the eusocial colony."""
 
-    QUEEN = "queen"              # Reproductive, decision-making
-    WORKER = "worker"            # General tasks
-    SOLDIER = "soldier"          # Defense and enforcement
-    FORAGER = "forager"          # Resource gathering
-    NURSE = "nurse"              # Care for developing agents
-    SCOUT = "scout"              # Exploration and reconnaissance
+    QUEEN = "queen"  # Reproductive, decision-making
+    WORKER = "worker"  # General tasks
+    SOLDIER = "soldier"  # Defense and enforcement
+    FORAGER = "forager"  # Resource gathering
+    NURSE = "nurse"  # Care for developing agents
+    SCOUT = "scout"  # Exploration and reconnaissance
 
 
-class ColonySignal(str, Enum):
+class ColonySignal(StrEnum):
     """Types of colony-wide signals."""
 
-    ALARM = "alarm"              # Danger detected
-    FOOD_FOUND = "food_found"    # Resource located
+    ALARM = "alarm"  # Danger detected
+    FOOD_FOUND = "food_found"  # Resource located
     RECRUITMENT = "recruitment"  # Request for workers
-    POLICING = "policing"        # Enforcement needed
-    TRAIL = "trail"              # Path to follow
+    POLICING = "policing"  # Enforcement needed
+    TRAIL = "trail"  # Path to follow
 
 
 @dataclass
@@ -61,15 +60,15 @@ class ColonyTask:
     assigned_caste: CasteType | None = None
     assigned_to: str | None = None
     completed: bool = False
-    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
 
 
 @dataclass
 class ColonyState:
     """State of the colony as a superorganism."""
 
-    health: float = 1.0           # 0-1, overall colony health
-    food_stores: float = 0.5      # 0-1, resource level
+    health: float = 1.0  # 0-1, overall colony health
+    food_stores: float = 0.5  # 0-1, resource level
     population: int = 0
     caste_counts: dict[str, int] = field(default_factory=dict)
     active_tasks: list[ColonyTask] = field(default_factory=list)
@@ -108,11 +107,14 @@ class EusocialColonyAgent(BaseAgent):
             **kwargs: Base agent arguments.
         """
         kwargs.setdefault("name", f"colony_{caste.value}")
-        kwargs.setdefault("capabilities", [
-            "caste_behavior",
-            "stigmergic_communication",
-            "colony_coordination",
-        ])
+        kwargs.setdefault(
+            "capabilities",
+            [
+                "caste_behavior",
+                "stigmergic_communication",
+                "colony_coordination",
+            ],
+        )
         super().__init__(**kwargs)
 
         self._caste = caste
@@ -140,7 +142,7 @@ class EusocialColonyAgent(BaseAgent):
 
     async def work(self) -> dict[str, Any]:
         """Perform caste-specific work."""
-        result = {
+        result: dict[str, Any] = {
             "caste": self._caste.value,
             "location": self._location,
             "actions": [],
@@ -171,7 +173,7 @@ class EusocialColonyAgent(BaseAgent):
 
     async def _queen_work(self) -> dict[str, Any]:
         """Queen behavior: strategic decisions and task assignment."""
-        result = {"role": "queen", "decisions": []}
+        result: dict[str, Any] = {"role": "queen", "decisions": []}
 
         # Monitor colony state
         await self._update_colony_state()
@@ -194,7 +196,7 @@ class EusocialColonyAgent(BaseAgent):
 
     async def _worker_work(self) -> dict[str, Any]:
         """Worker behavior: general task execution."""
-        result = {"role": "worker", "task_status": None}
+        result: dict[str, Any] = {"role": "worker", "task_status": None}
 
         # Check for assigned task
         if self._current_task:
@@ -220,7 +222,7 @@ class EusocialColonyAgent(BaseAgent):
 
     async def _soldier_work(self) -> dict[str, Any]:
         """Soldier behavior: defense and policing."""
-        result = {"role": "soldier", "patrols": 0, "incidents": []}
+        result: dict[str, Any] = {"role": "soldier", "patrols": 0, "incidents": []}
 
         # Patrol for threats
         threats = await self._patrol_for_threats()
@@ -230,11 +232,13 @@ class EusocialColonyAgent(BaseAgent):
         # Worker policing - check for defectors
         defectors = await self._check_for_defectors()
         for defector in defectors:
-            result["incidents"].append({
-                "type": "policing",
-                "target": defector,
-                "action": "warning_issued",
-            })
+            result["incidents"].append(
+                {
+                    "type": "policing",
+                    "target": defector,
+                    "action": "warning_issued",
+                }
+            )
 
         # Emit alarm if threats detected
         if threats:
@@ -244,7 +248,7 @@ class EusocialColonyAgent(BaseAgent):
 
     async def _forager_work(self) -> dict[str, Any]:
         """Forager behavior: resource gathering."""
-        result = {"role": "forager", "gathered": [], "trails_followed": 0}
+        result: dict[str, Any] = {"role": "forager", "gathered": [], "trails_followed": 0}
 
         # Follow food trails if available
         trail = await self._sense_signals([ColonySignal.FOOD_FOUND])
@@ -275,7 +279,7 @@ class EusocialColonyAgent(BaseAgent):
 
     async def _scout_work(self) -> dict[str, Any]:
         """Scout behavior: exploration and reconnaissance."""
-        result = {"role": "scout", "explored": [], "discoveries": []}
+        result: dict[str, Any] = {"role": "scout", "explored": [], "discoveries": []}
 
         # Explore new areas
         new_location = await self._explore()
@@ -350,10 +354,12 @@ class EusocialColonyAgent(BaseAgent):
         # Also broadcast via hive mind if available
         if self._hive_mind:
             await self._hive_mind.broadcast(
-                content=f"Colony signal: {signal_type.value}",
+                source_agent_id=self.agent_id,
+                message={
+                    "content": f"Colony signal: {signal_type.value}",
+                    "importance": 0.7,
+                },
                 topic=f"colony_{signal_type.value}",
-                importance=0.7,
-                sender_id=self.agent_id,
             )
 
     async def _sense_signals(
@@ -392,12 +398,14 @@ class EusocialColonyAgent(BaseAgent):
             )
 
             for trace in traces:
-                signals.append({
-                    "type": trace.payload.get("signal", "unknown"),
-                    "intensity": trace.intensity,
-                    "location": trace.location,
-                    **trace.payload,
-                })
+                signals.append(
+                    {
+                        "type": trace.payload.get("signal", "unknown"),
+                        "intensity": trace.intensity,
+                        "location": trace.location,
+                        **trace.payload,
+                    }
+                )
 
         return signals
 
@@ -424,6 +432,7 @@ class EusocialColonyAgent(BaseAgent):
             Created ColonyTask.
         """
         import uuid
+
         task = ColonyTask(
             task_id=f"CT-{uuid.uuid4().hex[:8]}",
             task_type=task_type,

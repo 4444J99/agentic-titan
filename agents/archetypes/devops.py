@@ -17,15 +17,16 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any
 
-from agents.framework.base_agent import BaseAgent, AgentState
 from adapters.base import LLMMessage
 from adapters.router import get_router
+from agents.framework.base_agent import BaseAgent
 
 logger = logging.getLogger("titan.agents.devops")
 
 
 class InfrastructureType(Enum):
     """Types of infrastructure components."""
+
     DOCKERFILE = "dockerfile"
     KUBERNETES = "kubernetes"
     HELM = "helm"
@@ -38,6 +39,7 @@ class InfrastructureType(Enum):
 
 class DeploymentStatus(Enum):
     """Deployment health status."""
+
     HEALTHY = "healthy"
     DEGRADED = "degraded"
     UNHEALTHY = "unhealthy"
@@ -47,6 +49,7 @@ class DeploymentStatus(Enum):
 @dataclass
 class InfraAnalysis:
     """Analysis result for infrastructure code."""
+
     file_path: str
     infra_type: InfrastructureType
     issues: list[dict[str, Any]] = field(default_factory=list)
@@ -58,6 +61,7 @@ class InfraAnalysis:
 @dataclass
 class DeploymentConfig:
     """Generated deployment configuration."""
+
     infra_type: InfrastructureType
     content: str
     description: str
@@ -68,6 +72,7 @@ class DeploymentConfig:
 @dataclass
 class HealthCheck:
     """Deployment health check result."""
+
     service_name: str
     status: DeploymentStatus
     latency_ms: float = 0.0
@@ -94,7 +99,10 @@ class DevOpsAgent(BaseAgent):
         "root_user": (r"^USER\s+root", "Running as root user is a security risk"),
         "latest_tag": (r"FROM\s+\S+:latest", "Using 'latest' tag makes builds non-reproducible"),
         "no_healthcheck": (None, "No HEALTHCHECK instruction found"),
-        "apt_cache": (r"apt-get\s+install(?!.*--no-install-recommends)", "Consider using --no-install-recommends"),
+        "apt_cache": (
+            r"apt-get\s+install(?!.*--no-install-recommends)",
+            "Consider using --no-install-recommends",
+        ),
         "multiple_run": (r"(RUN\s+[^\n]+\n){3,}", "Consider combining multiple RUN commands"),
     }
 
@@ -112,13 +120,16 @@ class DevOpsAgent(BaseAgent):
         **kwargs: Any,
     ) -> None:
         kwargs.setdefault("name", "devops")
-        kwargs.setdefault("capabilities", [
-            "infrastructure_analysis",
-            "dockerfile_generation",
-            "kubernetes_manifests",
-            "cicd_pipelines",
-            "health_checks",
-        ])
+        kwargs.setdefault(
+            "capabilities",
+            [
+                "infrastructure_analysis",
+                "dockerfile_generation",
+                "kubernetes_manifests",
+                "cicd_pipelines",
+                "health_checks",
+            ],
+        )
         super().__init__(**kwargs)
 
         self.project_path = project_path
@@ -259,26 +270,36 @@ class DevOpsAgent(BaseAgent):
         for issue_id, (pattern, message) in patterns.items():
             if pattern:
                 if re.search(pattern, content, re.MULTILINE | re.IGNORECASE):
-                    issues.append({
-                        "id": issue_id,
-                        "severity": "medium",
-                        "message": message,
-                        "pattern_match": True,
-                    })
+                    issues.append(
+                        {
+                            "id": issue_id,
+                            "severity": "medium",
+                            "message": message,
+                            "pattern_match": True,
+                        }
+                    )
             else:
                 # Check for absence of something
                 if issue_id == "no_healthcheck" and "HEALTHCHECK" not in content:
-                    issues.append({
-                        "id": issue_id,
-                        "severity": "low",
-                        "message": message,
-                    })
-                elif issue_id == "no_probes" and "livenessProbe" not in content and "readinessProbe" not in content:
-                    issues.append({
-                        "id": issue_id,
-                        "severity": "medium",
-                        "message": message,
-                    })
+                    issues.append(
+                        {
+                            "id": issue_id,
+                            "severity": "low",
+                            "message": message,
+                        }
+                    )
+                elif (
+                    issue_id == "no_probes"
+                    and "livenessProbe" not in content
+                    and "readinessProbe" not in content
+                ):
+                    issues.append(
+                        {
+                            "id": issue_id,
+                            "severity": "medium",
+                            "message": message,
+                        }
+                    )
 
         return issues
 
@@ -291,7 +312,8 @@ class DevOpsAgent(BaseAgent):
         messages = [
             LLMMessage(
                 role="user",
-                content=f"""Analyze this {infra_type.value} configuration for issues and improvements:
+                content=f"""Analyze this {infra_type.value} configuration
+for issues and improvements:
 
 ```
 {content[:3000]}
@@ -310,7 +332,10 @@ SCORE: X.X (0-10 best practices score)""",
 
         response = await self._router.complete(
             messages,
-            system="You are a DevOps expert. Analyze infrastructure code for issues, security, and best practices.",
+            system=(
+                "You are a DevOps expert. Analyze infrastructure code for issues, "
+                "security, and best practices."
+            ),
             max_tokens=500,
         )
 
@@ -374,8 +399,8 @@ SCORE: X.X (0-10 best practices score)""",
                 role="user",
                 content=f"""Generate a production-ready Dockerfile for:
 Language: {language}
-Framework: {framework or 'none'}
-Requirements: {', '.join(requirements or ['standard'])}
+Framework: {framework or "none"}
+Requirements: {", ".join(requirements or ["standard"])}
 
 Follow these best practices:
 1. Use multi-stage builds
@@ -390,7 +415,10 @@ Output only the Dockerfile content.""",
 
         response = await self._router.complete(
             messages,
-            system="You are a DevOps expert. Generate production-ready Dockerfiles following best practices.",
+            system=(
+                "You are a DevOps expert. Generate production-ready Dockerfiles "
+                "following best practices."
+            ),
             max_tokens=800,
         )
 
@@ -516,7 +544,7 @@ Follow security best practices. Output YAML only.""",
                 content=f"""Generate a CI/CD pipeline for:
 Platform: {platform}
 Language: {language}
-Stages: {', '.join(stages)}
+Stages: {", ".join(stages)}
 
 Include:
 1. Caching for dependencies
@@ -572,7 +600,8 @@ Output only the pipeline configuration file content.""",
         messages = [
             LLMMessage(
                 role="user",
-                content=f"""Simulate a health check response for service '{service_name}' in namespace '{namespace}'.
+                content=f"""Simulate a health check response for service '{service_name}'
+in namespace '{namespace}'.
 
 Provide realistic metrics in this format:
 STATUS: healthy/degraded/unhealthy

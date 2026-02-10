@@ -9,12 +9,15 @@ Provides safety mechanisms for the agent system:
 - Output sanitization
 """
 
-from titan.safety.policies import (
-    RiskLevel,
-    ActionPolicy,
-    ActionCategory,
-    ActionClassifier,
-    get_action_classifier,
+from titan.safety.filters import (
+    CommandInjectionFilter,
+    ContentFilter,
+    CredentialLeakFilter,
+    FilterMatch,
+    FilterPipeline,
+    FilterResult,
+    PromptInjectionFilter,
+    create_default_pipeline,
 )
 from titan.safety.gates import (
     ApprovalGate,
@@ -25,28 +28,38 @@ from titan.safety.gates import (
     get_gate_registry,
 )
 from titan.safety.hitl import (
-    HITLHandler,
     HITLConfig,
+    HITLHandler,
     get_hitl_handler,
     init_hitl_handler,
 )
 from titan.safety.patterns import (
+    DangerousPattern,
     PatternCategory,
     PatternSeverity,
-    DangerousPattern,
     get_all_patterns,
     get_patterns_by_category,
     get_patterns_by_severity,
 )
-from titan.safety.filters import (
-    ContentFilter,
-    FilterResult,
-    FilterMatch,
-    FilterPipeline,
-    PromptInjectionFilter,
-    CredentialLeakFilter,
-    CommandInjectionFilter,
-    create_default_pipeline,
+from titan.safety.permissions import (
+    Permission,
+    PersonaRole,
+    RolePermissions,
+    create_custom_role,
+    get_role_permissions,
+)
+from titan.safety.policies import (
+    ActionCategory,
+    ActionClassifier,
+    ActionPolicy,
+    RiskLevel,
+    get_action_classifier,
+)
+from titan.safety.rbac import (
+    ActionValidation,
+    RBACEnforcer,
+    ValidationResult,
+    get_rbac_enforcer,
 )
 from titan.safety.sanitizer import (
     OutputSanitizer,
@@ -54,19 +67,6 @@ from titan.safety.sanitizer import (
     SanitizationResult,
     get_sanitizer,
     sanitize_output,
-)
-from titan.safety.permissions import (
-    Permission,
-    PersonaRole,
-    RolePermissions,
-    get_role_permissions,
-    create_custom_role,
-)
-from titan.safety.rbac import (
-    RBACEnforcer,
-    ValidationResult,
-    ActionValidation,
-    get_rbac_enforcer,
 )
 
 __all__ = [

@@ -4,17 +4,18 @@ Tests for titan.auth.middleware module.
 Tests FastAPI authentication dependencies.
 """
 
-import pytest
-from datetime import datetime, timezone
-from unittest.mock import AsyncMock, MagicMock, patch
+from datetime import UTC, datetime
+from unittest.mock import AsyncMock, patch
 from uuid import uuid4
 
-from titan.auth.models import User, UserRole
+import pytest
+
 from titan.auth.middleware import (
     AuthenticationError,
     AuthorizationError,
     require_role,
 )
+from titan.auth.models import User, UserRole
 
 
 class TestAuthenticationError:
@@ -66,7 +67,7 @@ class TestRequireRole:
             hashed_password="hashed",  # allow-secret
             role=UserRole.ADMIN,
             is_active=True,
-            created_at=datetime.now(timezone.utc),
+            created_at=datetime.now(UTC),
         )
 
     @pytest.fixture
@@ -78,7 +79,7 @@ class TestRequireRole:
             hashed_password="hashed",  # allow-secret
             role=UserRole.USER,
             is_active=True,
-            created_at=datetime.now(timezone.utc),
+            created_at=datetime.now(UTC),
         )
 
     @pytest.fixture
@@ -90,7 +91,7 @@ class TestRequireRole:
             hashed_password="hashed",  # allow-secret
             role=UserRole.READONLY,
             is_active=True,
-            created_at=datetime.now(timezone.utc),
+            created_at=datetime.now(UTC),
         )
 
     @pytest.mark.asyncio
@@ -134,7 +135,7 @@ class TestUserModel:
             hashed_password="secret_hash",  # allow-secret
             role=UserRole.USER,
             is_active=True,
-            created_at=datetime.now(timezone.utc),
+            created_at=datetime.now(UTC),
         )
 
         public = user.to_public_dict()
@@ -148,7 +149,7 @@ class TestUserModel:
     def test_user_from_dict(self):
         """Test creating user from dictionary."""
         user_id = uuid4()
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
 
         data = {
             "id": str(user_id),
@@ -186,7 +187,7 @@ class TestJWTAuthentication:
             "hashed_password": "hashed",  # allow-secret
             "role": "user",
             "is_active": True,
-            "created_at": datetime.now(timezone.utc).isoformat(),
+            "created_at": datetime.now(UTC).isoformat(),
         }
 
         with patch("titan.auth.jwt.verify_token") as mock_verify:
@@ -205,8 +206,8 @@ class TestJWTAuthentication:
     @pytest.mark.asyncio
     async def test_authenticate_jwt_invalid(self):
         """Test authenticating with invalid JWT."""
-        from titan.auth.middleware import _authenticate_jwt
         from titan.auth.jwt import JWTError
+        from titan.auth.middleware import _authenticate_jwt
 
         with patch("titan.auth.jwt.verify_token") as mock_verify:
             mock_verify.side_effect = JWTError("Invalid token")
@@ -241,7 +242,7 @@ class TestJWTAuthentication:
             "hashed_password": "hashed",  # allow-secret
             "role": "user",
             "is_active": False,  # Disabled
-            "created_at": datetime.now(timezone.utc).isoformat(),
+            "created_at": datetime.now(UTC).isoformat(),
         }
 
         with patch("titan.auth.jwt.verify_token") as mock_verify:
@@ -278,7 +279,7 @@ class TestAPIKeyAuthentication:
             "hashed_password": "hashed",  # allow-secret
             "role": "service",
             "is_active": True,
-            "created_at": datetime.now(timezone.utc).isoformat(),
+            "created_at": datetime.now(UTC).isoformat(),
         }
 
         with patch("titan.auth.api_keys.hash_api_key") as mock_hash:
@@ -325,7 +326,7 @@ class TestAPIKeyAuthentication:
             "key_hash": "test_hash",
             "user_id": str(uuid4()),
             "is_active": True,
-            "expires_at": datetime.now(timezone.utc),  # Already expired
+            "expires_at": datetime.now(UTC),  # Already expired
         }
 
         with patch("titan.auth.api_keys.hash_api_key") as mock_hash:

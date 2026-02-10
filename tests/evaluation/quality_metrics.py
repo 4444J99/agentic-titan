@@ -46,9 +46,18 @@ class QualityEvaluator:
     def __init__(self) -> None:
         # Coherence indicators
         self._transition_words = [
-            "however", "therefore", "furthermore", "moreover",
-            "consequently", "thus", "hence", "additionally",
-            "first", "second", "finally", "in conclusion",
+            "however",
+            "therefore",
+            "furthermore",
+            "moreover",
+            "consequently",
+            "thus",
+            "hence",
+            "additionally",
+            "first",
+            "second",
+            "finally",
+            "in conclusion",
         ]
 
         # Code quality indicators
@@ -86,12 +95,7 @@ class QualityEvaluator:
         safety = self._calculate_safety(response, forbidden_patterns)
 
         # Calculate overall score (weighted average)
-        overall = (
-            relevance * 0.3 +
-            coherence * 0.2 +
-            completeness * 0.3 +
-            safety * 0.2
-        )
+        overall = relevance * 0.3 + coherence * 0.2 + completeness * 0.3 + safety * 0.2
 
         return QualityScore(
             overall=overall,
@@ -104,9 +108,7 @@ class QualityEvaluator:
     def _calculate_relevance(self, response: str, prompt: str) -> float:
         """Calculate relevance score based on keyword overlap."""
         # Extract significant words from prompt
-        prompt_words = set(
-            word.lower() for word in re.findall(r'\b\w{4,}\b', prompt)
-        )
+        prompt_words = set(word.lower() for word in re.findall(r"\b\w{4,}\b", prompt))
 
         # Check how many appear in response
         response_lower = response.lower()
@@ -123,19 +125,16 @@ class QualityEvaluator:
 
         # Check for transition words (indicates logical flow)
         response_lower = response.lower()
-        transitions_found = sum(
-            1 for word in self._transition_words
-            if word in response_lower
-        )
+        transitions_found = sum(1 for word in self._transition_words if word in response_lower)
         score += min(0.2, transitions_found * 0.05)
 
         # Check for paragraph structure
-        paragraphs = [p for p in response.split('\n\n') if p.strip()]
+        paragraphs = [p for p in response.split("\n\n") if p.strip()]
         if len(paragraphs) > 1:
             score += 0.1
 
         # Check for lists/numbered items (structured content)
-        if re.search(r'^\s*[\d\-\*]\s', response, re.MULTILINE):
+        if re.search(r"^\s*[\d\-\*]\s", response, re.MULTILINE):
             score += 0.1
 
         # Penalize very short responses
@@ -159,8 +158,7 @@ class QualityEvaluator:
         # Check expected patterns
         if expected_patterns:
             matches = sum(
-                1 for pattern in expected_patterns
-                if re.search(pattern, response, re.IGNORECASE)
+                1 for pattern in expected_patterns if re.search(pattern, response, re.IGNORECASE)
             )
             pattern_score = matches / len(expected_patterns)
             score = pattern_score * 0.7 + score * 0.3
@@ -219,16 +217,13 @@ class QualityEvaluator:
             metrics[name] = bool(re.search(pattern, code, re.MULTILINE))
 
         # Line count
-        lines = code.split('\n')
+        lines = code.split("\n")
         metrics["line_count"] = len(lines)
-        metrics["non_empty_lines"] = len([l for l in lines if l.strip()])
+        metrics["non_empty_lines"] = len([line for line in lines if line.strip()])
 
         # Complexity estimate (very rough)
         metrics["estimated_complexity"] = (
-            code.count("if ") +
-            code.count("for ") +
-            code.count("while ") +
-            code.count("try:")
+            code.count("if ") + code.count("for ") + code.count("while ") + code.count("try:")
         )
 
         # Calculate overall code quality score
@@ -253,6 +248,4 @@ def evaluate_response_quality(
 ) -> QualityScore:
     """Convenience function to evaluate response quality."""
     evaluator = QualityEvaluator()
-    return evaluator.evaluate_response(
-        response, prompt, expected_patterns, forbidden_patterns
-    )
+    return evaluator.evaluate_response(response, prompt, expected_patterns, forbidden_patterns)

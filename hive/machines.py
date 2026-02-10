@@ -12,41 +12,39 @@ emergent coordination patterns.
 
 from __future__ import annotations
 
-import asyncio
 import logging
 import random
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
-from enum import Enum
+from datetime import UTC, datetime
+from enum import StrEnum
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from hive.assembly import AssemblyManager
-    from hive.topology import BaseTopology
 
 logger = logging.getLogger("titan.hive.machines")
 
 
-class MachineType(str, Enum):
+class MachineType(StrEnum):
     """Types of organizational machines."""
 
-    STATE = "state"      # Hierarchical, capturing, striated
-    WAR = "war"          # Nomadic, smooth, distributed
-    HYBRID = "hybrid"    # Mixture of both
+    STATE = "state"  # Hierarchical, capturing, striated
+    WAR = "war"  # Nomadic, smooth, distributed
+    HYBRID = "hybrid"  # Mixture of both
 
 
-class OperationType(str, Enum):
+class OperationType(StrEnum):
     """Types of machine operations."""
 
     # State machine operations
-    CAPTURE = "capture"              # Absorb into structure
-    STRIATE = "striate"              # Impose divisions/hierarchy
-    OVERCODING = "overcoding"        # Apply meta-rules
+    CAPTURE = "capture"  # Absorb into structure
+    STRIATE = "striate"  # Impose divisions/hierarchy
+    OVERCODING = "overcoding"  # Apply meta-rules
     APPROPRIATION = "appropriation"  # Take over resources
 
     # War machine operations
-    SMOOTH = "smooth"                # Remove striations
-    NOMADIZE = "nomadize"            # Enable mobility
+    SMOOTH = "smooth"  # Remove striations
+    NOMADIZE = "nomadize"  # Enable mobility
     LINE_OF_FLIGHT = "line_of_flight"  # Enable escape
     DETERRITORIALIZE = "deterritorialize"  # Break boundaries
 
@@ -58,7 +56,7 @@ class MachineOperation:
     operation_type: OperationType
     machine_type: MachineType
     target_agents: list[str]
-    timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    timestamp: datetime = field(default_factory=lambda: datetime.now(UTC))
     success: bool = False
     metadata: dict[str, Any] = field(default_factory=dict)
 
@@ -79,11 +77,11 @@ class MachineState:
     """Current state of the machine dynamics."""
 
     dominant_machine: MachineType = MachineType.HYBRID
-    state_intensity: float = 0.5      # 0-1, how much state capture
-    war_intensity: float = 0.5        # 0-1, how much nomadic activity
-    capture_rate: float = 0.0         # Recent capture operations
-    escape_rate: float = 0.0          # Recent escape operations
-    striation_level: float = 0.5      # How structured the space is
+    state_intensity: float = 0.5  # 0-1, how much state capture
+    war_intensity: float = 0.5  # 0-1, how much nomadic activity
+    capture_rate: float = 0.0  # Recent capture operations
+    escape_rate: float = 0.0  # Recent escape operations
+    striation_level: float = 0.5  # How structured the space is
 
     @property
     def balance(self) -> float:
@@ -540,12 +538,10 @@ class MachineDynamics:
             "state_operations": len(state_ops),
             "war_operations": len(war_ops),
             "state_success_rate": (
-                sum(1 for o in state_ops if o.success) / len(state_ops)
-                if state_ops else 0.0
+                sum(1 for o in state_ops if o.success) / len(state_ops) if state_ops else 0.0
             ),
             "war_success_rate": (
-                sum(1 for o in war_ops if o.success) / len(war_ops)
-                if war_ops else 0.0
+                sum(1 for o in war_ops if o.success) / len(war_ops) if war_ops else 0.0
             ),
             "current_balance": self._state.balance,
             "dominant_machine": self.dominant_machine.value,

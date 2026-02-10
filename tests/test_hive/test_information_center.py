@@ -1,6 +1,5 @@
 """Tests for information centers (Phase 16C)."""
 
-import asyncio
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -330,7 +329,9 @@ class TestInformationCenterManager:
         )
 
         assert center is not None
-        assert center.member_count >= manager.MIN_CENTER_MEMBERS or center.member_count == len(candidates)
+        assert center.member_count >= manager.MIN_CENTER_MEMBERS or center.member_count == len(
+            candidates
+        )
 
     @pytest.mark.asyncio
     async def test_elect_center_by_performance(self, manager):

@@ -4,20 +4,19 @@ Tests for agent migration system.
 
 import pytest
 
-from hive.migration.state import AgentState, StateSnapshot
-from hive.migration.runtime import (
-    RuntimeType,
-    RuntimeSelector,
-    RuntimeConfig,
-    RuntimeCapabilities,
-    AgentRequirements,
-)
 from hive.migration.manager import (
     MigrationManager,
     MigrationRequest,
     MigrationStatus,
 )
-
+from hive.migration.runtime import (
+    AgentRequirements,
+    RuntimeCapabilities,
+    RuntimeConfig,
+    RuntimeSelector,
+    RuntimeType,
+)
+from hive.migration.state import AgentState, StateSnapshot
 
 # ============================================================================
 # State Tests
@@ -431,18 +430,21 @@ class TestMigrationManager:
 
     def test_history(self, manager: MigrationManager) -> None:
         """Test migration history."""
-        from hive.migration.manager import MigrationResult
         from datetime import datetime
 
+        from hive.migration.manager import MigrationResult
+
         # Add mock history
-        manager._history.append(MigrationResult(
-            id="mig_1",
-            agent_id="a1",
-            status=MigrationStatus.COMPLETED,
-            source_runtime="local",
-            target_runtime="k3s",
-            started_at=datetime.now(),
-        ))
+        manager._history.append(
+            MigrationResult(
+                id="mig_1",
+                agent_id="a1",
+                status=MigrationStatus.COMPLETED,
+                source_runtime="local",
+                target_runtime="k3s",
+                started_at=datetime.now(),
+            )
+        )
 
         history = manager.get_history()
 

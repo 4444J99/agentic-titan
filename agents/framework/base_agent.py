@@ -25,12 +25,13 @@ import asyncio
 import logging
 import uuid
 from abc import ABC, abstractmethod
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime
-from enum import Enum
-from typing import TYPE_CHECKING, Any, Callable
+from enum import Enum, StrEnum
+from typing import TYPE_CHECKING, Any
 
-from agents.framework.errors import AgentError, TitanError
+from agents.framework.errors import AgentError
 from titan.metrics import get_metrics
 
 if TYPE_CHECKING:
@@ -47,7 +48,7 @@ logger = logging.getLogger("titan.agent")
 # =============================================================================
 
 
-class StoppingReason(str, Enum):
+class StoppingReason(StrEnum):
     """Reasons for stopping agent execution."""
 
     SUCCESS = "success"  # Task completed successfully
@@ -70,11 +71,11 @@ class StoppingCondition:
     """
 
     reason: StoppingReason
-    check: Callable[["BaseAgent"], bool]
+    check: Callable[[BaseAgent], bool]
     message: str = ""
     priority: int = 0  # Higher priority checked first
 
-    def evaluate(self, agent: "BaseAgent") -> bool:
+    def evaluate(self, agent: BaseAgent) -> bool:
         """Evaluate if this stopping condition is met."""
         try:
             return self.check(agent)
@@ -308,23 +309,26 @@ class BaseAgent(ABC):
     def _add_default_stopping_conditions(self) -> None:
         """Add default stopping conditions."""
         # Max turns condition
-        self._stopping_conditions.append(StoppingCondition(
-            reason=StoppingReason.MAX_TURNS,
-            check=lambda agent: (
-                agent._context is not None and
-                agent._context.turn_number >= agent.max_turns
-            ),
-            message="Maximum turns reached",
-            priority=10,
-        ))
+        self._stopping_conditions.append(
+            StoppingCondition(
+                reason=StoppingReason.MAX_TURNS,
+                check=lambda agent: (
+                    agent._context is not None and agent._context.turn_number >= agent.max_turns
+                ),
+                message="Maximum turns reached",
+                priority=10,
+            )
+        )
 
         # Error threshold condition
-        self._stopping_conditions.append(StoppingCondition(
-            reason=StoppingReason.ERROR_THRESHOLD,
-            check=lambda agent: agent._consecutive_errors >= agent.error_threshold,
-            message="Error threshold exceeded",
-            priority=20,
-        ))
+        self._stopping_conditions.append(
+            StoppingCondition(
+                reason=StoppingReason.ERROR_THRESHOLD,
+                check=lambda agent: agent._consecutive_errors >= agent.error_threshold,
+                message="Error threshold exceeded",
+                priority=20,
+            )
+        )
 
         # Sort by priority
         self._stopping_conditions.sort(key=lambda c: c.priority, reverse=True)
@@ -444,8 +448,7 @@ class BaseAgent(ABC):
             # Complete
             self.state = AgentState.COMPLETED
             logger.info(
-                f"Agent '{self.name}' completed. "
-                f"Logged {len(self._decisions_logged)} decisions"
+                f"Agent '{self.name}' completed. Logged {len(self._decisions_logged)} decisions"
             )
 
             # Shutdown
@@ -475,7 +478,7 @@ class BaseAgent(ABC):
                 metadata={"decisions_logged": len(self._decisions_logged)},
             )
 
-        except asyncio.TimeoutError:
+        except TimeoutError:
             self.state = AgentState.FAILED
             self._last_error = AgentError(
                 f"Agent timed out after {self.timeout_ms}ms",
@@ -906,8 +909,7 @@ class BaseAgent(ABC):
                 self._consecutive_errors = state["consecutive_errors"]
 
             logger.info(
-                f"Agent '{self.name}' restored from checkpoint "
-                f"at turn {checkpoint.turn_number}"
+                f"Agent '{self.name}' restored from checkpoint at turn {checkpoint.turn_number}"
             )
             return True
 
@@ -975,8 +977,7 @@ class BaseAgent(ABC):
             self._consecutive_errors = 0
 
         logger.debug(
-            f"Decision tracked: {choice} "
-            f"(confidence={confidence:.2f}, category={category})"
+            f"Decision tracked: {choice} (confidence={confidence:.2f}, category={category})"
         )
 
         return decision
@@ -987,7 +988,7 @@ class BaseAgent(ABC):
             return {"count": 0}
 
         confidences = [d.confidence for d in self._tracked_decisions]
-        categories = {}
+        categories: dict[str, int] = {}
         for d in self._tracked_decisions:
             categories[d.category] = categories.get(d.category, 0) + 1
 
@@ -997,16 +998,16 @@ class BaseAgent(ABC):
             "min_confidence": min(confidences),
             "max_confidence": max(confidences),
             "by_category": categories,
-            "high_confidence_count": sum(1 for d in self._tracked_decisions if d.is_high_confidence),
+            "high_confidence_count": sum(
+                1 for d in self._tracked_decisions if d.is_high_confidence
+            ),
         }
 
     def record_error(self, error: Exception | str) -> None:
         """Record an error occurrence for threshold tracking."""
         self._consecutive_errors += 1
         self._last_error = error if isinstance(error, Exception) else Exception(str(error))
-        logger.warning(
-            f"Agent '{self.name}' error #{self._consecutive_errors}: {error}"
-        )
+        logger.warning(f"Agent '{self.name}' error #{self._consecutive_errors}: {error}")
 
     # =========================================================================
     # Audit Logging
@@ -1129,7 +1130,9 @@ class BaseAgent(ABC):
             logger.warning(f"Failed to audit decision: {e}")
 
     def __repr__(self) -> str:
-        return f"<{self.__class__.__name__} '{self.name}' id={self.agent_id} state={self.state.value}>"
+        return (
+            f"<{self.__class__.__name__} '{self.name}' id={self.agent_id} state={self.state.value}>"
+        )
 
     def __enter__(self) -> BaseAgent:
         """Context manager entry."""

@@ -10,11 +10,11 @@ from __future__ import annotations
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 
-class ContradictionType(str, Enum):
+class ContradictionType(StrEnum):
     """Types of contradictions that can be detected."""
 
     LOGICAL = "logical"  # A and not-A (direct logical contradiction)
@@ -26,7 +26,7 @@ class ContradictionType(str, Enum):
     CAUSAL = "causal"  # Conflicting causal claims
 
 
-class ContradictionSeverity(str, Enum):
+class ContradictionSeverity(StrEnum):
     """Severity levels for contradictions."""
 
     LOW = "low"  # Minor inconsistency, doesn't affect conclusions
@@ -87,7 +87,7 @@ class Contradiction:
         }
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> "Contradiction":
+    def from_dict(cls, data: dict[str, Any]) -> Contradiction:
         """Create from dictionary."""
         return cls(
             contradiction_id=data.get("contradiction_id", ""),
@@ -177,8 +177,8 @@ class ContradictionReport:
     def summary(self) -> str:
         """Generate a text summary of the report."""
         lines = [
-            f"Contradiction Analysis Report",
-            f"=" * 40,
+            "Contradiction Analysis Report",
+            "=" * 40,
             f"Total contradictions: {self.total_contradictions}",
             f"Sources analyzed: {len(self.sources_analyzed)}",
             f"Pairs analyzed: {self.pairs_analyzed}",

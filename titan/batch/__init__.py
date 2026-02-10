@@ -45,6 +45,13 @@ Example usage:
     archive = await store.export_batch_archive(str(batch.id))
 """
 
+from titan.batch.artifact_store import (
+    ArtifactStore,
+    FilesystemArtifactStore,
+    S3ArtifactStore,
+    get_artifact_store,
+    set_artifact_store,
+)
 from titan.batch.models import (
     BatchJob,
     BatchProgress,
@@ -58,13 +65,6 @@ from titan.batch.orchestrator import (
     BatchOrchestrator,
     get_batch_orchestrator,
     set_batch_orchestrator,
-)
-from titan.batch.artifact_store import (
-    ArtifactStore,
-    FilesystemArtifactStore,
-    S3ArtifactStore,
-    get_artifact_store,
-    set_artifact_store,
 )
 from titan.batch.scheduler import (
     BatchScheduler,

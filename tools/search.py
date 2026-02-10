@@ -12,12 +12,11 @@ Reference: vendor/cli/gemini-cli search grounding patterns
 
 from __future__ import annotations
 
-import hashlib
 import logging
 import re
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, Callable
+from typing import Any
 
 from tools.base import Tool, ToolParameter, ToolResult, register_tool
 
@@ -124,7 +123,6 @@ class DuckDuckGoProvider(SearchProvider):
         max_results: int = 10,
     ) -> SearchResults:
         """Search using DuckDuckGo HTML scraping."""
-        import asyncio
 
         try:
             import httpx
@@ -141,9 +139,7 @@ class DuckDuckGoProvider(SearchProvider):
                 response = await client.post(
                     url,
                     data={"q": query},
-                    headers={
-                        "User-Agent": "Mozilla/5.0 (compatible; TitanAgent/1.0)"
-                    },
+                    headers={"User-Agent": "Mozilla/5.0 (compatible; TitanAgent/1.0)"},
                 )
                 response.raise_for_status()
                 html = response.text

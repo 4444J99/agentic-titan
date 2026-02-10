@@ -14,13 +14,13 @@ import logging
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
-from agents.framework.base_agent import BaseAgent, AgentState
 from adapters.base import LLMMessage
 from adapters.router import get_router
+from agents.framework.base_agent import BaseAgent
 
 if TYPE_CHECKING:
-    from titan.costs.budget import BudgetTracker, Budget, BudgetAllocation
-    from titan.costs.router import CostAwareRouter, TaskComplexityAnalyzer
+    from titan.costs.budget import BudgetTracker
+    from titan.costs.router import CostAwareRouter
 
 logger = logging.getLogger("titan.agents.cfo")
 
@@ -188,7 +188,9 @@ class CFOAgent(BaseAgent):
         # Determine allocation
         if requested_usd:
             if requested_usd > remaining:
-                warnings.append(f"Requested ${requested_usd:.4f} exceeds remaining ${remaining:.4f}")
+                warnings.append(
+                    f"Requested ${requested_usd:.4f} exceeds remaining ${remaining:.4f}"
+                )
                 allocated = min(requested_usd, remaining)
             else:
                 allocated = requested_usd
@@ -198,7 +200,10 @@ class CFOAgent(BaseAgent):
 
         # Check if we can afford it
         if allocated < estimated_cost:
-            warnings.append(f"Allocated ${allocated:.4f} may be insufficient for estimated cost ${estimated_cost:.4f}")
+            warnings.append(
+                f"Allocated ${allocated:.4f} may be insufficient "
+                f"for estimated cost ${estimated_cost:.4f}"
+            )
             # Downgrade model tier if needed
             model_tier = "economy"
             model_id = "gpt-4o-mini"
@@ -314,15 +319,19 @@ class CFOAgent(BaseAgent):
                 allocated_usd=estimated_cost,
                 model_tier=model_tier,
                 model_id=model_id,
-                reasoning=f"Selected {model_tier} tier based on task analysis. Budget: ${remaining:.4f}",
+                reasoning=(
+                    f"Selected {model_tier} tier based on task analysis. Budget: ${remaining:.4f}"
+                ),
             )
 
-        self._model_selections.append({
-            "task": task[:100],
-            "model": recommendation.model_id,
-            "tier": recommendation.model_tier,
-            "cost": recommendation.allocated_usd,
-        })
+        self._model_selections.append(
+            {
+                "task": task[:100],
+                "model": recommendation.model_id,
+                "tier": recommendation.model_tier,
+                "cost": recommendation.allocated_usd,
+            }
+        )
 
         logger.info(f"Model selected: {recommendation.model_id} ({recommendation.model_tier})")
         return recommendation
@@ -423,12 +432,17 @@ class CFOAgent(BaseAgent):
         recommendations = []
 
         if utilization > 80:
-            recommendations.append("Budget utilization high. Consider increasing limits or optimizing model selection.")
+            recommendations.append(
+                "Budget utilization high. Consider increasing limits or optimizing model selection."
+            )
 
         if summary.get("by_model", {}):
             most_expensive = max(summary["by_model"].items(), key=lambda x: x[1])
             if most_expensive[1] > summary["total_spend_usd"] * 0.5:
-                recommendations.append(f"High spend on {most_expensive[0]}. Consider using economy models for simpler tasks.")
+                recommendations.append(
+                    f"High spend on {most_expensive[0]}. "
+                    "Consider using economy models for simpler tasks."
+                )
 
         if not recommendations:
             recommendations.append("Budget usage is healthy.")
@@ -453,23 +467,29 @@ class CFOAgent(BaseAgent):
         self.increment_turn()
 
         report = await self.generate_spend_report()
+        spending_lines = chr(10).join(
+            f"- {model}: ${spend:.4f}" for model, spend in report.by_model.items()
+        )
+        recent_lines = chr(10).join(
+            f"- {sel['task'][:50]}... -> {sel['model']}" for sel in self._model_selections[-5:]
+        )
 
         messages = [
             LLMMessage(
                 role="user",
-                content=f"""As a CFO AI, analyze this spending report and provide optimization advice:
-
-Total Spend: ${report.total_spend_usd:.4f}
-Budget Remaining: ${report.budget_remaining_usd:.4f}
-Utilization: {report.utilization_percent:.1f}%
-
-Spending by Model:
-{chr(10).join(f'- {model}: ${spend:.4f}' for model, spend in report.by_model.items())}
-
-Recent Model Selections:
-{chr(10).join(f'- {sel["task"][:50]}... -> {sel["model"]}' for sel in self._model_selections[-5:])}
-
-Provide 3-5 specific, actionable recommendations for optimizing costs while maintaining quality.""",
+                content=(
+                    f"As a CFO AI, analyze this spending report and provide "
+                    f"optimization advice:\n\n"
+                    f"Total Spend: ${report.total_spend_usd:.4f}\n"
+                    f"Budget Remaining: ${report.budget_remaining_usd:.4f}\n"
+                    f"Utilization: {report.utilization_percent:.1f}%\n\n"
+                    "Spending by Model:\n"
+                    f"{spending_lines}\n\n"
+                    "Recent Model Selections:\n"
+                    f"{recent_lines}\n\n"
+                    "Provide 3-5 specific, actionable recommendations "
+                    "for optimizing costs while maintaining quality."
+                ),
             )
         ]
 

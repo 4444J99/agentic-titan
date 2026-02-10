@@ -14,41 +14,41 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
-from enum import Enum
+from datetime import UTC, datetime
+from enum import StrEnum
 from typing import Any
 
-from agents.framework.base_agent import BaseAgent, AgentState
+from agents.framework.base_agent import AgentState, BaseAgent
 
 logger = logging.getLogger("titan.agents.actor_network")
 
 
-class ActantType(str, Enum):
+class ActantType(StrEnum):
     """Types of actants in the network."""
 
-    HUMAN = "human"          # Human agents
-    NONHUMAN = "nonhuman"    # Tools, services, infrastructure
-    HYBRID = "hybrid"        # Human-nonhuman combinations
+    HUMAN = "human"  # Human agents
+    NONHUMAN = "nonhuman"  # Tools, services, infrastructure
+    HYBRID = "hybrid"  # Human-nonhuman combinations
     CONCEPTUAL = "conceptual"  # Ideas, standards, protocols
 
 
-class LoyaltyLevel(str, Enum):
+class LoyaltyLevel(StrEnum):
     """Loyalty level of an actant."""
 
-    ENROLLED = "enrolled"        # Fully committed
-    INTERESTED = "interested"    # Showing interest
-    NEUTRAL = "neutral"          # Not yet engaged
-    RESISTANT = "resistant"      # Actively opposing
-    DEFECTED = "defected"        # Formerly enrolled, now left
+    ENROLLED = "enrolled"  # Fully committed
+    INTERESTED = "interested"  # Showing interest
+    NEUTRAL = "neutral"  # Not yet engaged
+    RESISTANT = "resistant"  # Actively opposing
+    DEFECTED = "defected"  # Formerly enrolled, now left
 
 
-class TranslationType(str, Enum):
+class TranslationType(StrEnum):
     """Types of translation operations."""
 
     PROBLEMATIZATION = "problematization"  # Defining the problem
-    INTERESSEMENT = "interessement"        # Getting others interested
-    ENROLLMENT = "enrollment"              # Committing actants
-    MOBILIZATION = "mobilization"          # Speaking for others
+    INTERESSEMENT = "interessement"  # Getting others interested
+    ENROLLMENT = "enrollment"  # Committing actants
+    MOBILIZATION = "mobilization"  # Speaking for others
 
 
 @dataclass
@@ -100,7 +100,7 @@ class Translation:
     target_actants: list[str]
     description: str
     success: bool = False
-    performed_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    performed_at: datetime = field(default_factory=lambda: datetime.now(UTC))
     result: str = ""
 
     def to_dict(self) -> dict[str, Any]:
@@ -167,12 +167,15 @@ class ActorNetworkAgent(BaseAgent):
             **kwargs: Base agent arguments.
         """
         kwargs.setdefault("name", "actor_network")
-        kwargs.setdefault("capabilities", [
-            "actant_enrollment",
-            "translation",
-            "network_mapping",
-            "inscription_management",
-        ])
+        kwargs.setdefault(
+            "capabilities",
+            [
+                "actant_enrollment",
+                "translation",
+                "network_mapping",
+                "inscription_management",
+            ],
+        )
         super().__init__(**kwargs)
 
         self._network_name = network_name
@@ -204,28 +207,29 @@ class ActorNetworkAgent(BaseAgent):
 
     async def work(self) -> dict[str, Any]:
         """Perform actor-network work cycle."""
-        result = {
+        actions: list[str] = []
+        result: dict[str, Any] = {
             "network": self._network_name,
             "actant_count": len(self._actants),
             "enrolled_count": self._count_enrolled(),
-            "actions": [],
+            "actions": actions,
         }
 
         # Check loyalty of enrolled actants
         defections = await self._check_loyalty()
         if defections:
-            result["actions"].append(f"detected_{len(defections)}_defections")
+            actions.append(f"detected_{len(defections)}_defections")
             result["defections"] = defections
 
         # Attempt to enroll interested actants
         new_enrollments = await self._attempt_enrollments()
         if new_enrollments:
-            result["actions"].append(f"enrolled_{len(new_enrollments)}_actants")
+            actions.append(f"enrolled_{len(new_enrollments)}_actants")
             result["new_enrollments"] = new_enrollments
 
         # Strengthen associations
         await self._strengthen_network()
-        result["actions"].append("strengthened_associations")
+        actions.append("strengthened_associations")
 
         return result
 
@@ -340,9 +344,7 @@ class ActorNetworkAgent(BaseAgent):
         Returns:
             The registered Actant.
         """
-        return self._register_actant(
-            actant_id, ActantType.CONCEPTUAL, name, description, [], []
-        )
+        return self._register_actant(actant_id, ActantType.CONCEPTUAL, name, description, [], [])
 
     def get_actant(self, actant_id: str) -> Actant | None:
         """Get an actant by ID."""
@@ -379,6 +381,7 @@ class ActorNetworkAgent(BaseAgent):
             The Translation record.
         """
         import uuid
+
         translation = Translation(
             translation_id=f"TR-{uuid.uuid4().hex[:8]}",
             translation_type=TranslationType.PROBLEMATIZATION,
@@ -418,6 +421,7 @@ class ActorNetworkAgent(BaseAgent):
             The Translation record.
         """
         import uuid
+
         translation = Translation(
             translation_id=f"TR-{uuid.uuid4().hex[:8]}",
             translation_type=TranslationType.INTERESSEMENT,
@@ -460,6 +464,7 @@ class ActorNetworkAgent(BaseAgent):
             The Translation record.
         """
         import uuid
+
         translation = Translation(
             translation_id=f"TR-{uuid.uuid4().hex[:8]}",
             translation_type=TranslationType.ENROLLMENT,
@@ -476,7 +481,7 @@ class ActorNetworkAgent(BaseAgent):
                 # Only interested actants can be enrolled
                 if actant.loyalty == LoyaltyLevel.INTERESTED:
                     actant.loyalty = LoyaltyLevel.ENROLLED
-                    actant.enrolled_at = datetime.now(timezone.utc)
+                    actant.enrolled_at = datetime.now(UTC)
                     actant.translations_applied.append(translation.translation_id)
                     enrolled += 1
 
@@ -506,6 +511,7 @@ class ActorNetworkAgent(BaseAgent):
             The Translation record.
         """
         import uuid
+
         translation = Translation(
             translation_id=f"TR-{uuid.uuid4().hex[:8]}",
             translation_type=TranslationType.MOBILIZATION,
@@ -578,9 +584,7 @@ class ActorNetworkAgent(BaseAgent):
     def get_obligatory_passage_points(self) -> list[Actant]:
         """Get all obligatory passage points."""
         return [
-            self._actants[aid]
-            for aid in self._obligatory_passage_points
-            if aid in self._actants
+            self._actants[aid] for aid in self._obligatory_passage_points if aid in self._actants
         ]
 
     # =========================================================================
@@ -605,6 +609,7 @@ class ActorNetworkAgent(BaseAgent):
             The created Inscription.
         """
         import uuid
+
         inscription = Inscription(
             inscription_id=f"INS-{uuid.uuid4().hex[:8]}",
             content=content,
@@ -630,6 +635,7 @@ class ActorNetworkAgent(BaseAgent):
             List of defected actant IDs.
         """
         import random
+
         defections: list[str] = []
 
         for actant in self._actants.values():
@@ -648,23 +654,21 @@ class ActorNetworkAgent(BaseAgent):
         Returns:
             List of newly enrolled actant IDs.
         """
-        interested = [
-            a for a in self._actants.values()
-            if a.loyalty == LoyaltyLevel.INTERESTED
-        ]
+        interested = [a for a in self._actants.values() if a.loyalty == LoyaltyLevel.INTERESTED]
 
         if not interested:
             return []
 
         # Attempt enrollment
         target_ids = [a.actant_id for a in interested[:3]]
-        result = await self.enroll(
+        await self.enroll(
             "Standard network participation terms",
             target_ids,
         )
 
         return [
-            aid for aid in target_ids
+            aid
+            for aid in target_ids
             if aid in self._actants and self._actants[aid].loyalty == LoyaltyLevel.ENROLLED
         ]
 
@@ -674,10 +678,11 @@ class ActorNetworkAgent(BaseAgent):
 
         # Create associations between enrolled actants that aren't connected
         for i, actant_a in enumerate(enrolled):
-            for actant_b in enrolled[i+1:]:
+            for actant_b in enrolled[i + 1 :]:
                 if actant_b.actant_id not in self._associations.get(actant_a.actant_id, []):
                     # 20% chance of forming new association
                     import random
+
                     if random.random() < 0.2:
                         self.associate(actant_a.actant_id, actant_b.actant_id)
 

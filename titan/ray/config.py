@@ -33,14 +33,26 @@ class RayConfig:
     memory: int = field(default_factory=lambda: int(os.getenv("RAY_MEMORY", "0")))  # 0 = auto
 
     # Autoscaling configuration
-    autoscaling_enabled: bool = field(default_factory=lambda: os.getenv("RAY_AUTOSCALING", "true").lower() == "true")
-    target_num_ongoing_requests: int = field(default_factory=lambda: int(os.getenv("RAY_TARGET_REQUESTS", "5")))
-    upscale_delay_s: float = field(default_factory=lambda: float(os.getenv("RAY_UPSCALE_DELAY", "30.0")))
-    downscale_delay_s: float = field(default_factory=lambda: float(os.getenv("RAY_DOWNSCALE_DELAY", "300.0")))
+    autoscaling_enabled: bool = field(
+        default_factory=lambda: os.getenv("RAY_AUTOSCALING", "true").lower() == "true"
+    )
+    target_num_ongoing_requests: int = field(
+        default_factory=lambda: int(os.getenv("RAY_TARGET_REQUESTS", "5"))
+    )
+    upscale_delay_s: float = field(
+        default_factory=lambda: float(os.getenv("RAY_UPSCALE_DELAY", "30.0"))
+    )
+    downscale_delay_s: float = field(
+        default_factory=lambda: float(os.getenv("RAY_DOWNSCALE_DELAY", "300.0"))
+    )
 
     # Health check configuration
-    health_check_period_s: float = field(default_factory=lambda: float(os.getenv("RAY_HEALTH_CHECK_PERIOD", "10.0")))
-    health_check_timeout_s: float = field(default_factory=lambda: float(os.getenv("RAY_HEALTH_CHECK_TIMEOUT", "30.0")))
+    health_check_period_s: float = field(
+        default_factory=lambda: float(os.getenv("RAY_HEALTH_CHECK_PERIOD", "10.0"))
+    )
+    health_check_timeout_s: float = field(
+        default_factory=lambda: float(os.getenv("RAY_HEALTH_CHECK_TIMEOUT", "30.0"))
+    )
 
     def to_deployment_config(self) -> dict[str, Any]:
         """Convert to Ray Serve deployment configuration."""

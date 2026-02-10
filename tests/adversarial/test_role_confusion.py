@@ -5,13 +5,14 @@ Tests for RBAC enforcement and role boundary protection.
 """
 
 import pytest
-from titan.safety.rbac import RBACEnforcer, get_rbac_enforcer
+
 from titan.safety.permissions import (
+    DEFAULT_ROLE_PERMISSIONS,
     Permission,
     PersonaRole,
     get_role_permissions,
-    DEFAULT_ROLE_PERMISSIONS,
 )
+from titan.safety.rbac import RBACEnforcer
 
 
 class TestRBACEnforcement:
@@ -42,38 +43,39 @@ class TestRBACEnforcement:
         assert result.allowed
 
     # Test permission checking per role
-    @pytest.mark.parametrize("role,permission,expected", [
-        # Orchestrator permissions
-        (PersonaRole.ORCHESTRATOR, Permission.SPAWN_AGENTS, True),
-        (PersonaRole.ORCHESTRATOR, Permission.EXECUTE_CODE, False),
-        (PersonaRole.ORCHESTRATOR, Permission.MODIFY_TOPOLOGY, True),
-
-        # Coder permissions
-        (PersonaRole.CODER, Permission.EXECUTE_CODE, True),
-        (PersonaRole.CODER, Permission.WRITE_FILES, True),
-        (PersonaRole.CODER, Permission.SPAWN_AGENTS, False),
-
-        # Researcher permissions
-        (PersonaRole.RESEARCHER, Permission.READ_FILES, True),
-        (PersonaRole.RESEARCHER, Permission.WRITE_FILES, False),
-        (PersonaRole.RESEARCHER, Permission.EXECUTE_CODE, False),
-
-        # Reviewer permissions
-        (PersonaRole.REVIEWER, Permission.APPROVE_ACTIONS, True),
-        (PersonaRole.REVIEWER, Permission.EXECUTE_CODE, False),
-        (PersonaRole.REVIEWER, Permission.WRITE_FILES, False),
-
-        # CFO permissions
-        (PersonaRole.CFO, Permission.ALLOCATE_BUDGET, True),
-        (PersonaRole.CFO, Permission.EXECUTE_CODE, False),
-        (PersonaRole.CFO, Permission.MODIFY_LIMITS, True),
-    ])
+    @pytest.mark.parametrize(
+        "role,permission,expected",
+        [
+            # Orchestrator permissions
+            (PersonaRole.ORCHESTRATOR, Permission.SPAWN_AGENTS, True),
+            (PersonaRole.ORCHESTRATOR, Permission.EXECUTE_CODE, False),
+            (PersonaRole.ORCHESTRATOR, Permission.MODIFY_TOPOLOGY, True),
+            # Coder permissions
+            (PersonaRole.CODER, Permission.EXECUTE_CODE, True),
+            (PersonaRole.CODER, Permission.WRITE_FILES, True),
+            (PersonaRole.CODER, Permission.SPAWN_AGENTS, False),
+            # Researcher permissions
+            (PersonaRole.RESEARCHER, Permission.READ_FILES, True),
+            (PersonaRole.RESEARCHER, Permission.WRITE_FILES, False),
+            (PersonaRole.RESEARCHER, Permission.EXECUTE_CODE, False),
+            # Reviewer permissions
+            (PersonaRole.REVIEWER, Permission.APPROVE_ACTIONS, True),
+            (PersonaRole.REVIEWER, Permission.EXECUTE_CODE, False),
+            (PersonaRole.REVIEWER, Permission.WRITE_FILES, False),
+            # CFO permissions
+            (PersonaRole.CFO, Permission.ALLOCATE_BUDGET, True),
+            (PersonaRole.CFO, Permission.EXECUTE_CODE, False),
+            (PersonaRole.CFO, Permission.MODIFY_LIMITS, True),
+        ],
+    )
     def test_role_permissions(self, enforcer, role, permission, expected):
         """Test that roles have correct permissions."""
         agent_id = f"agent-{role.value}"
         enforcer.assign_role(agent_id, role)
         result = enforcer.check_permission(agent_id, permission)
-        assert result.allowed == expected, f"Expected {expected} for {role.value} + {permission.value}"
+        assert result.allowed == expected, (
+            f"Expected {expected} for {role.value} + {permission.value}"
+        )
 
     # Test permission override
     def test_grant_additional_permission(self, enforcer):

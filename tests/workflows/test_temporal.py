@@ -6,16 +6,16 @@ from datetime import datetime, timedelta
 
 import pytest
 
+from titan.workflows.inquiry_config import QUICK_INQUIRY_WORKFLOW
+from titan.workflows.inquiry_engine import InquirySession, StageResult
 from titan.workflows.inquiry_temporal import (
     DriftType,
-    StageDiff,
     InquiryDiff,
+    StageDiff,
     TemporalChain,
     TemporalTracker,
     get_temporal_tracker,
 )
-from titan.workflows.inquiry_engine import InquirySession, StageResult, InquiryStatus
-from titan.workflows.inquiry_config import QUICK_INQUIRY_WORKFLOW
 
 
 class TestDriftType:

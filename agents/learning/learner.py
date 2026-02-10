@@ -12,7 +12,7 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from agents.framework.base_agent import BaseAgent, AgentResult
+from agents.framework.base_agent import AgentResult, BaseAgent
 from agents.learning.episodic import (
     Episode,
     EpisodeOutcome,
@@ -56,8 +56,6 @@ class LearningAgent(BaseAgent):
 
     async def initialize(self) -> None:
         """Initialize with episodic memory."""
-        await super().initialize()
-
         # Initialize memory if not provided
         if self._memory is None:
             self._memory = EpisodicMemory()
@@ -65,7 +63,7 @@ class LearningAgent(BaseAgent):
 
         logger.info(f"Learning agent '{self.name}' initialized")
 
-    async def run(self) -> AgentResult:
+    async def run(self, prompt: str | None = None) -> AgentResult:
         """Run with episode recording."""
         # Start episode
         self._start_episode()
@@ -76,7 +74,7 @@ class LearningAgent(BaseAgent):
                 await self._retrieve_experience()
 
             # Run the actual work
-            result = await super().run()
+            result = await super().run(prompt)
 
             # Complete episode
             outcome = EpisodeOutcome.SUCCESS if result.success else EpisodeOutcome.FAILURE
@@ -117,6 +115,7 @@ class LearningAgent(BaseAgent):
         # Store episode asynchronously
         if self._memory:
             import asyncio
+
             try:
                 loop = asyncio.get_event_loop()
                 if loop.is_running():
@@ -149,16 +148,13 @@ class LearningAgent(BaseAgent):
         )
 
         if self._retrieved_experience:
-            logger.info(
-                f"Retrieved {len(self._retrieved_experience)} "
-                f"relevant past episodes"
-            )
+            logger.info(f"Retrieved {len(self._retrieved_experience)} relevant past episodes")
 
     def _get_context_for_episode(self) -> dict[str, Any]:
         """Get context to record in episode."""
         return {
             "agent_name": self.name,
-            "agent_id": self.id,
+            "agent_id": self.agent_id,
             "turn": self._context.turn_number if self._context else 0,
         }
 
@@ -223,8 +219,7 @@ class LearningAgent(BaseAgent):
 
         # Summarize successful approaches
         successes = [
-            ep for ep in self._retrieved_experience
-            if ep.outcome == EpisodeOutcome.SUCCESS
+            ep for ep in self._retrieved_experience if ep.outcome == EpisodeOutcome.SUCCESS
         ]
         if successes:
             parts.append("\nSuccessful approaches for similar tasks:")
@@ -237,7 +232,8 @@ class LearningAgent(BaseAgent):
 
         # Summarize failures to avoid
         failures = [
-            ep for ep in self._retrieved_experience
+            ep
+            for ep in self._retrieved_experience
             if ep.outcome in [EpisodeOutcome.FAILURE, EpisodeOutcome.TIMEOUT]
         ]
         if failures and self._learn_from_failures:
@@ -311,6 +307,7 @@ class LearningMixin:
 
         if self._memory:
             import asyncio
+
             asyncio.create_task(self._memory.store(self._current_episode))
 
     def record_action(self, action_type: str, **details: Any) -> None:

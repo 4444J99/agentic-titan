@@ -15,16 +15,16 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
-from enum import Enum
+from datetime import UTC, datetime
+from enum import StrEnum
 from typing import Any
 
-from agents.framework.base_agent import BaseAgent, AgentState
+from agents.framework.base_agent import AgentState, BaseAgent
 
 logger = logging.getLogger("titan.agents.dao")
 
 
-class ProposalStatus(str, Enum):
+class ProposalStatus(StrEnum):
     """Status of a DAO proposal."""
 
     DRAFT = "draft"
@@ -36,7 +36,7 @@ class ProposalStatus(str, Enum):
     VETOED = "vetoed"
 
 
-class VoteChoice(str, Enum):
+class VoteChoice(StrEnum):
     """Voting choices."""
 
     FOR = "for"
@@ -44,13 +44,13 @@ class VoteChoice(str, Enum):
     ABSTAIN = "abstain"
 
 
-class ProposalType(str, Enum):
+class ProposalType(StrEnum):
     """Types of proposals."""
 
-    GOVERNANCE = "governance"      # Change rules/parameters
-    TREASURY = "treasury"          # Spend resources
-    MEMBERSHIP = "membership"      # Add/remove members
-    EXECUTION = "execution"        # Execute an action
+    GOVERNANCE = "governance"  # Change rules/parameters
+    TREASURY = "treasury"  # Spend resources
+    MEMBERSHIP = "membership"  # Add/remove members
+    EXECUTION = "execution"  # Execute an action
     CONSTITUTIONAL = "constitutional"  # Major rule changes
 
 
@@ -61,7 +61,7 @@ class Vote:
     voter_id: str
     choice: VoteChoice
     weight: float = 1.0  # Token/voting power
-    timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    timestamp: datetime = field(default_factory=lambda: datetime.now(UTC))
     rationale: str = ""
 
 
@@ -76,7 +76,7 @@ class Proposal:
     proposer: str
     status: ProposalStatus = ProposalStatus.DRAFT
     votes: list[Vote] = field(default_factory=list)
-    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
     expires_at: datetime | None = None
     execution_payload: dict[str, Any] = field(default_factory=dict)
     quorum_threshold: float = 0.5
@@ -126,7 +126,7 @@ class Member:
 
     member_id: str
     voting_power: float = 1.0
-    joined_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    joined_at: datetime = field(default_factory=lambda: datetime.now(UTC))
     proposals_created: int = 0
     votes_cast: int = 0
     delegated_to: str | None = None  # Voting power delegation
@@ -154,11 +154,11 @@ class OligarchyIndicators:
     def oligarchy_risk(self) -> str:
         """Overall oligarchy risk level."""
         score = (
-            self.power_concentration * 0.3 +
-            self.proposal_concentration * 0.2 +
-            (1 - self.voting_participation) * 0.2 +
-            self.delegation_centralization * 0.15 +
-            self.whale_influence * 0.15
+            self.power_concentration * 0.3
+            + self.proposal_concentration * 0.2
+            + (1 - self.voting_participation) * 0.2
+            + self.delegation_centralization * 0.15
+            + self.whale_influence * 0.15
         )
 
         if score > 0.7:
@@ -215,12 +215,15 @@ class DAOAgent(BaseAgent):
             **kwargs: Base agent arguments.
         """
         kwargs.setdefault("name", f"dao_{dao_name}")
-        kwargs.setdefault("capabilities", [
-            "proposal_management",
-            "voting",
-            "governance",
-            "rule_execution",
-        ])
+        kwargs.setdefault(
+            "capabilities",
+            [
+                "proposal_management",
+                "voting",
+                "governance",
+                "rule_execution",
+            ],
+        )
         super().__init__(**kwargs)
 
         self._dao_name = dao_name
@@ -255,36 +258,36 @@ class DAOAgent(BaseAgent):
 
     async def work(self) -> dict[str, Any]:
         """Perform DAO governance cycle."""
-        result = {
+        actions: list[str] = []
+        result: dict[str, Any] = {
             "dao": self._dao_name,
             "members": self.member_count,
             "active_proposals": len(self._get_active_proposals()),
-            "actions": [],
+            "actions": actions,
         }
 
         # Process expired proposals
         expired = await self._process_expired_proposals()
         if expired:
-            result["actions"].append(f"expired_{len(expired)}_proposals")
+            actions.append(f"expired_{len(expired)}_proposals")
 
         # Execute passed proposals
         executed = await self._execute_passed_proposals()
         if executed:
-            result["actions"].append(f"executed_{len(executed)}_proposals")
+            actions.append(f"executed_{len(executed)}_proposals")
 
         # Check for oligarchy
         indicators = self.detect_oligarchy()
         result["oligarchy_risk"] = indicators.oligarchy_risk
         if indicators.oligarchy_risk == "HIGH":
-            result["actions"].append("oligarchy_warning")
+            actions.append("oligarchy_warning")
 
         return result
 
     async def shutdown(self) -> None:
         """Shutdown DAO agent."""
         logger.info(
-            f"DAO agent shutdown "
-            f"(members={self.member_count}, proposals={len(self._proposals)})"
+            f"DAO agent shutdown (members={self.member_count}, proposals={len(self._proposals)})"
         )
 
     # =========================================================================
@@ -361,7 +364,7 @@ class DAOAgent(BaseAgent):
         if delegate.delegated_to:
             # Already delegated - check depth
             depth = 1
-            current = delegate.delegated_to
+            current: str | None = delegate.delegated_to
             while current and depth < self._config.max_delegation_depth:
                 if current in self._members and self._members[current].delegated_to:
                     current = self._members[current].delegated_to
@@ -443,7 +446,7 @@ class DAOAgent(BaseAgent):
             description=description,
             proposer=proposer,
             status=ProposalStatus.ACTIVE,
-            expires_at=datetime.now(timezone.utc) + timedelta(hours=self._config.proposal_duration_hours),
+            expires_at=datetime.now(UTC) + timedelta(hours=self._config.proposal_duration_hours),
             execution_payload=execution_payload or {},
             quorum_threshold=quorum,
             approval_threshold=approval,
@@ -483,10 +486,7 @@ class DAOAgent(BaseAgent):
             return None
 
         # Check if already voted
-        existing_vote = next(
-            (v for v in proposal.votes if v.voter_id == voter_id),
-            None
-        )
+        existing_vote = next((v for v in proposal.votes if v.voter_id == voter_id), None)
         if existing_vote:
             return None  # Already voted
 
@@ -532,10 +532,7 @@ class DAOAgent(BaseAgent):
 
     def _get_active_proposals(self) -> list[Proposal]:
         """Get all active proposals."""
-        return [
-            p for p in self._proposals.values()
-            if p.status == ProposalStatus.ACTIVE
-        ]
+        return [p for p in self._proposals.values() if p.status == ProposalStatus.ACTIVE]
 
     async def _process_expired_proposals(self) -> list[str]:
         """Process proposals that have expired.
@@ -543,7 +540,7 @@ class DAOAgent(BaseAgent):
         Returns:
             List of expired proposal IDs.
         """
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         expired: list[str] = []
 
         for proposal in self._get_active_proposals():
@@ -644,8 +641,8 @@ class DAOAgent(BaseAgent):
         if n > 1:
             total = sum(powers)
             if total > 0:
-                cumulative = 0
-                area = 0
+                cumulative = 0.0
+                area = 0.0
                 for i, power in enumerate(powers):
                     cumulative += power
                     area += cumulative
@@ -661,19 +658,20 @@ class DAOAgent(BaseAgent):
         # Voting participation
         total_possible_votes = len(self._members) * len(self._proposals) if self._proposals else 1
         actual_votes = sum(m.votes_cast for m in self._members.values())
-        indicators.voting_participation = actual_votes / total_possible_votes if total_possible_votes > 0 else 0
+        indicators.voting_participation = (
+            actual_votes / total_possible_votes if total_possible_votes > 0 else 0
+        )
 
         # Delegation centralization
         delegates_with_delegations = sum(
-            1 for m in self._members.values()
-            if m.delegations_received
+            1 for m in self._members.values() if m.delegations_received
         )
         if len(self._members) > 1:
             indicators.delegation_centralization = delegates_with_delegations / len(self._members)
 
         # Whale influence (top 10% voting power share)
         if len(powers) >= 10:
-            top_10_percent = powers[-len(powers)//10:]
+            top_10_percent = powers[-len(powers) // 10 :]
             indicators.whale_influence = sum(top_10_percent) / sum(powers) if sum(powers) > 0 else 0
         else:
             indicators.whale_influence = powers[-1] / sum(powers) if sum(powers) > 0 else 0

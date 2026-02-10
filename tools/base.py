@@ -10,11 +10,12 @@ Tools follow a simple protocol:
 
 from __future__ import annotations
 
+import json
 import logging
 from abc import ABC, abstractmethod
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
-from typing import Any, Callable, Awaitable
-import json
+from typing import Any
 
 logger = logging.getLogger("titan.tools")
 
@@ -222,8 +223,7 @@ class ToolRegistry:
         """Get tools that match capabilities."""
         # Simple name-based matching for now
         return [
-            t for t in self._tools.values()
-            if any(cap in t.name.lower() for cap in capabilities)
+            t for t in self._tools.values() if any(cap in t.name.lower() for cap in capabilities)
         ]
 
 
@@ -257,8 +257,10 @@ def tool(
         async def greet(name: str) -> ToolResult:
             return ToolResult(success=True, output=f"Hello, {name}!")
     """
+
     def decorator(func: Callable[..., Awaitable[ToolResult]]) -> Tool:
         t = FunctionTool(name, description, parameters or [], func)
         register_tool(t)
         return t
+
     return decorator

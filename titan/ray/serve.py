@@ -6,9 +6,8 @@ as an alternative to Celery for distributed compute.
 
 from __future__ import annotations
 
-import asyncio
 import logging
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 from titan.ray import RAY_AVAILABLE
 
@@ -19,13 +18,13 @@ if RAY_AVAILABLE:
 from titan.ray.config import get_ray_config
 
 if TYPE_CHECKING:
-    from titan.workflows.inquiry_engine import InquiryEngine, StageResult
-    from titan.batch.orchestrator import BatchOrchestrator, BatchJob
+    from titan.workflows.inquiry_engine import InquiryEngine
 
 logger = logging.getLogger("titan.ray.serve")
 
 
 if RAY_AVAILABLE:
+
     @serve.deployment(
         name="inquiry-deployment",
         route_prefix="/ray/inquiry",
@@ -37,10 +36,11 @@ if RAY_AVAILABLE:
         and fault tolerance.
         """
 
-        def __init__(self):
+        def __init__(self) -> None:
             """Initialize the inquiry deployment."""
             from titan.workflows.inquiry_engine import get_inquiry_engine
-            self.engine = get_inquiry_engine()
+
+            self.engine: InquiryEngine = get_inquiry_engine()
             logger.info("InquiryDeployment initialized")
 
         async def run_stage(
@@ -58,7 +58,30 @@ if RAY_AVAILABLE:
                 Stage result as dictionary
             """
             try:
-                result = await self.engine.run_stage(session_id, stage_name)
+                session = self.engine.get_session(session_id)
+                if session is None:
+                    return {
+                        "success": False,
+                        "error": f"Session not found: {session_id}",
+                        "stage_name": stage_name,
+                    }
+
+                stage_index = next(
+                    (
+                        i
+                        for i, stage in enumerate(session.workflow.stages)
+                        if stage.name == stage_name
+                    ),
+                    None,
+                )
+                if stage_index is None:
+                    return {
+                        "success": False,
+                        "error": f"Unknown stage: {stage_name}",
+                        "stage_name": stage_name,
+                    }
+
+                result = await self.engine.run_stage(session, stage_index)
                 return result.to_dict()
             except Exception as e:
                 logger.exception(f"Stage execution failed: {e}")
@@ -81,11 +104,18 @@ if RAY_AVAILABLE:
                 Workflow result as dictionary
             """
             try:
-                results = await self.engine.run_full_workflow(session_id)
+                session = self.engine.get_session(session_id)
+                if session is None:
+                    return {
+                        "success": False,
+                        "error": f"Session not found: {session_id}",
+                    }
+
+                completed_session = await self.engine.run_full_workflow(session)
                 return {
                     "success": True,
-                    "results": [r.to_dict() for r in results],
-                    "total_stages": len(results),
+                    "results": [r.to_dict() for r in completed_session.results],
+                    "total_stages": len(completed_session.results),
                 }
             except Exception as e:
                 logger.exception(f"Workflow execution failed: {e}")
@@ -122,7 +152,6 @@ if RAY_AVAILABLE:
             else:
                 return {"error": f"Unknown action: {action}"}
 
-
     @serve.deployment(
         name="batch-deployment",
         route_prefix="/ray/batch",
@@ -133,11 +162,12 @@ if RAY_AVAILABLE:
         Handles batch job orchestration with automatic scaling.
         """
 
-        def __init__(self):
+        def __init__(self) -> None:
             """Initialize the batch deployment."""
             from titan.batch.orchestrator import get_batch_orchestrator
+
             self.orchestrator = get_batch_orchestrator()
-            self.orchestrator.enable_celery = False  # Disable Celery when using Ray
+            self.orchestrator._enable_celery = False  # Disable Celery when using Ray
             logger.info("BatchDeployment initialized")
 
         async def start_batch(self, batch_id: str) -> dict[str, Any]:
@@ -211,14 +241,14 @@ class RayBackend:
     via Ray Serve, handling deployment initialization and cleanup.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize the Ray backend."""
         if not RAY_AVAILABLE:
             raise ImportError("Ray is not installed")
 
         self._initialized = False
-        self._inquiry_handle = None
-        self._batch_handle = None
+        self._inquiry_handle: Any | None = None
+        self._batch_handle: Any | None = None
 
     async def initialize(self) -> None:
         """Initialize Ray and deploy services."""
@@ -238,12 +268,12 @@ class RayBackend:
         deployment_config = config.to_deployment_config()
 
         # Apply configuration to deployments
-        InquiryDeployment.options(**deployment_config)
-        BatchDeployment.options(**deployment_config)
+        inquiry_deployment = cast(Any, InquiryDeployment).options(**deployment_config)
+        batch_deployment = cast(Any, BatchDeployment).options(**deployment_config)
 
         # Deploy
-        serve.run(InquiryDeployment.bind(), name="inquiry", route_prefix="/ray/inquiry")
-        serve.run(BatchDeployment.bind(), name="batch", route_prefix="/ray/batch")
+        serve.run(inquiry_deployment.bind(), name="inquiry", route_prefix="/ray/inquiry")
+        serve.run(batch_deployment.bind(), name="batch", route_prefix="/ray/batch")
 
         # Get handles
         self._inquiry_handle = serve.get_deployment_handle("inquiry")
@@ -280,7 +310,10 @@ class RayBackend:
         if not self._initialized:
             await self.initialize()
 
-        return await self._inquiry_handle.run_stage.remote(session_id, stage_name)
+        if self._inquiry_handle is None:
+            raise RuntimeError("Inquiry deployment handle is not initialized")
+        result = await self._inquiry_handle.run_stage.remote(session_id, stage_name)
+        return cast(dict[str, Any], result)
 
     async def run_inquiry_workflow(
         self,
@@ -297,7 +330,10 @@ class RayBackend:
         if not self._initialized:
             await self.initialize()
 
-        return await self._inquiry_handle.run_full_workflow.remote(session_id)
+        if self._inquiry_handle is None:
+            raise RuntimeError("Inquiry deployment handle is not initialized")
+        result = await self._inquiry_handle.run_full_workflow.remote(session_id)
+        return cast(dict[str, Any], result)
 
     async def start_batch(self, batch_id: str) -> dict[str, Any]:
         """Start a batch job via Ray Serve.
@@ -311,7 +347,10 @@ class RayBackend:
         if not self._initialized:
             await self.initialize()
 
-        return await self._batch_handle.start_batch.remote(batch_id)
+        if self._batch_handle is None:
+            raise RuntimeError("Batch deployment handle is not initialized")
+        result = await self._batch_handle.start_batch.remote(batch_id)
+        return cast(dict[str, Any], result)
 
     async def get_batch(self, batch_id: str) -> dict[str, Any] | None:
         """Get batch status via Ray Serve.
@@ -325,4 +364,7 @@ class RayBackend:
         if not self._initialized:
             await self.initialize()
 
-        return await self._batch_handle.get_batch.remote(batch_id)
+        if self._batch_handle is None:
+            raise RuntimeError("Batch deployment handle is not initialized")
+        result = await self._batch_handle.get_batch.remote(batch_id)
+        return cast(dict[str, Any] | None, result)

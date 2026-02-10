@@ -13,12 +13,12 @@ Reference: vendor/cli/terminal-ai Langfuse integration
 from __future__ import annotations
 
 import logging
-import time
 import uuid
+from collections.abc import Generator
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, Generator
+from typing import Any
 
 logger = logging.getLogger("titan.observability.langfuse")
 
@@ -272,6 +272,7 @@ class LangfuseTracer:
         if not local_only and public_key and secret_key:
             try:
                 from langfuse import Langfuse
+
                 self._langfuse = Langfuse(
                     public_key=public_key,
                     secret_key=secret_key,
@@ -463,8 +464,7 @@ class LangfuseTracer:
                     logger.warning(f"Failed to update Langfuse generation: {e}")
 
             logger.debug(
-                f"Span {span_id} completed: {span.duration_ms:.1f}ms, "
-                f"{span.total_tokens} tokens"
+                f"Span {span_id} completed: {span.duration_ms:.1f}ms, {span.total_tokens} tokens"
             )
 
     def get_trace(self, trace_id: str) -> Trace | None:

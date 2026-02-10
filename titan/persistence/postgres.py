@@ -10,9 +10,9 @@ import asyncio
 import json
 import logging
 import os
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime
-from typing import Any
+from typing import Any, cast
 from uuid import UUID
 
 logger = logging.getLogger("titan.persistence.postgres")
@@ -53,10 +53,7 @@ class PostgresConfig:
     @property
     def dsn(self) -> str:
         """Get connection DSN."""
-        return (
-            f"postgresql://{self.user}:{self.password}@"
-            f"{self.host}:{self.port}/{self.database}"
-        )
+        return f"postgresql://{self.user}:{self.password}@{self.host}:{self.port}/{self.database}"
 
 
 class PostgresClient:
@@ -127,17 +124,17 @@ class PostgresClient:
 
     async def _init_tables(self) -> None:
         """Initialize database tables if they don't exist."""
-        from titan.persistence.models import (
-            AUDIT_EVENTS_TABLE_SQL,
-            AGENT_DECISIONS_TABLE_SQL,
-            BATCH_CLEANUP_LOG_TABLE_SQL,
-            BATCH_JOBS_STALLED_INDEX_SQL,
-            BATCH_JOBS_CLEANUP_INDEX_SQL,
-        )
         from titan.batch.models import (
             BATCH_JOBS_TABLE_SQL,
             QUEUED_SESSIONS_TABLE_SQL,
             SESSION_ARTIFACTS_TABLE_SQL,
+        )
+        from titan.persistence.models import (
+            AGENT_DECISIONS_TABLE_SQL,
+            AUDIT_EVENTS_TABLE_SQL,
+            BATCH_CLEANUP_LOG_TABLE_SQL,
+            BATCH_JOBS_CLEANUP_INDEX_SQL,
+            BATCH_JOBS_STALLED_INDEX_SQL,
         )
 
         if not self._pool:
@@ -187,10 +184,13 @@ class PostgresClient:
             return "NOT_CONNECTED"
 
         async with self._pool.acquire() as conn:
-            return await conn.execute(
-                query,
-                *args,
-                timeout=timeout or self.config.command_timeout,
+            return cast(
+                str,
+                await conn.execute(
+                    query,
+                    *args,
+                    timeout=timeout or self.config.command_timeout,
+                ),
             )
 
     async def fetch(
@@ -300,19 +300,21 @@ class PostgresClient:
         """
         if not self._connected or not self._pool:
             # Fallback to in-memory
-            self._fallback_store.append({
-                "id": str(event_id),
-                "timestamp": timestamp.isoformat(),
-                "event_type": event_type,
-                "action": action,
-                "agent_id": agent_id,
-                "session_id": session_id,
-                "user_id": user_id,
-                "input_data": input_data,
-                "output_data": output_data,
-                "metadata": metadata or {},
-                "checksum": checksum,
-            })
+            self._fallback_store.append(
+                {
+                    "id": str(event_id),
+                    "timestamp": timestamp.isoformat(),
+                    "event_type": event_type,
+                    "action": action,
+                    "agent_id": agent_id,
+                    "session_id": session_id,
+                    "user_id": user_id,
+                    "input_data": input_data,
+                    "output_data": output_data,
+                    "metadata": metadata or {},
+                    "checksum": checksum,
+                }
+            )
             return False
 
         try:
@@ -339,19 +341,21 @@ class PostgresClient:
         except Exception as e:
             logger.error(f"Failed to insert audit event: {e}")
             # Fallback
-            self._fallback_store.append({
-                "id": str(event_id),
-                "timestamp": timestamp.isoformat(),
-                "event_type": event_type,
-                "action": action,
-                "agent_id": agent_id,
-                "session_id": session_id,
-                "user_id": user_id,
-                "input_data": input_data,
-                "output_data": output_data,
-                "metadata": metadata or {},
-                "checksum": checksum,
-            })
+            self._fallback_store.append(
+                {
+                    "id": str(event_id),
+                    "timestamp": timestamp.isoformat(),
+                    "event_type": event_type,
+                    "action": action,
+                    "agent_id": agent_id,
+                    "session_id": session_id,
+                    "user_id": user_id,
+                    "input_data": input_data,
+                    "output_data": output_data,
+                    "metadata": metadata or {},
+                    "checksum": checksum,
+                }
+            )
             return False
 
     async def insert_agent_decision(
@@ -504,17 +508,21 @@ class PostgresClient:
                 if event.verify_checksum():
                     valid += 1
                 else:
-                    invalid.append({
-                        "id": str(event.id),
-                        "timestamp": event.timestamp.isoformat(),
-                        "stored_checksum": event_data.get("checksum"),
-                        "computed_checksum": event._compute_checksum(),
-                    })
+                    invalid.append(
+                        {
+                            "id": str(event.id),
+                            "timestamp": event.timestamp.isoformat(),
+                            "stored_checksum": event_data.get("checksum"),
+                            "computed_checksum": event._compute_checksum(),
+                        }
+                    )
             except Exception as e:
-                invalid.append({
-                    "id": event_data.get("id"),
-                    "error": str(e),
-                })
+                invalid.append(
+                    {
+                        "id": event_data.get("id"),
+                        "error": str(e),
+                    }
+                )
 
         return {
             "total_events": total,
@@ -875,9 +883,7 @@ class PostgresClient:
             return 0
 
         try:
-            terminal_states = (
-                "'completed'", "'failed'", "'cancelled'", "'partially_completed'"
-            )
+            terminal_states = ("'completed'", "'failed'", "'cancelled'", "'partially_completed'")
 
             if terminal_only:
                 query = f"""

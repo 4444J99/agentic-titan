@@ -111,28 +111,41 @@ async def search_knowledge(
 
         try:
             # Perform search
-            raw_results = await hive.search(query, limit=limit * 2)  # Get extra for filtering
+            raw_results = await hive.recall(query, k=limit * 2)  # Get extra for filtering
 
             # Filter and format results
             results: list[SearchResult] = []
             for r in raw_results:
                 # Apply filters
-                if source and r.get("source") != source:
+                result_source = str(r.get("source", "hive_memory"))
+                if source and result_source != source:
                     continue
-                if tag and tag not in r.get("tags", []):
+                result_tags = [str(item) for item in r.get("tags", [])]
+                if tag and tag not in result_tags:
                     continue
 
                 if len(results) >= limit:
                     break
 
+                score_value = r.get("score")
+                if isinstance(score_value, int | float):
+                    score = float(score_value)
+                else:
+                    distance = r.get("distance", 1.0)
+                    score = 1.0 - float(distance) if isinstance(distance, int | float) else 0.0
+
                 results.append(
                     SearchResult(
-                        key=r.get("key", ""),
-                        content_preview=str(r.get("value", ""))[:200],
-                        score=r.get("score", 0.0),
-                        source=r.get("source", "unknown"),
-                        tags=r.get("tags", []),
-                        metadata=r.get("metadata", {}),
+                        key=str(r.get("id", "")),
+                        content_preview=str(r.get("content", ""))[:200],
+                        score=score,
+                        source=result_source,
+                        tags=result_tags,
+                        metadata={
+                            "agent_id": r.get("agent_id"),
+                            "importance": r.get("importance"),
+                            "timestamp": r.get("timestamp"),
+                        },
                     )
                 )
 
@@ -239,12 +252,12 @@ async def get_knowledge_graph(
 
         # Try to get topology information
         try:
-            from hive.topology import get_topology_engine
+            from hive.topology import TopologyEngine
 
-            topo_engine = get_topology_engine()
-            if hasattr(topo_engine, "_active_topology") and topo_engine._active_topology:
-                topo = topo_engine._active_topology
-                topo_type = topo.topology_type.value if hasattr(topo, "topology_type") else "custom"
+            topo_engine = TopologyEngine()
+            topo = topo_engine.current_topology
+            if topo is not None:
+                topo_type = topo.topology_type.value
                 topo_node_id = f"topology_{topo_type}"
 
                 nodes.append(
@@ -252,13 +265,7 @@ async def get_knowledge_graph(
                         id=topo_node_id,
                         label="Active Topology",
                         type="topology",
-                        properties={
-                            "type": (
-                                topo.topology_type.value
-                                if hasattr(topo, "topology_type")
-                                else "unknown"
-                            ),
-                        },
+                        properties={"type": topo.topology_type.value},
                     )
                 )
 

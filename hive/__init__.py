@@ -11,95 +11,95 @@ Provides collective memory and real-time coordination for the agent swarm:
 - Episodic learning from outcomes
 """
 
-from hive.memory import HiveMind, MemoryConfig
-from hive.topology import (
-    TopologyEngine,
-    TopologyType,
-    TaskProfile,
-    AgentNode,
-    BaseTopology,
-    SwarmTopology,
-    HierarchyTopology,
-    PipelineTopology,
-    MeshTopology,
-    RingTopology,
-    StarTopology,
+from hive.analyzer import (
+    AnalysisResult,
+    TaskAnalyzer,
+    analyze_task,
+)
+from hive.assembly import (
+    AssemblyEvent,
+    AssemblyManager,
+    AssemblyState,
+    DeterritorializationType,
+    StabilityMetrics,
+    TerritorizationType,
+)
+from hive.criticality import (
+    CriticalityMetrics,
+    CriticalityMonitor,
+    CriticalityState,
+    PhaseTransition,
 )
 from hive.events import (
-    EventBus,
     Event,
+    EventBus,
     EventType,
     get_event_bus,
 )
-from hive.analyzer import (
-    TaskAnalyzer,
-    AnalysisResult,
-    analyze_task,
+from hive.fission_fusion import (
+    Cluster,
+    FissionFusionManager,
+    FissionFusionMetrics,
+    FissionFusionState,
+)
+from hive.information_center import (
+    InformationCenter,
+    InformationCenterManager,
+    InformationCenterRole,
+    LearnedPattern,
 )
 from hive.learning import (
-    EpisodicLearner,
     Episode,
     EpisodeOutcome,
+    EpisodicLearner,
     TopologyPreference,
     get_episodic_learner,
 )
+from hive.machines import (
+    MachineDynamics,
+    MachineOperation,
+    MachineState,
+    MachineType,
+    OperationType,
+)
+from hive.memory import HiveMind, MemoryConfig
+from hive.neighborhood import (
+    AgentProfile,
+    InteractionRecord,
+    InteractionType,
+    LayeredNeighborConfig,
+    NeighborLayer,
+    NeighborScore,
+    TopologicalNeighborhood,
+)
 from hive.stigmergy import (
+    GradientInfo,
     PheromoneField,
     PheromoneTrace,
     TraceType,
-    GradientInfo,
 )
-from hive.neighborhood import (
-    TopologicalNeighborhood,
-    InteractionRecord,
-    InteractionType,
-    AgentProfile,
-    NeighborScore,
-    NeighborLayer,
-    LayeredNeighborConfig,
+from hive.topology import (
+    AgentNode,
+    BaseTopology,
+    HierarchyTopology,
+    MeshTopology,
+    PipelineTopology,
+    RingTopology,
+    StarTopology,
+    SwarmTopology,
+    TaskProfile,
+    TopologyEngine,
+    TopologyType,
 )
 from hive.topology_extended import (
-    ExtendedTopologyType,
-    RhizomaticTopology,
     ArborealTopology,
-    TerritorializedTopology,
-    DeterritorializedTopology,
-    Territory,
     Connection,
     ConnectionType,
-)
-from hive.assembly import (
-    AssemblyManager,
-    AssemblyState,
-    AssemblyEvent,
-    StabilityMetrics,
-    TerritorizationType,
-    DeterritorializationType,
-)
-from hive.machines import (
-    MachineDynamics,
-    MachineType,
-    MachineState,
-    MachineOperation,
-    OperationType,
-)
-from hive.criticality import (
-    CriticalityMonitor,
-    CriticalityState,
-    CriticalityMetrics,
-    PhaseTransition,
-)
-from hive.fission_fusion import (
-    FissionFusionManager,
-    FissionFusionState,
-    FissionFusionMetrics,
-    Cluster,
-)
-from hive.information_center import (
-    InformationCenterManager,
-    InformationCenter,
-    InformationCenterRole,
-    LearnedPattern,
+    DeterritorializedTopology,
+    ExtendedTopologyType,
+    RhizomaticTopology,
+    TerritorializedTopology,
+    Territory,
 )
 
 __all__ = [

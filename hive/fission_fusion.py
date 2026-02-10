@@ -21,10 +21,11 @@ import asyncio
 import logging
 import statistics
 import uuid
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
-from enum import Enum
-from typing import TYPE_CHECKING, Any, Callable
+from datetime import UTC, datetime
+from enum import StrEnum
+from typing import TYPE_CHECKING, Any, Protocol, cast
 
 from titan.metrics import get_metrics
 
@@ -36,11 +37,23 @@ if TYPE_CHECKING:
 logger = logging.getLogger("titan.hive.fission_fusion")
 
 
-class FissionFusionState(str, Enum):
+class MetricsSink(Protocol):
+    """Typed metrics surface used by fission-fusion manager."""
+
+    def fission_event(self) -> None: ...
+
+    def fusion_event(self) -> None: ...
+
+    def set_cluster_count(self, count: int) -> None: ...
+
+    def set_fission_fusion_state(self, state: str) -> None: ...
+
+
+class FissionFusionState(StrEnum):
     """State of fission-fusion dynamics."""
 
-    FISSION = "fission"            # Sparse, independent clusters
-    FUSION = "fusion"              # Dense, information-sharing mode
+    FISSION = "fission"  # Sparse, independent clusters
+    FUSION = "fusion"  # Dense, information-sharing mode
     TRANSITIONING = "transitioning"  # Moving between states
 
 
@@ -52,7 +65,7 @@ class Cluster:
     agent_ids: list[str] = field(default_factory=list)
     task_focus: str | None = None
     centroid_agent: str | None = None  # Most central agent
-    formation_time: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    formation_time: datetime = field(default_factory=lambda: datetime.now(UTC))
     metadata: dict[str, Any] = field(default_factory=dict)
 
     def add_agent(self, agent_id: str) -> None:
@@ -87,14 +100,14 @@ class Cluster:
 class FissionFusionMetrics:
     """Metrics for evaluating fission-fusion state."""
 
-    task_correlation: float = 0.5     # 0-1, how correlated current tasks are
-    information_spread: float = 0.5    # 0-1, how well information is propagating
-    cluster_count: int = 1            # Number of clusters
-    avg_cluster_size: float = 0.0     # Average cluster size
-    cohesion: float = 0.5             # 0-1, overall group cohesion
-    crisis_level: float = 0.0         # 0-1, urgency requiring fusion
-    exploration_need: float = 0.0     # 0-1, need for parallel exploration
-    timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    task_correlation: float = 0.5  # 0-1, how correlated current tasks are
+    information_spread: float = 0.5  # 0-1, how well information is propagating
+    cluster_count: int = 1  # Number of clusters
+    avg_cluster_size: float = 0.0  # Average cluster size
+    cohesion: float = 0.5  # 0-1, overall group cohesion
+    crisis_level: float = 0.0  # 0-1, urgency requiring fusion
+    exploration_need: float = 0.0  # 0-1, need for parallel exploration
+    timestamp: datetime = field(default_factory=lambda: datetime.now(UTC))
 
     def suggest_state(self) -> FissionFusionState:
         """Suggest optimal state based on metrics."""
@@ -127,7 +140,7 @@ class FissionFusionEvent:
     metrics: FissionFusionMetrics
     clusters_formed: int = 0
     info_center_id: str | None = None
-    timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    timestamp: datetime = field(default_factory=lambda: datetime.now(UTC))
     metadata: dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -156,8 +169,8 @@ class FissionFusionManager:
     """
 
     # Thresholds for state transitions
-    FISSION_THRESHOLD = 0.3   # Low task correlation -> fission
-    FUSION_THRESHOLD = 0.7    # High task correlation -> fusion
+    FISSION_THRESHOLD = 0.3  # Low task correlation -> fission
+    FUSION_THRESHOLD = 0.7  # High task correlation -> fusion
     TRANSITION_HYSTERESIS = 0.1  # Prevent rapid oscillation
 
     # Cluster parameters
@@ -311,7 +324,7 @@ class FissionFusionManager:
         # Calculate pairwise task similarity
         similarities: list[float] = []
         for i, p1 in enumerate(profiles):
-            for p2 in profiles[i + 1:]:
+            for p2 in profiles[i + 1 :]:
                 sim = p1.task_similarity(p2)
                 similarities.append(sim)
 
@@ -326,8 +339,8 @@ class FissionFusionManager:
             return 0.5
 
         stats = self._neighborhood.get_network_stats()
-        density = stats.get("density", 0.5)
-        avg_clustering = stats.get("average_clustering", 0.5)
+        density = float(stats.get("density", 0.5))
+        avg_clustering = float(stats.get("average_clustering", 0.5))
 
         # Good information spread = high density + high clustering
         return (density + avg_clustering) / 2
@@ -338,7 +351,7 @@ class FissionFusionManager:
             return 0.5
 
         stats = self._neighborhood.get_network_stats()
-        return stats.get("average_clustering", 0.5)
+        return float(stats.get("average_clustering", 0.5))
 
     async def should_transition(self) -> FissionFusionState | None:
         """Determine if state transition should occur.
@@ -412,6 +425,7 @@ class FissionFusionManager:
         # Emit event
         if self._event_bus:
             from hive.events import EventType
+
             await self._event_bus.emit(
                 EventType.FISSION_COMPLETED,
                 {
@@ -422,9 +436,11 @@ class FissionFusionManager:
             )
 
         # Record metrics
-        get_metrics().fission_event()
-        get_metrics().set_cluster_count(clusters_formed)
-        get_metrics().set_fission_fusion_state(FissionFusionState.FISSION.value)
+        typed_get_metrics = cast(Callable[[], MetricsSink], get_metrics)
+        metrics = typed_get_metrics()
+        metrics.fission_event()
+        metrics.set_cluster_count(clusters_formed)
+        metrics.set_fission_fusion_state(FissionFusionState.FISSION.value)
 
         logger.info(f"Fission completed: {clusters_formed} clusters formed")
 
@@ -442,6 +458,10 @@ class FissionFusionManager:
 
         Uses a simple greedy clustering algorithm.
         """
+        neighborhood = self._neighborhood
+        if neighborhood is None:
+            return 0
+
         if not agents:
             return 0
 
@@ -456,6 +476,7 @@ class FissionFusionManager:
 
         # Initialize clusters with seed agents
         import random
+
         seeds = random.sample(list(unassigned), min(cluster_count, len(unassigned)))
 
         for seed in seeds:
@@ -474,7 +495,7 @@ class FissionFusionManager:
             best_cluster = None
             best_score = -1.0
 
-            profile = self._neighborhood._profiles.get(agent_id)
+            profile = neighborhood._profiles.get(agent_id)
             if not profile:
                 continue
 
@@ -483,7 +504,9 @@ class FissionFusionManager:
                     continue
 
                 # Calculate similarity to cluster centroid
-                centroid_profile = self._neighborhood._profiles.get(cluster.centroid_agent)
+                if cluster.centroid_agent is None:
+                    continue
+                centroid_profile = neighborhood._profiles.get(cluster.centroid_agent)
                 if centroid_profile:
                     score = profile.task_similarity(centroid_profile)
                     if score > best_score:
@@ -536,6 +559,7 @@ class FissionFusionManager:
         # Emit event
         if self._event_bus:
             from hive.events import EventType
+
             await self._event_bus.emit(
                 EventType.FUSION_COMPLETED,
                 {
@@ -545,9 +569,11 @@ class FissionFusionManager:
             )
 
         # Record metrics
-        get_metrics().fusion_event()
-        get_metrics().set_cluster_count(0)
-        get_metrics().set_fission_fusion_state(FissionFusionState.FUSION.value)
+        typed_get_metrics = cast(Callable[[], MetricsSink], get_metrics)
+        metrics = typed_get_metrics()
+        metrics.fusion_event()
+        metrics.set_cluster_count(0)
+        metrics.set_fission_fusion_state(FissionFusionState.FUSION.value)
 
         logger.info(f"Fusion completed: info center {self._info_center_id}")
 
@@ -558,6 +584,7 @@ class FissionFusionManager:
             except Exception as e:
                 logger.error(f"State change callback error: {e}")
 
+        assert self._info_center_id is not None
         return self._info_center_id
 
     def get_agent_cluster(self, agent_id: str) -> Cluster | None:

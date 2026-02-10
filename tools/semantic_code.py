@@ -332,12 +332,14 @@ def find_references_in_file(
             if end < len(line):
                 context = context + "..."
 
-            references.append({
-                "file": str(path),
-                "line": line_num + 1,
-                "column": match.start() + 1,
-                "context": context.strip(),
-            })
+            references.append(
+                {
+                    "file": str(path),
+                    "line": line_num + 1,
+                    "column": match.start() + 1,
+                    "context": context.strip(),
+                }
+            )
 
     return references
 

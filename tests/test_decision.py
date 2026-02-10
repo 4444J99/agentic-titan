@@ -4,21 +4,18 @@ Tests for voting and consensus systems.
 
 import pytest
 
+from hive.decision.consensus import (
+    ConsensusEngine,
+    ConsensusResult,
+    create_approval_vote,
+    create_ranked_vote,
+    create_simple_vote,
+)
 from hive.decision.voting import (
     Vote,
     VotingSession,
     VotingStrategy,
-    VotingResult,
 )
-from hive.decision.consensus import (
-    ConsensusEngine,
-    ConsensusConfig,
-    ConsensusResult,
-    create_simple_vote,
-    create_ranked_vote,
-    create_approval_vote,
-)
-
 
 # ============================================================================
 # Vote Tests
@@ -192,15 +189,25 @@ class TestWeightedVoting:
         )
 
         # High weight but low confidence
-        session.cast_vote(Vote(
-            agent_id="1", agent_name="unsure",
-            choice="A", weight=2.0, confidence=0.5,
-        ))
+        session.cast_vote(
+            Vote(
+                agent_id="1",
+                agent_name="unsure",
+                choice="A",
+                weight=2.0,
+                confidence=0.5,
+            )
+        )
         # Normal weight, high confidence
-        session.cast_vote(Vote(
-            agent_id="2", agent_name="sure",
-            choice="B", weight=1.0, confidence=1.0,
-        ))
+        session.cast_vote(
+            Vote(
+                agent_id="2",
+                agent_name="sure",
+                choice="B",
+                weight=1.0,
+                confidence=1.0,
+            )
+        )
 
         result = session.tally()
 
@@ -346,6 +353,7 @@ class TestConsensusEngine:
     @pytest.mark.asyncio
     async def test_with_voters(self, engine: ConsensusEngine) -> None:
         """Test with registered voters."""
+
         async def voter1(q: str, c: list[str], ctx: dict) -> Vote:
             return create_simple_vote("v1", "Voter1", "A")
 
@@ -366,6 +374,7 @@ class TestConsensusEngine:
     @pytest.mark.asyncio
     async def test_quick_poll(self, engine: ConsensusEngine) -> None:
         """Test quick poll."""
+
         async def voter(q: str, c: list[str], ctx: dict) -> Vote:
             return create_simple_vote("v1", "Voter", "B")
 
@@ -377,10 +386,12 @@ class TestConsensusEngine:
 
     def test_history(self, engine: ConsensusEngine) -> None:
         """Test history tracking."""
-        engine._history.append(ConsensusResult(
-            reached=True,
-            decision="A",
-        ))
+        engine._history.append(
+            ConsensusResult(
+                reached=True,
+                decision="A",
+            )
+        )
 
         history = engine.get_history()
 

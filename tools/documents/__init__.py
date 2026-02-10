@@ -10,8 +10,8 @@ Reference: vendor/agents/skills/ document manipulation patterns
 """
 
 from tools.documents.docx import DOCXTool, docx_tool
-from tools.documents.xlsx import XLSXTool, xlsx_tool
 from tools.documents.pptx import PPTXTool, pptx_tool
+from tools.documents.xlsx import XLSXTool, xlsx_tool
 
 __all__ = [
     "DOCXTool",

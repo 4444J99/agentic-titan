@@ -7,16 +7,15 @@ Extracts reward signals from user interactions for RLHF training.
 from __future__ import annotations
 
 import logging
-import re
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
-from enum import Enum
+from datetime import UTC, datetime
+from enum import StrEnum
 from typing import Any
 
 logger = logging.getLogger("titan.learning.reward_signals")
 
 
-class SignalType(str, Enum):
+class SignalType(StrEnum):
     """Types of reward signals."""
 
     # Explicit signals
@@ -48,7 +47,7 @@ class RewardSignal:
     value: float  # Normalized to [-1, 1]
     confidence: float  # 0-1 confidence in the signal
     raw_value: Any = None
-    timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    timestamp: datetime = field(default_factory=lambda: datetime.now(UTC))
     metadata: dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -315,12 +314,28 @@ class RewardSignalExtractor:
 
         # Simple keyword-based sentiment
         positive_keywords = [
-            "great", "good", "excellent", "perfect", "helpful",
-            "thanks", "awesome", "correct", "right", "useful",
+            "great",
+            "good",
+            "excellent",
+            "perfect",
+            "helpful",
+            "thanks",
+            "awesome",
+            "correct",
+            "right",
+            "useful",
         ]
         negative_keywords = [
-            "wrong", "bad", "incorrect", "useless", "broken",
-            "error", "mistake", "fail", "terrible", "awful",
+            "wrong",
+            "bad",
+            "incorrect",
+            "useless",
+            "broken",
+            "error",
+            "mistake",
+            "fail",
+            "terrible",
+            "awful",
         ]
 
         positive_count = sum(1 for kw in positive_keywords if kw in feedback_lower)
@@ -387,7 +402,9 @@ class RewardSignalExtractor:
         # Build explanation
         explanations = []
         for signal in sorted(signals, key=lambda s: abs(s.value), reverse=True):
-            direction = "positive" if signal.value > 0 else "negative" if signal.value < 0 else "neutral"
+            direction = (
+                "positive" if signal.value > 0 else "negative" if signal.value < 0 else "neutral"
+            )
             explanations.append(f"{signal.signal_type.value}: {direction} ({signal.value:.2f})")
 
         return RewardEstimate(

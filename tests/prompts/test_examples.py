@@ -5,9 +5,9 @@ Tests for titan.prompts.examples module.
 import pytest
 
 from titan.prompts.examples import (
+    STAGE_EXAMPLES,
     Example,
     ExampleBank,
-    STAGE_EXAMPLES,
     get_example_bank,
 )
 

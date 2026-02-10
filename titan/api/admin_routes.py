@@ -25,7 +25,7 @@ import logging
 import os
 import time
 from datetime import UTC, datetime
-from typing import Any, cast
+from typing import Any
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -552,20 +552,27 @@ async def get_stalled_batches(
         from titan.batch.orchestrator import get_batch_orchestrator
 
         orchestrator = get_batch_orchestrator()
-        stalled = await orchestrator.get_stalled_batches(threshold_minutes=threshold_minutes)
+        stalled_ids = await orchestrator.get_stalled_batches(threshold_minutes=threshold_minutes)
 
-        return [
-            StalledBatchResponse(
-                batch_id=str(b.id),
-                status=b.status.value,
-                topics=b.topics[:5],  # Limit for response size
-                stalled_since=(
-                    b.started_at.isoformat() if b.started_at else b.created_at.isoformat()
-                ),
-                recommended_action="retry",
+        response: list[StalledBatchResponse] = []
+        for batch_id in stalled_ids:
+            batch = orchestrator.get_batch(batch_id)
+            if batch is None:
+                continue
+            response.append(
+                StalledBatchResponse(
+                    batch_id=str(batch.id),
+                    status=batch.status.value,
+                    topics=batch.topics[:5],  # Limit for response size
+                    stalled_since=(
+                        batch.started_at.isoformat()
+                        if batch.started_at
+                        else batch.created_at.isoformat()
+                    ),
+                    recommended_action="retry",
+                )
             )
-            for b in stalled
-        ]
+        return response
     except Exception as e:
         logger.error(f"Failed to get stalled batches: {e}")
         return []
@@ -586,18 +593,31 @@ async def recover_batch(batch_id: str, request: RecoveryRequest) -> dict[str, An
                 detail=f"Invalid strategy: {request.strategy}",
             )
 
-        result = await orchestrator.recover_stalled_batch(
+        recovery_result = await orchestrator.recover_stalled_batch(
             batch_id=batch_id,
             strategy=request.strategy,
         )
 
         logger.info(f"Admin recovered batch {batch_id} with strategy {request.strategy}")
 
+        recovered_sessions = 0
+        failed_sessions = 0
+        recovered = False
+
+        if isinstance(recovery_result, dict):
+            recovered_sessions = int(recovery_result.get("recovered", 0))
+            failed_sessions = int(recovery_result.get("failed", 0))
+            recovered = bool(recovery_result.get("success", recovered_sessions > 0))
+        else:
+            recovered = bool(recovery_result)
+            recovered_sessions = int(recovered)
+
         return {
             "batch_id": batch_id,
             "strategy": request.strategy,
-            "recovered_sessions": result.get("recovered", 0),
-            "failed_sessions": result.get("failed", 0),
+            "recovered": recovered,
+            "recovered_sessions": recovered_sessions,
+            "failed_sessions": failed_sessions,
         }
     except ValueError as e:
         raise HTTPException(
@@ -614,7 +634,7 @@ async def cleanup_batches(
     try:
         from titan.batch.cleanup import full_cleanup
 
-        result = cast(dict[str, Any], await full_cleanup(retention_days=retention_days))
+        result = await full_cleanup(retention_days=retention_days)
 
         logger.info(f"Admin triggered batch cleanup: {result}")
 

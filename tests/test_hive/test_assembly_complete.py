@@ -363,7 +363,7 @@ class TestAssemblyIntegration:
             node = MagicMock()
             node.agent_id = f"agent_{i}"
             node.role = "worker"
-            node.neighbors = [f"agent_{(i+1) % 20}"]
+            node.neighbors = [f"agent_{(i + 1) % 20}"]
             node.child_ids = []
             nodes[f"agent_{i}"] = node
 

@@ -9,18 +9,18 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime, timedelta
-from enum import Enum
+from enum import StrEnum
 from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
 if TYPE_CHECKING:
-    from titan.batch.orchestrator import BatchOrchestrator
     from titan.batch.models import BatchJob, QueuedSession
+    from titan.batch.orchestrator import BatchOrchestrator
 
 logger = logging.getLogger("titan.batch.recovery")
 
 
-class RecoveryStrategy(str, Enum):
+class RecoveryStrategy(StrEnum):
     """Recovery strategies for stalled or failed batches."""
 
     RETRY = "retry"  # Retry failed sessions
@@ -63,7 +63,7 @@ class RecoveryResult:
 
 
 async def recover_batch(
-    orchestrator: "BatchOrchestrator",
+    orchestrator: BatchOrchestrator,
     batch_id: UUID | str,
     strategy: RecoveryStrategy = RecoveryStrategy.RETRY,
     max_retry_count: int = 3,
@@ -111,8 +111,8 @@ async def recover_batch(
 
 
 async def _recover_retry(
-    orchestrator: "BatchOrchestrator",
-    batch: "BatchJob",
+    orchestrator: BatchOrchestrator,
+    batch: BatchJob,
     max_retry_count: int,
 ) -> RecoveryResult:
     """
@@ -159,8 +159,8 @@ async def _recover_retry(
 
 
 async def _recover_skip(
-    orchestrator: "BatchOrchestrator",
-    batch: "BatchJob",
+    orchestrator: BatchOrchestrator,
+    batch: BatchJob,
 ) -> RecoveryResult:
     """
     Skip strategy: Mark stalled sessions as failed and continue.
@@ -193,8 +193,8 @@ async def _recover_skip(
 
 
 async def _recover_fail(
-    orchestrator: "BatchOrchestrator",
-    batch: "BatchJob",
+    orchestrator: BatchOrchestrator,
+    batch: BatchJob,
 ) -> RecoveryResult:
     """
     Fail strategy: Mark the entire batch as failed.
@@ -232,8 +232,8 @@ async def _recover_fail(
 
 
 async def _recover_manual(
-    orchestrator: "BatchOrchestrator",
-    batch: "BatchJob",
+    orchestrator: BatchOrchestrator,
+    batch: BatchJob,
 ) -> RecoveryResult:
     """
     Manual strategy: Pause batch for manual intervention.
@@ -254,9 +254,7 @@ async def _recover_manual(
     # Count stalled sessions
     from titan.batch.models import SessionQueueStatus
 
-    stalled = sum(
-        1 for s in batch.sessions if s.status == SessionQueueStatus.RUNNING
-    )
+    stalled = sum(1 for s in batch.sessions if s.status == SessionQueueStatus.RUNNING)
 
     return RecoveryResult(
         success=True,
@@ -269,9 +267,9 @@ async def _recover_manual(
 
 
 async def detect_stalled_sessions(
-    batch: "BatchJob",
+    batch: BatchJob,
     threshold_minutes: int = 30,
-) -> list["QueuedSession"]:
+) -> list[QueuedSession]:
     """
     Detect sessions that appear stalled (running too long without progress).
 
@@ -296,7 +294,7 @@ async def detect_stalled_sessions(
 
 
 async def get_recovery_recommendation(
-    batch: "BatchJob",
+    batch: BatchJob,
 ) -> dict[str, Any]:
     """
     Analyze batch state and recommend a recovery strategy.

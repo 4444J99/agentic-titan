@@ -8,15 +8,15 @@ from __future__ import annotations
 
 import hashlib
 import json
-from datetime import datetime, timezone
-from enum import Enum
+from datetime import UTC, datetime
+from enum import StrEnum
 from typing import Any
 from uuid import UUID, uuid4
 
 from pydantic import BaseModel, Field
 
 
-class AuditEventType(str, Enum):
+class AuditEventType(StrEnum):
     """Types of audit events."""
 
     # Agent lifecycle
@@ -62,7 +62,7 @@ class AuditEvent(BaseModel):
     """
 
     id: UUID = Field(default_factory=uuid4)
-    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))
     event_type: AuditEventType
     agent_id: str | None = None
     session_id: str | None = None
@@ -121,7 +121,8 @@ class AuditEvent(BaseModel):
         """Create from dictionary."""
         return cls(
             id=UUID(data["id"]) if isinstance(data["id"], str) else data["id"],
-            timestamp=data["timestamp"] if isinstance(data["timestamp"], datetime)
+            timestamp=data["timestamp"]
+            if isinstance(data["timestamp"], datetime)
             else datetime.fromisoformat(data["timestamp"]),
             event_type=AuditEventType(data["event_type"]),
             agent_id=data.get("agent_id"),
@@ -135,7 +136,7 @@ class AuditEvent(BaseModel):
         )
 
 
-class DecisionType(str, Enum):
+class DecisionType(StrEnum):
     """Types of agent decisions."""
 
     TOOL_SELECTION = "tool_selection"

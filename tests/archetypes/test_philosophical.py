@@ -4,9 +4,8 @@ from __future__ import annotations
 
 import pytest
 
-from agents.archetypes.assemblage import AssemblageAgent, TerritorialState, ComponentType
 from agents.archetypes.actor_network import ActorNetworkAgent, TranslationType
-from agents.framework.base_agent import AgentState
+from agents.archetypes.assemblage import AssemblageAgent, ComponentType, TerritorialState
 
 
 class TestAssemblageAgent:
@@ -35,7 +34,12 @@ class TestAssemblageAgent:
 
     def test_territorial_state_enum_values(self):
         """Test that expected territorial states exist."""
-        expected_states = ["DETERRITORIALIZED", "RETERRITORIALIZING", "TERRITORIALIZED", "STRATIFIED"]
+        expected_states = [
+            "DETERRITORIALIZED",
+            "RETERRITORIALIZING",
+            "TERRITORIALIZED",
+            "STRATIFIED",
+        ]
         for state_name in expected_states:
             assert hasattr(TerritorialState, state_name)
 

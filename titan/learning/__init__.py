@@ -18,50 +18,11 @@ Phase 18 RLHF Training Pipeline:
 - RLHFDeployment: A/B testing and deployment
 """
 
-from titan.learning.local_trainer import (
-    LocalTrainer,
-    TrainingConfig,
-    TrainingResult,
-    StyleAdapter,
-    CodingPattern,
-    extract_patterns,
-)
-from titan.learning.rlhf import (
-    RLHFSample,
-    RLHFCollector,
-    RLHFDatasetStats,
-    FeedbackType,
-    ResponseQuality,
-    get_rlhf_collector,
-)
-from titan.learning.feedback import (
-    FeedbackHandler,
-    FeedbackRequest,
-    FeedbackResponse,
-    FeedbackChannel,
-    get_feedback_handler,
-)
-from titan.learning.reward_signals import (
-    RewardSignal,
-    RewardEstimate,
-    RewardSignalExtractor,
-    SignalType,
-    get_reward_extractor,
-)
-
-# Phase 18A: RLHF Training Pipeline
-from titan.learning.preference_pairs import (
-    PreferencePair,
-    PreferencePairDataset,
-    PreferencePairBuilder,
-    get_preference_pair_builder,
-)
-from titan.learning.reward_model import (
-    RewardModelConfig,
-    RewardMetrics,
-    RewardModel,
-    RewardModelTrainer,
-    get_reward_model_trainer,
+from titan.learning.deployment import (
+    ABTestStats,
+    DeploymentConfig,
+    RLHFDeployment,
+    get_rlhf_deployment,
 )
 from titan.learning.dpo_trainer import (
     DPOConfig,
@@ -70,8 +31,8 @@ from titan.learning.dpo_trainer import (
     get_dpo_trainer,
 )
 from titan.learning.eval_suite import (
-    EvalResult,
     EvalReport,
+    EvalResult,
     RLHFEvalSuite,
     get_eval_suite,
 )
@@ -81,11 +42,50 @@ from titan.learning.experiment import (
     ExperimentTracker,
     get_experiment_tracker,
 )
-from titan.learning.deployment import (
-    DeploymentConfig,
-    ABTestStats,
-    RLHFDeployment,
-    get_rlhf_deployment,
+from titan.learning.feedback import (
+    FeedbackChannel,
+    FeedbackHandler,
+    FeedbackRequest,
+    FeedbackResponse,
+    get_feedback_handler,
+)
+from titan.learning.local_trainer import (
+    CodingPattern,
+    LocalTrainer,
+    StyleAdapter,
+    TrainingConfig,
+    TrainingResult,
+    extract_patterns,
+)
+
+# Phase 18A: RLHF Training Pipeline
+from titan.learning.preference_pairs import (
+    PreferencePair,
+    PreferencePairBuilder,
+    PreferencePairDataset,
+    get_preference_pair_builder,
+)
+from titan.learning.reward_model import (
+    RewardMetrics,
+    RewardModel,
+    RewardModelConfig,
+    RewardModelTrainer,
+    get_reward_model_trainer,
+)
+from titan.learning.reward_signals import (
+    RewardEstimate,
+    RewardSignal,
+    RewardSignalExtractor,
+    SignalType,
+    get_reward_extractor,
+)
+from titan.learning.rlhf import (
+    FeedbackType,
+    ResponseQuality,
+    RLHFCollector,
+    RLHFDatasetStats,
+    RLHFSample,
+    get_rlhf_collector,
 )
 
 __all__ = [

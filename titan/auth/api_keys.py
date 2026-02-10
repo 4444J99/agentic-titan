@@ -10,7 +10,7 @@ import hashlib
 import logging
 import os
 import secrets
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 logger = logging.getLogger("titan.auth.api_keys")
 
@@ -133,7 +133,7 @@ def calculate_expiry(days: int | None) -> datetime | None:
     """
     if days is None:
         return None
-    return datetime.now(timezone.utc) + timedelta(days=days)
+    return datetime.now(UTC) + timedelta(days=days)
 
 
 def is_key_valid(
@@ -159,7 +159,7 @@ def is_key_valid(
         return False, "API key is deactivated"
 
     # Check expiry
-    if expires_at and datetime.now(timezone.utc) > expires_at:
+    if expires_at and datetime.now(UTC) > expires_at:
         return False, "API key has expired"
 
     # Verify hash

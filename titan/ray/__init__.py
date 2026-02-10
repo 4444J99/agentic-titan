@@ -19,16 +19,14 @@ Usage:
 
 from __future__ import annotations
 
-import os
+from importlib.util import find_spec
 from typing import TYPE_CHECKING
 
+if TYPE_CHECKING:
+    from titan.ray.serve import RayBackend
+
 # Check for Ray availability
-RAY_AVAILABLE = False
-try:
-    import ray
-    RAY_AVAILABLE = True
-except ImportError:
-    pass
+RAY_AVAILABLE = find_spec("ray") is not None
 
 
 def is_ray_available() -> bool:
@@ -36,7 +34,7 @@ def is_ray_available() -> bool:
     return RAY_AVAILABLE
 
 
-def get_ray_backend():
+def get_ray_backend() -> RayBackend:
     """Get the Ray backend if available.
 
     Returns:
@@ -46,10 +44,9 @@ def get_ray_backend():
         ImportError: If Ray is not installed
     """
     if not RAY_AVAILABLE:
-        raise ImportError(
-            "Ray is not installed. Install with: pip install 'agentic-titan[ray]'"
-        )
+        raise ImportError("Ray is not installed. Install with: pip install 'agentic-titan[ray]'")
     from titan.ray.serve import RayBackend
+
     return RayBackend()
 
 

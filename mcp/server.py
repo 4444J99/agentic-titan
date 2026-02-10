@@ -25,24 +25,20 @@ import json
 import logging
 import sys
 import uuid
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from datetime import datetime
-from enum import Enum
-from typing import Any, Callable, Awaitable
+from enum import StrEnum
+from typing import Any
 
-from mcp.prompts import get_all_prompts, get_prompt, get_prompt_messages
-from mcp.resources import (
-    get_all_resources,
-    get_resource_definition,
-    read_resource,
-    format_resource_contents,
-)
 from mcp.notifications import (
-    get_notification_manager,
     NotificationType,
+    get_notification_manager,
     start_notifications,
     stop_notifications,
 )
+from mcp.prompts import get_all_prompts, get_prompt, get_prompt_messages
+from mcp.resources import format_resource_contents, get_all_resources, read_resource
 
 logger = logging.getLogger("titan.mcp")
 
@@ -51,7 +47,8 @@ logger = logging.getLogger("titan.mcp")
 # MCP Protocol Types
 # ============================================================================
 
-class MCPMethod(str, Enum):
+
+class MCPMethod(StrEnum):
     """MCP JSON-RPC methods."""
 
     # Lifecycle
@@ -106,7 +103,7 @@ class MCPTool:
 
     name: str
     description: str
-    inputSchema: dict[str, Any]
+    inputSchema: dict[str, Any]  # noqa: N815
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -123,7 +120,7 @@ class MCPResource:
     uri: str
     name: str
     description: str
-    mimeType: str = "application/json"
+    mimeType: str = "application/json"  # noqa: N815
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -137,6 +134,7 @@ class MCPResource:
 # ============================================================================
 # Agent Session Management
 # ============================================================================
+
 
 @dataclass
 class AgentSession:
@@ -176,9 +174,7 @@ class AgentManager:
         self._sessions[session_id] = session
 
         # Start agent in background
-        agent_task = asyncio.create_task(
-            self._run_agent(session, **kwargs)
-        )
+        agent_task = asyncio.create_task(self._run_agent(session, **kwargs))
         self._tasks[session_id] = agent_task
 
         logger.info(f"Spawned agent {agent_type} with session {session_id}")
@@ -188,10 +184,10 @@ class AgentManager:
         """Run an agent to completion."""
         try:
             # Import agent types
-            from agents.archetypes.researcher import ResearcherAgent
             from agents.archetypes.coder import CoderAgent
-            from agents.archetypes.reviewer import ReviewerAgent
             from agents.archetypes.orchestrator import OrchestratorAgent
+            from agents.archetypes.researcher import ResearcherAgent
+            from agents.archetypes.reviewer import ReviewerAgent
             from agents.framework.tool_agent import SimpleToolAgent
 
             agent_classes = {
@@ -258,6 +254,7 @@ class AgentManager:
 # MCP Server
 # ============================================================================
 
+
 class TitanMCPServer:
     """
     MCP Server for Titan multi-agent system.
@@ -285,13 +282,19 @@ class TitanMCPServer:
         return [
             MCPTool(
                 name="spawn_agent",
-                description="Spawn a new Titan agent to perform a task. Returns a session ID to track progress.",
+                description=(
+                    "Spawn a new Titan agent to perform a task. "
+                    "Returns a session ID to track progress."
+                ),
                 inputSchema={
                     "type": "object",
                     "properties": {
                         "agent_type": {
                             "type": "string",
-                            "description": "Type of agent: researcher, coder, reviewer, orchestrator, or simple",
+                            "description": (
+                                "Type of agent: researcher, coder, reviewer, "
+                                "orchestrator, or simple"
+                            ),
                             "enum": ["researcher", "coder", "reviewer", "orchestrator", "simple"],
                         },
                         "task": {
@@ -354,7 +357,9 @@ class TitanMCPServer:
             ),
             MCPTool(
                 name="route_cognitive_task",
-                description="Route a cognitive task to the optimal AI model based on task requirements.",
+                description=(
+                    "Route a cognitive task to the optimal AI model based on task requirements."
+                ),
                 inputSchema={
                     "type": "object",
                     "properties": {
@@ -364,8 +369,19 @@ class TitanMCPServer:
                         },
                         "cognitive_type": {
                             "type": "string",
-                            "description": "Type of cognitive task: structured_reasoning, creative_synthesis, mathematical_analysis, cross_domain, meta_analysis, pattern_recognition",
-                            "enum": ["structured_reasoning", "creative_synthesis", "mathematical_analysis", "cross_domain", "meta_analysis", "pattern_recognition"],
+                            "description": (
+                                "Type of cognitive task: structured_reasoning, "
+                                "creative_synthesis, mathematical_analysis, "
+                                "cross_domain, meta_analysis, pattern_recognition"
+                            ),
+                            "enum": [
+                                "structured_reasoning",
+                                "creative_synthesis",
+                                "mathematical_analysis",
+                                "cross_domain",
+                                "meta_analysis",
+                                "pattern_recognition",
+                            ],
                         },
                         "preferred_model": {
                             "type": "string",
@@ -538,11 +554,13 @@ class TitanMCPServer:
                 "content": [
                     {
                         "type": "text",
-                        "text": json.dumps({
-                            "session_id": session_id,
-                            "status": "running",
-                            "message": f"Agent spawned with session {session_id}",
-                        }),
+                        "text": json.dumps(
+                            {
+                                "session_id": session_id,
+                                "status": "running",
+                                "message": f"Agent spawned with session {session_id}",
+                            }
+                        ),
                     }
                 ],
             }
@@ -558,13 +576,15 @@ class TitanMCPServer:
                 "content": [
                     {
                         "type": "text",
-                        "text": json.dumps({
-                            "session_id": session.id,
-                            "agent_type": session.agent_type,
-                            "status": session.status,
-                            "created_at": session.created_at.isoformat(),
-                            "error": session.error,
-                        }),
+                        "text": json.dumps(
+                            {
+                                "session_id": session.id,
+                                "agent_type": session.agent_type,
+                                "status": session.status,
+                                "created_at": session.created_at.isoformat(),
+                                "error": session.error,
+                            }
+                        ),
                     }
                 ],
             }
@@ -580,12 +600,15 @@ class TitanMCPServer:
                 "content": [
                     {
                         "type": "text",
-                        "text": json.dumps({
-                            "session_id": session.id,
-                            "status": session.status,
-                            "result": session.result,
-                            "error": session.error,
-                        }, default=str),
+                        "text": json.dumps(
+                            {
+                                "session_id": session.id,
+                                "status": session.status,
+                                "result": session.result,
+                                "error": session.error,
+                            },
+                            default=str,
+                        ),
                     }
                 ],
             }
@@ -596,15 +619,17 @@ class TitanMCPServer:
                 "content": [
                     {
                         "type": "text",
-                        "text": json.dumps([
-                            {
-                                "session_id": s.id,
-                                "agent_type": s.agent_type,
-                                "status": s.status,
-                                "task": s.task[:100],
-                            }
-                            for s in sessions
-                        ]),
+                        "text": json.dumps(
+                            [
+                                {
+                                    "session_id": s.id,
+                                    "agent_type": s.agent_type,
+                                    "status": s.status,
+                                    "task": s.task[:100],
+                                }
+                                for s in sessions
+                            ]
+                        ),
                     }
                 ],
             }
@@ -615,10 +640,12 @@ class TitanMCPServer:
                 "content": [
                     {
                         "type": "text",
-                        "text": json.dumps({
-                            "cancelled": success,
-                            "session_id": arguments["session_id"],
-                        }),
+                        "text": json.dumps(
+                            {
+                                "cancelled": success,
+                                "session_id": arguments["session_id"],
+                            }
+                        ),
                     }
                 ],
             }
@@ -647,7 +674,18 @@ class TitanMCPServer:
 
     async def _handle_resources_read(self, params: dict[str, Any]) -> dict[str, Any]:
         """Handle resources/read request."""
-        uri = params.get("uri")
+        uri_value = params.get("uri")
+        if not isinstance(uri_value, str) or not uri_value:
+            return {
+                "contents": [
+                    {
+                        "uri": "",
+                        "mimeType": "text/plain",
+                        "text": "Missing required parameter: uri",
+                    }
+                ]
+            }
+        uri = uri_value
 
         if uri == "titan://agents/types":
             return {
@@ -655,56 +693,71 @@ class TitanMCPServer:
                     {
                         "uri": uri,
                         "mimeType": "application/json",
-                        "text": json.dumps({
-                            "agent_types": [
-                                {
-                                    "name": "researcher",
-                                    "description": "Research and analyze information on topics",
-                                    "capabilities": ["web_search", "document_analysis", "summarization"],
-                                },
-                                {
-                                    "name": "coder",
-                                    "description": "Write, test, and review code",
-                                    "capabilities": ["code_generation", "code_review", "testing"],
-                                },
-                                {
-                                    "name": "reviewer",
-                                    "description": "Review code and documents for quality",
-                                    "capabilities": ["code_review", "document_analysis"],
-                                },
-                                {
-                                    "name": "orchestrator",
-                                    "description": "Coordinate multi-agent workflows",
-                                    "capabilities": ["planning", "coordination", "aggregation"],
-                                },
-                                {
-                                    "name": "simple",
-                                    "description": "Simple tool-using agent",
-                                    "capabilities": ["tool_use"],
-                                },
-                            ],
-                        }, indent=2),
+                        "text": json.dumps(
+                            {
+                                "agent_types": [
+                                    {
+                                        "name": "researcher",
+                                        "description": "Research and analyze information on topics",
+                                        "capabilities": [
+                                            "web_search",
+                                            "document_analysis",
+                                            "summarization",
+                                        ],
+                                    },
+                                    {
+                                        "name": "coder",
+                                        "description": "Write, test, and review code",
+                                        "capabilities": [
+                                            "code_generation",
+                                            "code_review",
+                                            "testing",
+                                        ],
+                                    },
+                                    {
+                                        "name": "reviewer",
+                                        "description": "Review code and documents for quality",
+                                        "capabilities": ["code_review", "document_analysis"],
+                                    },
+                                    {
+                                        "name": "orchestrator",
+                                        "description": "Coordinate multi-agent workflows",
+                                        "capabilities": ["planning", "coordination", "aggregation"],
+                                    },
+                                    {
+                                        "name": "simple",
+                                        "description": "Simple tool-using agent",
+                                        "capabilities": ["tool_use"],
+                                    },
+                                ],
+                            },
+                            indent=2,
+                        ),
                     }
                 ],
             }
 
         elif uri == "titan://agents/tools":
             from tools.base import get_registry
+
             registry = get_registry()
             return {
                 "contents": [
                     {
                         "uri": uri,
                         "mimeType": "application/json",
-                        "text": json.dumps({
-                            "tools": [
-                                {
-                                    "name": t.name,
-                                    "description": t.description,
-                                }
-                                for t in registry.list()
-                            ],
-                        }, indent=2),
+                        "text": json.dumps(
+                            {
+                                "tools": [
+                                    {
+                                        "name": t.name,
+                                        "description": t.description,
+                                    }
+                                    for t in registry.list()
+                                ],
+                            },
+                            indent=2,
+                        ),
                     }
                 ],
             }
@@ -728,8 +781,18 @@ class TitanMCPServer:
 
     async def _handle_prompts_get(self, params: dict[str, Any]) -> dict[str, Any]:
         """Handle prompts/get request."""
-        name = params.get("name")
-        arguments = params.get("arguments", {})
+        name_value = params.get("name")
+        if not isinstance(name_value, str) or not name_value:
+            return {
+                "description": "Missing required parameter: name",
+                "messages": [],
+            }
+        name = name_value
+
+        arguments_raw = params.get("arguments", {})
+        arguments: dict[str, str] = {}
+        if isinstance(arguments_raw, dict):
+            arguments = {str(k): str(v) for k, v in arguments_raw.items()}
 
         prompt = get_prompt(name)
         if not prompt:
@@ -760,10 +823,7 @@ class TitanMCPServer:
     ) -> dict[str, Any]:
         """Handle route_cognitive_task tool call."""
         try:
-            from titan.workflows.cognitive_router import (
-                get_cognitive_router,
-                CognitiveTaskType,
-            )
+            from titan.workflows.cognitive_router import CognitiveTaskType, get_cognitive_router
 
             task_description = arguments["task_description"]
             cognitive_type_str = arguments["cognitive_type"]
@@ -782,13 +842,15 @@ class TitanMCPServer:
                 "content": [
                     {
                         "type": "text",
-                        "text": json.dumps({
-                            "recommended_model": routing.model_id,
-                            "score": routing.score,
-                            "reasoning": routing.reasoning,
-                            "cognitive_type": cognitive_type_str,
-                            "task": task_description[:200],
-                        }),
+                        "text": json.dumps(
+                            {
+                                "recommended_model": routing.model_id,
+                                "score": routing.score,
+                                "reasoning": routing.reasoning,
+                                "cognitive_type": cognitive_type_str,
+                                "task": task_description[:200],
+                            }
+                        ),
                     }
                 ],
             }
@@ -806,17 +868,14 @@ class TitanMCPServer:
     ) -> dict[str, Any]:
         """Handle compare_models tool call."""
         try:
-            from titan.workflows.cognitive_router import get_cognitive_router
+            from titan.workflows.cognitive_router import MODEL_RANKINGS, CognitiveTaskType
 
             model_a = arguments["model_a"]
             model_b = arguments["model_b"]
 
-            router = get_cognitive_router()
-            registry = router._model_registry
-
             # Get traits for both models
-            traits_a = registry.get(model_a, {})
-            traits_b = registry.get(model_b, {})
+            traits_a = MODEL_RANKINGS.get(model_a)
+            traits_b = MODEL_RANKINGS.get(model_b)
 
             if not traits_a:
                 return {
@@ -832,36 +891,41 @@ class TitanMCPServer:
 
             # Compare across dimensions
             dimensions = [
-                "structured_reasoning",
-                "creative_synthesis",
-                "mathematical_analysis",
-                "cross_domain",
-                "meta_analysis",
-                "pattern_recognition",
+                CognitiveTaskType.STRUCTURED_REASONING,
+                CognitiveTaskType.CREATIVE_SYNTHESIS,
+                CognitiveTaskType.MATHEMATICAL_ANALYSIS,
+                CognitiveTaskType.CROSS_DOMAIN,
+                CognitiveTaskType.META_ANALYSIS,
+                CognitiveTaskType.PATTERN_RECOGNITION,
             ]
 
-            comparison = {
+            model_a_scores = {d.value: float(traits_a.get(d, 0.5)) for d in dimensions}
+            model_b_scores = {d.value: float(traits_b.get(d, 0.5)) for d in dimensions}
+            winner_by_dimension: dict[str, str] = {}
+
+            for d in dimensions:
+                key = d.value
+                score_a = model_a_scores[key]
+                score_b = model_b_scores[key]
+                if score_a > score_b:
+                    winner_by_dimension[key] = model_a
+                elif score_b > score_a:
+                    winner_by_dimension[key] = model_b
+                else:
+                    winner_by_dimension[key] = "tie"
+
+            comparison: dict[str, Any] = {
                 "model_a": {
                     "id": model_a,
-                    "scores": {d: traits_a.get(d, 0.5) for d in dimensions},
+                    "scores": model_a_scores,
                 },
                 "model_b": {
                     "id": model_b,
-                    "scores": {d: traits_b.get(d, 0.5) for d in dimensions},
+                    "scores": model_b_scores,
                 },
-                "dimensions": dimensions,
-                "winner_by_dimension": {},
+                "dimensions": [d.value for d in dimensions],
+                "winner_by_dimension": winner_by_dimension,
             }
-
-            for d in dimensions:
-                score_a = traits_a.get(d, 0.5)
-                score_b = traits_b.get(d, 0.5)
-                if score_a > score_b:
-                    comparison["winner_by_dimension"][d] = model_a
-                elif score_b > score_a:
-                    comparison["winner_by_dimension"][d] = model_b
-                else:
-                    comparison["winner_by_dimension"][d] = "tie"
 
             return {
                 "content": [
@@ -885,8 +949,8 @@ class TitanMCPServer:
     ) -> dict[str, Any]:
         """Handle start_inquiry tool call."""
         try:
-            from titan.workflows.inquiry_engine import get_inquiry_engine
             from titan.workflows.inquiry_config import get_workflow
+            from titan.workflows.inquiry_engine import get_inquiry_engine
 
             topic = arguments["topic"]
             workflow_name = arguments.get("workflow", "expansive")
@@ -959,7 +1023,7 @@ class TitanMCPServer:
                     "isError": True,
                 }
 
-            result = {
+            result: dict[str, Any] = {
                 "session_id": session.id,
                 "topic": session.topic,
                 "workflow": session.workflow.name,
@@ -1014,14 +1078,13 @@ class TitanMCPServer:
 
         reader = asyncio.StreamReader()
         protocol = asyncio.StreamReaderProtocol(reader)
-        await asyncio.get_event_loop().connect_read_pipe(
-            lambda: protocol, sys.stdin
-        )
+        await asyncio.get_event_loop().connect_read_pipe(lambda: protocol, sys.stdin)
 
         writer_transport, writer_protocol = await asyncio.get_event_loop().connect_write_pipe(
             asyncio.streams.FlowControlMixin, sys.stdout
         )
-        writer = asyncio.StreamWriter(writer_transport, writer_protocol, reader, asyncio.get_event_loop())
+        loop = asyncio.get_event_loop()
+        writer = asyncio.StreamWriter(writer_transport, writer_protocol, reader, loop)
 
         try:
             while True:

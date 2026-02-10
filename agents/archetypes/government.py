@@ -15,16 +15,16 @@ from __future__ import annotations
 import logging
 from abc import abstractmethod
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
-from enum import Enum
+from datetime import UTC, datetime
+from enum import StrEnum
 from typing import Any
 
-from agents.framework.base_agent import BaseAgent, AgentState
+from agents.framework.base_agent import AgentState, BaseAgent
 
 logger = logging.getLogger("titan.agents.government")
 
 
-class PolicyStatus(str, Enum):
+class PolicyStatus(StrEnum):
     """Status of a policy proposal."""
 
     DRAFT = "draft"
@@ -37,7 +37,7 @@ class PolicyStatus(str, Enum):
     INVALIDATED = "invalidated"
 
 
-class DisputeStatus(str, Enum):
+class DisputeStatus(StrEnum):
     """Status of a dispute."""
 
     FILED = "filed"
@@ -84,7 +84,7 @@ class ExecutiveOrder:
     title: str
     directive: str
     issued_by: str
-    issued_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    issued_at: datetime = field(default_factory=lambda: datetime.now(UTC))
     implements_policy: str | None = None  # Policy ID
     active: bool = True
 
@@ -110,11 +110,14 @@ class GovernmentAgent(BaseAgent):
 
     def __init__(self, **kwargs: Any) -> None:
         """Initialize government agent."""
-        kwargs.setdefault("capabilities", [
-            "governance",
-            "coordination",
-            "policy_management",
-        ])
+        kwargs.setdefault(
+            "capabilities",
+            [
+                "governance",
+                "coordination",
+                "policy_management",
+            ],
+        )
         super().__init__(**kwargs)
         self._peer_branches: dict[str, str] = {}  # branch -> agent_id
 
@@ -176,7 +179,7 @@ class ExecutiveAgent(GovernmentAgent):
 
     async def work(self) -> dict[str, Any]:
         """Execute pending policies and manage orders."""
-        result = {
+        result: dict[str, Any] = {
             "branch": "executive",
             "policies_executed": [],
             "orders_issued": [],
@@ -186,19 +189,23 @@ class ExecutiveAgent(GovernmentAgent):
         # Process execution queue
         for policy in self._execution_queue[:5]:  # Process up to 5
             execution_result = await self._execute_policy(policy)
-            result["policies_executed"].append({
-                "policy_id": policy.policy_id,
-                "success": execution_result["success"],
-                "details": execution_result.get("details", ""),
-            })
+            result["policies_executed"].append(
+                {
+                    "policy_id": policy.policy_id,
+                    "success": execution_result["success"],
+                    "details": execution_result.get("details", ""),
+                }
+            )
 
         # Update execution status
         for policy_id, status in self._execution_status.items():
-            result["status_updates"].append({
-                "policy_id": policy_id,
-                "progress": status.get("progress", 0),
-                "issues": status.get("issues", []),
-            })
+            result["status_updates"].append(
+                {
+                    "policy_id": policy_id,
+                    "progress": status.get("progress", 0),
+                    "issues": status.get("issues", []),
+                }
+            )
 
         return result
 
@@ -233,7 +240,7 @@ class ExecutiveAgent(GovernmentAgent):
         """
         self._execution_status[policy.policy_id] = {
             "status": "executing",
-            "started_at": datetime.now(timezone.utc).isoformat(),
+            "started_at": datetime.now(UTC).isoformat(),
             "progress": 0,
             "issues": [],
         }
@@ -270,6 +277,7 @@ class ExecutiveAgent(GovernmentAgent):
             The issued ExecutiveOrder.
         """
         import uuid
+
         order = ExecutiveOrder(
             order_id=f"EO-{uuid.uuid4().hex[:8]}",
             title=title,
@@ -359,7 +367,7 @@ class LegislativeAgent(GovernmentAgent):
 
     async def work(self) -> dict[str, Any]:
         """Process policy proposals through debate and voting."""
-        result = {
+        result: dict[str, Any] = {
             "branch": "legislative",
             "proposals_reviewed": [],
             "policies_passed": [],
@@ -370,10 +378,12 @@ class LegislativeAgent(GovernmentAgent):
         for proposal in [p for p in self._proposals if p.status == PolicyStatus.DEBATING]:
             # Simulate voting
             vote_result = await self._vote_on_policy(proposal)
-            result["proposals_reviewed"].append({
-                "policy_id": proposal.policy_id,
-                "result": vote_result,
-            })
+            result["proposals_reviewed"].append(
+                {
+                    "policy_id": proposal.policy_id,
+                    "result": vote_result,
+                }
+            )
 
             if vote_result == "passed":
                 result["policies_passed"].append(proposal.policy_id)
@@ -401,6 +411,7 @@ class LegislativeAgent(GovernmentAgent):
             The created Policy.
         """
         import uuid
+
         policy = Policy(
             policy_id=f"POL-{uuid.uuid4().hex[:8]}",
             title=title,
@@ -441,6 +452,7 @@ class LegislativeAgent(GovernmentAgent):
         # Simulate votes based on policy content
         # In practice, this would involve peer agents
         import random
+
         votes_for = random.randint(3, 7)
         votes_against = random.randint(1, 5)
 
@@ -475,7 +487,7 @@ class LegislativeAgent(GovernmentAgent):
 
         if override_support >= self._override_threshold:
             policy.status = PolicyStatus.ENACTED
-            policy.enacted_at = datetime.now(timezone.utc)
+            policy.enacted_at = datetime.now(UTC)
             self._enacted_policies.append(policy)
             logger.info(f"Veto override successful: {policy.policy_id}")
             return True
@@ -495,7 +507,7 @@ class LegislativeAgent(GovernmentAgent):
             return False
 
         policy.status = PolicyStatus.ENACTED
-        policy.enacted_at = datetime.now(timezone.utc)
+        policy.enacted_at = datetime.now(UTC)
         self._enacted_policies.append(policy)
 
         logger.info(f"Policy enacted: {policy.policy_id}")
@@ -511,8 +523,7 @@ class LegislativeAgent(GovernmentAgent):
     def get_pending_proposals(self) -> list[Policy]:
         """Get proposals pending debate or voting."""
         return [
-            p for p in self._proposals
-            if p.status in [PolicyStatus.PROPOSED, PolicyStatus.DEBATING]
+            p for p in self._proposals if p.status in [PolicyStatus.PROPOSED, PolicyStatus.DEBATING]
         ]
 
 
@@ -551,7 +562,7 @@ class JudicialAgent(GovernmentAgent):
 
     async def work(self) -> dict[str, Any]:
         """Process reviews and disputes."""
-        result = {
+        result: dict[str, Any] = {
             "branch": "judicial",
             "reviews_completed": [],
             "disputes_resolved": [],
@@ -566,10 +577,12 @@ class JudicialAgent(GovernmentAgent):
         # Process disputes
         for dispute in [d for d in self._disputes if d.status == DisputeStatus.HEARING]:
             ruling = await self._rule_on_dispute(dispute)
-            result["disputes_resolved"].append({
-                "dispute_id": dispute.dispute_id,
-                "ruling": ruling,
-            })
+            result["disputes_resolved"].append(
+                {
+                    "dispute_id": dispute.dispute_id,
+                    "ruling": ruling,
+                }
+            )
             result["rulings"].append(ruling)
 
         return result
@@ -595,15 +608,18 @@ class JudicialAgent(GovernmentAgent):
             Review ID.
         """
         import uuid
+
         review_id = f"REV-{uuid.uuid4().hex[:8]}"
 
-        self._pending_reviews.append({
-            "review_id": review_id,
-            "item_type": item_type,
-            "item": item,
-            "requester": requester,
-            "submitted_at": datetime.now(timezone.utc).isoformat(),
-        })
+        self._pending_reviews.append(
+            {
+                "review_id": review_id,
+                "item_type": item_type,
+                "item": item,
+                "requester": requester,
+                "submitted_at": datetime.now(UTC).isoformat(),
+            }
+        )
 
         return review_id
 
@@ -673,6 +689,7 @@ class JudicialAgent(GovernmentAgent):
             The created Dispute.
         """
         import uuid
+
         dispute = Dispute(
             dispute_id=f"DIS-{uuid.uuid4().hex[:8]}",
             title=title,
@@ -720,7 +737,7 @@ class JudicialAgent(GovernmentAgent):
             ruling += "the court finds insufficient grounds for relief."
 
         dispute.ruling = ruling
-        dispute.ruled_at = datetime.now(timezone.utc)
+        dispute.ruled_at = datetime.now(UTC)
         dispute.status = DisputeStatus.DECIDED
 
         return ruling
@@ -733,8 +750,7 @@ class JudicialAgent(GovernmentAgent):
     def get_pending_disputes(self) -> list[Dispute]:
         """Get disputes awaiting hearing."""
         return [
-            d for d in self._disputes
-            if d.status in [DisputeStatus.FILED, DisputeStatus.REVIEWING]
+            d for d in self._disputes if d.status in [DisputeStatus.FILED, DisputeStatus.REVIEWING]
         ]
 
     def get_rulings(self, limit: int = 20) -> list[dict[str, Any]]:

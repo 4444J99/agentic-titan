@@ -15,44 +15,42 @@ from __future__ import annotations
 import asyncio
 import logging
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
-from enum import Enum
+from datetime import UTC, datetime
+from enum import StrEnum
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from hive.events import EventBus
-    from hive.topology import BaseTopology
-    from hive.topology_extended import Territory
 
 logger = logging.getLogger("titan.hive.assembly")
 
 
-class AssemblyState(str, Enum):
+class AssemblyState(StrEnum):
     """State of an assembly (assemblage)."""
 
-    STABLE = "stable"              # Well-territorialized, functioning
-    UNSTABLE = "unstable"          # Deterritorializing, in flux
+    STABLE = "stable"  # Well-territorialized, functioning
+    UNSTABLE = "unstable"  # Deterritorializing, in flux
     TRANSITIONING = "transitioning"  # Moving between states
-    RUPTURED = "ruptured"          # Broken connections, needs repair
+    RUPTURED = "ruptured"  # Broken connections, needs repair
     CRYSTALLIZED = "crystallized"  # Over-territorialized, rigid
 
 
-class TerritorizationType(str, Enum):
+class TerritorizationType(StrEnum):
     """Types of territorialization processes."""
 
-    CODING = "coding"              # Establishing rules and patterns
+    CODING = "coding"  # Establishing rules and patterns
     STRATIFICATION = "stratification"  # Creating layers/hierarchy
     SEGMENTATION = "segmentation"  # Dividing into bounded regions
-    CAPTURE = "capture"            # State capture of war machine
+    CAPTURE = "capture"  # State capture of war machine
 
 
-class DeterritorializationType(str, Enum):
+class DeterritorializationType(StrEnum):
     """Types of deterritorialization processes."""
 
-    DECODING = "decoding"          # Breaking down rules
-    SMOOTHING = "smoothing"        # Removing striations
+    DECODING = "decoding"  # Breaking down rules
+    SMOOTHING = "smoothing"  # Removing striations
     NOMADIZATION = "nomadization"  # Becoming mobile/fluid
-    FLIGHT = "flight"              # Line of flight/escape
+    FLIGHT = "flight"  # Line of flight/escape
 
 
 @dataclass
@@ -63,7 +61,7 @@ class AssemblyEvent:
     previous_state: AssemblyState
     new_state: AssemblyState
     trigger: str
-    timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    timestamp: datetime = field(default_factory=lambda: datetime.now(UTC))
     affected_agents: list[str] = field(default_factory=list)
     metadata: dict[str, Any] = field(default_factory=dict)
 
@@ -84,26 +82,23 @@ class AssemblyEvent:
 class StabilityMetrics:
     """Metrics for evaluating assembly stability."""
 
-    connection_density: float = 0.0     # How connected agents are (0-1)
-    role_consistency: float = 0.0       # How stable roles are (0-1)
-    communication_flow: float = 0.0     # Information flow efficiency (0-1)
-    defection_rate: float = 0.0         # Rate of agents leaving (0-1)
-    task_completion_rate: float = 0.0   # Task success rate (0-1)
+    connection_density: float = 0.0  # How connected agents are (0-1)
+    role_consistency: float = 0.0  # How stable roles are (0-1)
+    communication_flow: float = 0.0  # Information flow efficiency (0-1)
+    defection_rate: float = 0.0  # Rate of agents leaving (0-1)
+    task_completion_rate: float = 0.0  # Task success rate (0-1)
     coordination_overhead: float = 0.0  # Cost of coordination (0-1)
 
     @property
     def overall_stability(self) -> float:
         """Calculate overall stability score (0-1)."""
         positive = (
-            self.connection_density * 0.2 +
-            self.role_consistency * 0.2 +
-            self.communication_flow * 0.2 +
-            self.task_completion_rate * 0.3
+            self.connection_density * 0.2
+            + self.role_consistency * 0.2
+            + self.communication_flow * 0.2
+            + self.task_completion_rate * 0.3
         )
-        negative = (
-            self.defection_rate * 0.5 +
-            self.coordination_overhead * 0.5
-        )
+        negative = self.defection_rate * 0.5 + self.coordination_overhead * 0.5
         return max(0.0, min(1.0, positive - negative * 0.3))
 
     @property
@@ -149,6 +144,7 @@ class AssemblyManager:
             event_bus: Optional event bus for publishing events.
         """
         import uuid
+
         self._assembly_id = assembly_id or str(uuid.uuid4())[:8]
         self._evaluation_interval = evaluation_interval
         self._event_bus = event_bus
@@ -241,7 +237,7 @@ class AssemblyManager:
         Returns:
             Updated StabilityMetrics.
         """
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         window_seconds = 300.0  # 5 minute window
 
         # Calculate connection density from topologies
@@ -262,8 +258,7 @@ class AssemblyManager:
 
         # Calculate role consistency from recent role changes
         recent_changes = [
-            t for t in self._role_changes
-            if (now - t).total_seconds() < window_seconds
+            t for t in self._role_changes if (now - t).total_seconds() < window_seconds
         ]
         if total_agents > 0:
             change_rate = len(recent_changes) / (total_agents * (window_seconds / 60))
@@ -273,8 +268,7 @@ class AssemblyManager:
 
         # Calculate defection rate
         recent_defections = [
-            t for t in self._defections
-            if (now - t).total_seconds() < window_seconds
+            t for t in self._defections if (now - t).total_seconds() < window_seconds
         ]
         if total_agents > 0:
             self._metrics.defection_rate = len(recent_defections) / total_agents
@@ -290,8 +284,7 @@ class AssemblyManager:
 
         # Estimate communication flow (based on connectivity)
         self._metrics.communication_flow = (
-            self._metrics.connection_density * 0.5 +
-            self._metrics.role_consistency * 0.5
+            self._metrics.connection_density * 0.5 + self._metrics.role_consistency * 0.5
         )
 
         # Coordination overhead increases with complexity
@@ -322,9 +315,9 @@ class AssemblyManager:
             return False
 
         return (
-            self._metrics.overall_stability < self.STABILITY_LOW_THRESHOLD or
-            self._metrics.defection_rate > self.DEFECTION_THRESHOLD or
-            self._metrics.task_completion_rate < 0.3
+            self._metrics.overall_stability < self.STABILITY_LOW_THRESHOLD
+            or self._metrics.defection_rate > self.DEFECTION_THRESHOLD
+            or self._metrics.task_completion_rate < 0.3
         )
 
     def should_deterritorialize(self) -> bool:
@@ -342,11 +335,11 @@ class AssemblyManager:
             return False
 
         return (
-            self._state == AssemblyState.CRYSTALLIZED or
-            self._metrics.coordination_overhead > 0.7 or
-            (
-                self._metrics.overall_stability > self.STABILITY_HIGH_THRESHOLD and
-                self._metrics.task_completion_rate < 0.5
+            self._state == AssemblyState.CRYSTALLIZED
+            or self._metrics.coordination_overhead > 0.7
+            or (
+                self._metrics.overall_stability > self.STABILITY_HIGH_THRESHOLD
+                and self._metrics.task_completion_rate < 0.5
             )
         )
 
@@ -450,11 +443,10 @@ class AssemblyManager:
                 if hasattr(topology, "initiate_line_of_flight") and hasattr(topology, "nodes"):
                     # Allow some agents to escape
                     import random
+
                     for node in topology.nodes.values():
                         if random.random() < 0.1:  # 10% chance
-                            topology.initiate_line_of_flight(
-                                node.agent_id, "exploration", 300.0
-                            )
+                            topology.initiate_line_of_flight(node.agent_id, "exploration", 300.0)
                             affected_agents.append(node.agent_id)
 
         # Record event
@@ -483,9 +475,7 @@ class AssemblyManager:
         old_state = self._state
         self._state = new_state
 
-        logger.info(
-            f"Assembly {self._assembly_id} state: {old_state.value} -> {new_state.value}"
-        )
+        logger.info(f"Assembly {self._assembly_id} state: {old_state.value} -> {new_state.value}")
 
         # Publish event if bus available
         if self._event_bus:
@@ -494,14 +484,14 @@ class AssemblyManager:
 
     def record_role_change(self, agent_id: str) -> None:
         """Record a role change for metrics."""
-        self._role_changes.append(datetime.now(timezone.utc))
+        self._role_changes.append(datetime.now(UTC))
         # Keep only recent changes
         if len(self._role_changes) > 1000:
             self._role_changes = self._role_changes[-500:]
 
     def record_defection(self, agent_id: str) -> None:
         """Record an agent leaving for metrics."""
-        self._defections.append(datetime.now(timezone.utc))
+        self._defections.append(datetime.now(UTC))
         if len(self._defections) > 1000:
             self._defections = self._defections[-500:]
 

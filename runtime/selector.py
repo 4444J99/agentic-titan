@@ -15,35 +15,33 @@ import logging
 import os
 from dataclasses import dataclass, field
 from datetime import datetime
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 from runtime.base import (
-    Runtime,
-    RuntimeType,
-    RuntimeConfig,
-    RuntimeConstraints,
     AgentProcess,
+    Runtime,
+    RuntimeConstraints,
+    RuntimeType,
 )
-from runtime.local import LocalRuntime
 from runtime.docker import DockerRuntime
-from runtime.openfaas import OpenFaaSRuntime
+from runtime.local import LocalRuntime
 
 logger = logging.getLogger("titan.runtime.selector")
 
 
-class SelectionStrategy(str, Enum):
+class SelectionStrategy(StrEnum):
     """Strategy for runtime selection."""
 
-    AUTO = "auto"              # Intelligent selection based on constraints
-    PREFER_LOCAL = "local"     # Prefer local, fallback to others
-    PREFER_DOCKER = "docker"   # Prefer Docker containers
-    COST_OPTIMIZED = "cost"    # Minimize resource usage
-    PERFORMANCE = "perf"       # Maximum performance
+    AUTO = "auto"  # Intelligent selection based on constraints
+    PREFER_LOCAL = "local"  # Prefer local, fallback to others
+    PREFER_DOCKER = "docker"  # Prefer Docker containers
+    COST_OPTIMIZED = "cost"  # Minimize resource usage
+    PERFORMANCE = "perf"  # Maximum performance
     LOAD_AWARE = "load_aware"  # Select based on system load
 
 
-class LoadLevel(str, Enum):
+class LoadLevel(StrEnum):
     """System load level classification."""
 
     LOW = "low"
@@ -262,7 +260,10 @@ class RuntimeSelector:
         logger.info("Runtime selection scores:")
         for score in scores:
             status = "✓" if score.available else "✗"
-            logger.info(f"  {status} {score.runtime_type.value}: {score.score:.1f} - {', '.join(score.reasons)}")
+            logger.info(
+                f"  {status} {score.runtime_type.value}: {score.score:.1f} - "
+                f"{', '.join(score.reasons)}"
+            )
 
         # Return highest scoring available runtime
         for score in scores:
@@ -297,15 +298,13 @@ class RuntimeSelector:
         # Adjust constraints based on load
         if system_load.cpu_percent > self._load_threshold_cpu:
             logger.info(
-                f"High CPU load ({system_load.cpu_percent:.1f}%), "
-                "preferring non-local runtime"
+                f"High CPU load ({system_load.cpu_percent:.1f}%), preferring non-local runtime"
             )
             constraints.prefer_local = False
 
         if system_load.memory_percent > self._load_threshold_memory:
             logger.info(
-                f"High memory pressure ({system_load.memory_percent:.1f}%), "
-                "requiring isolation"
+                f"High memory pressure ({system_load.memory_percent:.1f}%), requiring isolation"
             )
             constraints.needs_isolation = True
 
@@ -507,6 +506,7 @@ class RuntimeSelector:
 
         # Platform check (Linux only)
         import platform
+
         if platform.system() != "Linux":
             score = 0
             reasons = ["Linux only"]

@@ -19,9 +19,9 @@ import os
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from datetime import datetime
-from enum import Enum
+from enum import StrEnum
 from pathlib import Path
-from typing import Any, Protocol
+from typing import Any
 
 logger = logging.getLogger("titan.tools.image_gen")
 
@@ -31,15 +31,17 @@ logger = logging.getLogger("titan.tools.image_gen")
 # ============================================================================
 
 
-class ImageFormat(str, Enum):
+class ImageFormat(StrEnum):
     """Output image format."""
+
     PNG = "png"
     JPEG = "jpeg"
     WEBP = "webp"
 
 
-class ImageSize(str, Enum):
+class ImageSize(StrEnum):
     """Predefined image sizes."""
+
     SMALL = "256x256"
     MEDIUM = "512x512"
     LARGE = "1024x1024"
@@ -229,16 +231,22 @@ class StableDiffusionBackend(ImageBackend):
     @property
     def supported_sizes(self) -> list[str]:
         return [
-            "256x256", "512x512", "768x768", "1024x1024",
-            "512x768", "768x512", "1024x768", "768x1024",
+            "256x256",
+            "512x512",
+            "768x768",
+            "1024x1024",
+            "512x768",
+            "768x512",
+            "1024x768",
+            "768x1024",
         ]
 
     def _get_pipeline(self) -> Any:
         """Get or create the diffusion pipeline."""
         if self._pipeline is None:
             try:
-                from diffusers import StableDiffusionPipeline, StableDiffusionXLPipeline
                 import torch
+                from diffusers import StableDiffusionPipeline, StableDiffusionXLPipeline
 
                 # Determine device
                 if self.device == "auto":
@@ -252,22 +260,25 @@ class StableDiffusionBackend(ImageBackend):
                     device = self.device
 
                 # Load appropriate pipeline
+                pipeline: Any
                 if "xl" in self.model_id.lower():
-                    self._pipeline = StableDiffusionXLPipeline.from_pretrained(
+                    pipeline = StableDiffusionXLPipeline.from_pretrained(
                         self.model_id,
                         torch_dtype=torch.float16 if device != "cpu" else torch.float32,
                     )
                 else:
-                    self._pipeline = StableDiffusionPipeline.from_pretrained(
+                    pipeline = StableDiffusionPipeline.from_pretrained(
                         self.model_id,
                         torch_dtype=torch.float16 if device != "cpu" else torch.float32,
                     )
 
-                self._pipeline = self._pipeline.to(device)
+                pipeline = pipeline.to(device)
 
                 # Enable memory optimizations
                 if device == "cuda":
-                    self._pipeline.enable_attention_slicing()
+                    pipeline.enable_attention_slicing()
+
+                self._pipeline = pipeline
 
                 logger.info(f"Loaded Stable Diffusion pipeline on {device}")
 
@@ -307,6 +318,7 @@ class StableDiffusionBackend(ImageBackend):
     async def _generate_local(self, request: ImageRequest) -> ImageGenerationResult:
         """Generate using local pipeline."""
         import time
+
         import torch
 
         start_time = time.time()
@@ -337,15 +349,17 @@ class StableDiffusionBackend(ImageBackend):
             pil_image.save(buffer, format=request.output_format.value.upper())
             image_data = buffer.getvalue()
 
-            images.append(GeneratedImage(
-                data=image_data,
-                format=request.output_format,
-                width=request.width,
-                height=request.height,
-                seed=request.seed,
-                prompt=request.prompt,
-                model=self.name,
-            ))
+            images.append(
+                GeneratedImage(
+                    data=image_data,
+                    format=request.output_format,
+                    width=request.width,
+                    height=request.height,
+                    seed=request.seed,
+                    prompt=request.prompt,
+                    model=self.name,
+                )
+            )
 
         return ImageGenerationResult(
             images=images,
@@ -356,6 +370,7 @@ class StableDiffusionBackend(ImageBackend):
     async def _generate_api(self, request: ImageRequest) -> ImageGenerationResult:
         """Generate using API service."""
         import time
+
         import httpx
 
         start_time = time.time()
@@ -394,15 +409,17 @@ class StableDiffusionBackend(ImageBackend):
         images = []
         for artifact in data.get("artifacts", []):
             image_data = base64.b64decode(artifact["base64"])
-            images.append(GeneratedImage(
-                data=image_data,
-                format=request.output_format,
-                width=request.width,
-                height=request.height,
-                seed=artifact.get("seed"),
-                prompt=request.prompt,
-                model=self.name,
-            ))
+            images.append(
+                GeneratedImage(
+                    data=image_data,
+                    format=request.output_format,
+                    width=request.width,
+                    height=request.height,
+                    seed=artifact.get("seed"),
+                    prompt=request.prompt,
+                    model=self.name,
+                )
+            )
 
         return ImageGenerationResult(
             images=images,
@@ -507,14 +524,16 @@ class DallEBackend(ImageBackend):
             images = []
             for item in data.get("data", []):
                 image_data = base64.b64decode(item["b64_json"])
-                images.append(GeneratedImage(
-                    data=image_data,
-                    format=ImageFormat.PNG,
-                    width=request.width,
-                    height=request.height,
-                    prompt=item.get("revised_prompt", request.prompt),
-                    model=self.name,
-                ))
+                images.append(
+                    GeneratedImage(
+                        data=image_data,
+                        format=ImageFormat.PNG,
+                        width=request.width,
+                        height=request.height,
+                        prompt=item.get("revised_prompt", request.prompt),
+                        model=self.name,
+                    )
+                )
 
             # Estimate cost
             cost = self._estimate_cost(request.size, len(images))
@@ -605,8 +624,12 @@ class ImageGenerationTool:
         openai_key = os.environ.get("OPENAI_API_KEY")  # allow-secret
         if openai_key:
             self._backends["dall-e"] = DallEBackend(api_key=openai_key)  # allow-secret
-            self._backends["dall-e-3"] = DallEBackend(api_key=openai_key, model="dall-e-3")  # allow-secret
-            self._backends["dall-e-2"] = DallEBackend(api_key=openai_key, model="dall-e-2")  # allow-secret
+            self._backends["dall-e-3"] = DallEBackend(
+                api_key=openai_key, model="dall-e-3"  # allow-secret
+            )  # allow-secret
+            self._backends["dall-e-2"] = DallEBackend(
+                api_key=openai_key, model="dall-e-2"  # allow-secret
+            )  # allow-secret
 
         # Stable Diffusion (local - lazy loaded)
         self._backends["stable-diffusion"] = StableDiffusionBackend()

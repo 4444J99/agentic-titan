@@ -17,10 +17,10 @@ import re
 from dataclasses import dataclass, field
 from typing import Any
 
-from agents.framework.base_agent import BaseAgent
-from agents.personas import think
 from adapters.base import LLMMessage
 from adapters.router import get_router
+from agents.framework.base_agent import BaseAgent
+from agents.personas import think
 
 logger = logging.getLogger("titan.agents.paper2code")
 
@@ -109,7 +109,10 @@ class Paper2CodeAgent(BaseAgent):
         self.target_language = target_language
         self.include_tests = include_tests
 
-        self.result: Paper2CodeResult | None = None
+        self.result: Paper2CodeResult = Paper2CodeResult(
+            paper_title="",
+            algorithms_found=0,
+        )
         self._router = get_router()
 
         # Extracted data
@@ -206,7 +209,11 @@ class Paper2CodeAgent(BaseAgent):
         if self._hive_mind and self.result:
             for algo in self._algorithms:
                 await self.remember(
-                    content=f"Algorithm: {algo.name}\n{algo.description}\nFrom paper: {self._paper_title}",
+                    content=(
+                        f"Algorithm: {algo.name}\n"
+                        f"{algo.description}\n"
+                        f"From paper: {self._paper_title}"
+                    ),
                     importance=0.7,
                     tags=["algorithm", "paper2code", self.target_language],
                     metadata={
@@ -222,12 +229,13 @@ class Paper2CodeAgent(BaseAgent):
 
     async def _analyze_paper_structure(self) -> None:
         """Analyze the paper structure and extract sections."""
+        paper_excerpt = self.paper_content[:8000] if self.paper_content else ""
         messages = [
             LLMMessage(
                 role="user",
                 content=f"""Analyze this research paper and extract its structure:
 
-{self.paper_content[:8000]}
+{paper_excerpt}
 
 Provide:
 1. Paper title
@@ -274,12 +282,13 @@ ALGORITHMS:
 
     async def _extract_algorithms(self) -> None:
         """Extract algorithms from the paper."""
+        paper_excerpt = self.paper_content[:10000] if self.paper_content else ""
         messages = [
             LLMMessage(
                 role="user",
                 content=f"""Extract all algorithms from this research paper:
 
-{self.paper_content[:10000]}
+{paper_excerpt}
 
 For each algorithm, provide:
 1. Name
@@ -302,7 +311,10 @@ COMPLEXITY: [complexity if known]
 
         response = await self._router.complete(
             messages,
-            system="You are an expert at extracting algorithms from research papers. Be thorough and accurate.",
+            system=(
+                "You are an expert at extracting algorithms from research papers. "
+                "Be thorough and accurate."
+            ),
             max_tokens=2000,
         )
 
@@ -322,7 +334,9 @@ COMPLEXITY: [complexity if known]
             if desc_match:
                 algo.description = desc_match.group(1).strip()
 
-            pseudo_match = re.search(r"PSEUDOCODE:\s*(.+?)(?:INPUTS|OUTPUTS|COMPLEXITY|$)", block, re.DOTALL)
+            pseudo_match = re.search(
+                r"PSEUDOCODE:\s*(.+?)(?:INPUTS|OUTPUTS|COMPLEXITY|$)", block, re.DOTALL
+            )
             if pseudo_match:
                 algo.pseudocode = pseudo_match.group(1).strip()
 
@@ -346,10 +360,11 @@ COMPLEXITY: [complexity if known]
         messages = [
             LLMMessage(
                 role="user",
-                content=f"""Based on these algorithms, list the {self.target_language} dependencies needed:
+                content=f"""Based on these algorithms, list the {self.target_language}
+dependencies needed:
 
 Algorithms:
-{chr(10).join(f'- {a.name}: {a.description}' for a in self._algorithms)}
+{chr(10).join(f"- {a.name}: {a.description}" for a in self._algorithms)}
 
 List only package names, one per line.
 Common packages to consider: numpy, scipy, torch, tensorflow, sklearn, networkx, etc.""",
@@ -387,8 +402,8 @@ Description: {algo.description}
 Pseudocode:
 {algo.pseudocode}
 
-Inputs: {', '.join(algo.inputs)}
-Outputs: {', '.join(algo.outputs)}
+Inputs: {", ".join(algo.inputs)}
+Outputs: {", ".join(algo.outputs)}
 
 Requirements:
 - Clean, documented code
@@ -402,7 +417,10 @@ Return only the code.""",
 
         response = await self._router.complete(
             messages,
-            system=f"You are an expert {self.target_language} developer specializing in algorithm implementation.",
+            system=(
+                f"You are an expert {self.target_language} developer specializing in "
+                "algorithm implementation."
+            ),
             max_tokens=2000,
         )
 
@@ -429,7 +447,7 @@ Return only the code.""",
                 role="user",
                 content=f"""Write tests for these algorithm implementations:
 
-Algorithms: {', '.join(algo_names)}
+Algorithms: {", ".join(algo_names)}
 
 Write pytest tests that:
 1. Test basic functionality

@@ -11,17 +11,16 @@ Executes agents as serverless functions on OpenFaaS. Best for:
 from __future__ import annotations
 
 import asyncio
-import json
 import logging
 from datetime import datetime
 from typing import Any
 
 from runtime.base import (
-    Runtime,
-    RuntimeType,
-    RuntimeConfig,
     AgentProcess,
     ProcessState,
+    Runtime,
+    RuntimeConfig,
+    RuntimeType,
 )
 
 logger = logging.getLogger("titan.runtime.openfaas")
@@ -270,10 +269,12 @@ class OpenFaaSRuntime(Runtime):
     async def health_check(self) -> dict[str, Any]:
         """Check OpenFaaS runtime health."""
         base = await super().health_check()
-        base.update({
-            "openfaas_available": self._openfaas_available,
-            "gateway_url": self._gateway_url,
-        })
+        base.update(
+            {
+                "openfaas_available": self._openfaas_available,
+                "gateway_url": self._gateway_url,
+            }
+        )
         return base
 
     async def deploy_function(
@@ -345,10 +346,7 @@ class OpenFaaSRuntime(Runtime):
                 if response.status_code == 200:
                     functions = response.json()
                     # Filter to Titan functions
-                    return [
-                        f for f in functions
-                        if f.get("labels", {}).get("titan.agent")
-                    ]
+                    return [f for f in functions if f.get("labels", {}).get("titan.agent")]
 
         except Exception as e:
             logger.debug(f"Failed to list functions: {e}")

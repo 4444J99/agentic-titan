@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
 from titan.knowledge.lexicon import (
@@ -39,7 +39,7 @@ class LearningProposal:
     interaction_rules: list[InteractionRule] = field(default_factory=list)
     confidence: float = 0.0
     evidence: list[str] = field(default_factory=list)
-    timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    timestamp: datetime = field(default_factory=lambda: datetime.now(UTC))
     status: str = "pending"  # pending, approved, rejected
 
     def to_dict(self) -> dict[str, Any]:
@@ -170,10 +170,7 @@ class LexiconLearner:
         evidence: list[str],
     ) -> LearningProposal:
         """Create a proposal to update an existing entry."""
-        updated_notes = (
-            f"{existing.notes}\n\n"
-            f"[Agent {self._agent_id} observation]: {new_notes}"
-        )
+        updated_notes = f"{existing.notes}\n\n[Agent {self._agent_id} observation]: {new_notes}"
 
         proposal = LearningProposal(
             agent_id=self._agent_id,
@@ -266,35 +263,52 @@ class LexiconLearner:
 
         keywords_map = {
             InteractionType.STIGMERGIC: [
-                "environment", "trace", "pheromone", "indirect", "modify surroundings"
+                "environment",
+                "trace",
+                "pheromone",
+                "indirect",
+                "modify surroundings",
             ],
             InteractionType.TOPOLOGICAL_NEIGHBOR: [
-                "neighbor", "nearest", "local", "adjacent", "proximity"
+                "neighbor",
+                "nearest",
+                "local",
+                "adjacent",
+                "proximity",
             ],
             InteractionType.HIERARCHICAL: [
-                "hierarchy", "command", "leader", "tree", "top-down", "authority"
+                "hierarchy",
+                "command",
+                "leader",
+                "tree",
+                "top-down",
+                "authority",
             ],
             InteractionType.RHIZOMATIC: [
-                "network", "decentralized", "horizontal", "any-to-any", "distributed"
+                "network",
+                "decentralized",
+                "horizontal",
+                "any-to-any",
+                "distributed",
             ],
             InteractionType.VOTING: [
-                "vote", "consensus", "majority", "deliberate", "decide together"
+                "vote",
+                "consensus",
+                "majority",
+                "deliberate",
+                "decide together",
             ],
-            InteractionType.SIGNALING: [
-                "signal", "communicate", "message", "broadcast", "inform"
-            ],
-            InteractionType.TERRITORIAL: [
-                "territory", "boundary", "domain", "region", "zone"
-            ],
-            InteractionType.PHEROMONE: [
-                "trail", "mark", "scent", "deposit", "evaporate"
-            ],
+            InteractionType.SIGNALING: ["signal", "communicate", "message", "broadcast", "inform"],
+            InteractionType.TERRITORIAL: ["territory", "boundary", "domain", "region", "zone"],
+            InteractionType.PHEROMONE: ["trail", "mark", "scent", "deposit", "evaporate"],
             InteractionType.SELF_ASSEMBLY: [
-                "emerge", "spontaneous", "self-organize", "bottom-up", "local rules"
+                "emerge",
+                "spontaneous",
+                "self-organize",
+                "bottom-up",
+                "local rules",
             ],
-            InteractionType.ALLELOMIMETIC: [
-                "copy", "imitate", "follow", "mimic", "herd"
-            ],
+            InteractionType.ALLELOMIMETIC: ["copy", "imitate", "follow", "mimic", "herd"],
         }
 
         best_type: InteractionType | None = None
@@ -321,25 +335,58 @@ class LexiconLearner:
 
         category_keywords = {
             LexiconCategory.INORGANIC_PHYSICS: [
-                "gravity", "particle", "physics", "force", "material", "granular"
+                "gravity",
+                "particle",
+                "physics",
+                "force",
+                "material",
+                "granular",
             ],
             LexiconCategory.BIOLOGICAL_SUPERORGANISM: [
-                "cell", "organism", "colony", "gene", "evolution", "biological"
+                "cell",
+                "organism",
+                "colony",
+                "gene",
+                "evolution",
+                "biological",
             ],
             LexiconCategory.ANIMAL_ETHOLOGY: [
-                "flock", "herd", "animal", "bird", "swarm", "prey", "predator"
+                "flock",
+                "herd",
+                "animal",
+                "bird",
+                "swarm",
+                "prey",
+                "predator",
             ],
             LexiconCategory.HUMAN_ORGANIZATION: [
-                "organization", "company", "government", "team", "crowd", "society"
+                "organization",
+                "company",
+                "government",
+                "team",
+                "crowd",
+                "society",
             ],
             LexiconCategory.PHILOSOPHICAL_ASSEMBLAGE: [
-                "assemblage", "network", "actor", "rhizome", "territory"
+                "assemblage",
+                "network",
+                "actor",
+                "rhizome",
+                "territory",
             ],
             LexiconCategory.DIGITAL_ALGORITHMIC: [
-                "algorithm", "digital", "software", "optimization", "robot", "ai"
+                "algorithm",
+                "digital",
+                "software",
+                "optimization",
+                "robot",
+                "ai",
             ],
             LexiconCategory.ASSEMBLY_THEORY: [
-                "assembly index", "complexity", "selection", "history"
+                "assembly index",
+                "complexity",
+                "selection",
+                "history",
             ],
         }
 

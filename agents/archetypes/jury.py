@@ -16,16 +16,16 @@ from __future__ import annotations
 import asyncio
 import logging
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
-from enum import Enum
+from datetime import UTC, datetime
+from enum import StrEnum
 from typing import Any
 
-from agents.framework.base_agent import BaseAgent, AgentState
+from agents.framework.base_agent import AgentState, BaseAgent
 
 logger = logging.getLogger("titan.agents.jury")
 
 
-class VerdictType(str, Enum):
+class VerdictType(StrEnum):
     """Types of verdicts a jury can reach."""
 
     APPROVED = "approved"
@@ -35,7 +35,7 @@ class VerdictType(str, Enum):
     PENDING = "pending"
 
 
-class DeliberationPhase(str, Enum):
+class DeliberationPhase(StrEnum):
     """Phases of jury deliberation."""
 
     EVIDENCE_PRESENTATION = "evidence_presentation"
@@ -65,7 +65,7 @@ class JurorVote:
     vote: VerdictType
     confidence: float = 1.0
     reasoning: str = ""
-    timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    timestamp: datetime = field(default_factory=lambda: datetime.now(UTC))
 
 
 @dataclass
@@ -121,12 +121,15 @@ class JuryAgent(BaseAgent):
             **kwargs: Base agent arguments.
         """
         kwargs.setdefault("name", "jury")
-        kwargs.setdefault("capabilities", [
-            "evidence_evaluation",
-            "deliberation",
-            "voting",
-            "consensus_building",
-        ])
+        kwargs.setdefault(
+            "capabilities",
+            [
+                "evidence_evaluation",
+                "deliberation",
+                "voting",
+                "consensus_building",
+            ],
+        )
         super().__init__(**kwargs)
 
         self._is_foreperson = is_foreperson
@@ -159,7 +162,7 @@ class JuryAgent(BaseAgent):
 
     async def _foreperson_work(self) -> dict[str, Any]:
         """Foreperson coordinates the deliberation process."""
-        result = {
+        result: dict[str, Any] = {
             "role": "foreperson",
             "verdict": VerdictType.PENDING.value,
             "phases_completed": [],
@@ -201,7 +204,7 @@ class JuryAgent(BaseAgent):
 
     async def _juror_work(self) -> dict[str, Any]:
         """Individual juror participates in deliberation."""
-        result = {
+        result: dict[str, Any] = {
             "role": "juror",
             "voted": False,
             "contributions": [],
@@ -254,10 +257,9 @@ class JuryAgent(BaseAgent):
         if self._hive_mind and self._peer_jurors:
             summary = self._format_evidence_summary()
             await self._hive_mind.broadcast(
-                content=summary,
+                source_agent_id=self.agent_id,
+                message={"content": summary, "importance": 0.9},
                 topic="jury_evidence",
-                importance=0.9,
-                sender_id=self.agent_id,
             )
 
     def _format_evidence_summary(self) -> str:
@@ -272,12 +274,8 @@ class JuryAgent(BaseAgent):
 
     async def _evaluate_evidence(self) -> dict[str, Any]:
         """Evaluate evidence and form initial opinion."""
-        supporting_weight = sum(
-            e.weight for e in self._deliberation.evidence if e.supporting
-        )
-        opposing_weight = sum(
-            e.weight for e in self._deliberation.evidence if not e.supporting
-        )
+        supporting_weight = sum(e.weight for e in self._deliberation.evidence if e.supporting)
+        opposing_weight = sum(e.weight for e in self._deliberation.evidence if not e.supporting)
         total = supporting_weight + opposing_weight
 
         if total == 0:
@@ -301,11 +299,15 @@ class JuryAgent(BaseAgent):
         # Request input from all jurors
         if self._hive_mind and self._peer_jurors:
             await self._hive_mind.broadcast(
-                content=f"Deliberation round {self._deliberation.rounds_completed + 1}: "
-                        "Please share your thoughts on the evidence.",
+                source_agent_id=self.agent_id,
+                message={
+                    "content": (
+                        f"Deliberation round {self._deliberation.rounds_completed + 1}: "
+                        "Please share your thoughts on the evidence."
+                    ),
+                    "importance": 0.8,
+                },
                 topic="jury_discussion",
-                importance=0.8,
-                sender_id=self.agent_id,
             )
 
             # Wait for responses
@@ -315,7 +317,7 @@ class JuryAgent(BaseAgent):
         """Contribute to jury discussion."""
         evaluation = await self._evaluate_evidence()
 
-        contribution = {
+        contribution: dict[str, Any] = {
             "juror_id": self.agent_id,
             "round": self._deliberation.rounds_completed,
             "position": evaluation["initial_lean"],
@@ -323,10 +325,7 @@ class JuryAgent(BaseAgent):
         }
 
         # Identify key evidence points
-        strong_evidence = [
-            e for e in self._deliberation.evidence
-            if e.weight >= 1.5
-        ]
+        strong_evidence = [e for e in self._deliberation.evidence if e.weight >= 1.5]
         for ev in strong_evidence[:3]:
             contribution["key_points"].append(ev.description)
 
@@ -342,7 +341,10 @@ class JuryAgent(BaseAgent):
 
         # Check if positions are converging
         if len(self._deliberation.discussion_points) >= len(self._peer_jurors) + 1:
-            positions = [d["position"] for d in self._deliberation.discussion_points[-len(self._peer_jurors):]]
+            positions = [
+                str(d["position"])
+                for d in self._deliberation.discussion_points[-len(self._peer_jurors) :]
+            ]
             if len(set(positions)) == 1:
                 return True  # All agree
 
@@ -357,10 +359,12 @@ class JuryAgent(BaseAgent):
         # Request votes
         if self._hive_mind and self._peer_jurors:
             await self._hive_mind.broadcast(
-                content="Please cast your vote: APPROVED or REJECTED",
+                source_agent_id=self.agent_id,
+                message={
+                    "content": "Please cast your vote: APPROVED or REJECTED",
+                    "importance": 0.95,
+                },
                 topic="jury_vote",
-                importance=0.95,
-                sender_id=self.agent_id,
             )
 
         # Foreperson also votes
@@ -386,9 +390,15 @@ class JuryAgent(BaseAgent):
         opposing = [e.description for e in self._deliberation.evidence if not e.supporting]
 
         if vote_type == VerdictType.APPROVED:
-            reasoning = f"Supporting evidence ({len(supporting)} items) outweighs opposing ({len(opposing)} items)"
+            reasoning = (
+                f"Supporting evidence ({len(supporting)} items) "
+                f"outweighs opposing ({len(opposing)} items)"
+            )
         else:
-            reasoning = f"Opposing evidence ({len(opposing)} items) outweighs supporting ({len(supporting)} items)"
+            reasoning = (
+                f"Opposing evidence ({len(opposing)} items) "
+                f"outweighs supporting ({len(supporting)} items)"
+            )
 
         vote = JurorVote(
             juror_id=self.agent_id,

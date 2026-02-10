@@ -4,10 +4,9 @@ Tests for RLHF Evaluation Suite (Phase 18A)
 
 import pytest
 
-from titan.learning.preference_pairs import PreferencePair, PreferencePairDataset
 from titan.learning.eval_suite import (
-    EvalResult,
     EvalReport,
+    EvalResult,
     RLHFEvalSuite,
     get_eval_suite,
 )
@@ -208,7 +207,10 @@ class TestRLHFEvalSuite:
         responses = [
             "Short.",
             "This is a medium length response with more words.",
-            "This is a longer response that provides more detail and explanation about the topic at hand.",
+            (
+                "This is a longer response that provides more detail and "
+                "explanation about the topic at hand."
+            ),
         ]
 
         result = eval_suite.length_analysis(responses)
@@ -244,8 +246,11 @@ class TestRLHFEvalSuite:
         prompts = ["Q1?", "Q2?", "Q3?"]
 
         report = eval_suite.full_eval(
-            "good-model", "poor-model",
-            good_model, poor_baseline, prompts,
+            "good-model",
+            "poor-model",
+            good_model,
+            poor_baseline,
+            prompts,
         )
 
         assert "recommendation" in report.to_dict()

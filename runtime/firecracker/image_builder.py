@@ -9,7 +9,6 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
-import shutil
 import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -82,9 +81,7 @@ class ImageBuilder:
         Returns:
             ImageInfo with kernel details
         """
-        output_path = output_path or str(
-            Path(self._config.output_dir) / self._config.kernel_name
-        )
+        output_path = output_path or str(Path(self._config.output_dir) / self._config.kernel_name)
 
         # Check if already exists
         if os.path.exists(output_path):
@@ -126,9 +123,7 @@ class ImageBuilder:
         """
         base = base or self._config.base_image
         packages = packages or self._config.packages
-        output_path = output_path or str(
-            Path(self._config.output_dir) / self._config.rootfs_name
-        )
+        output_path = output_path or str(Path(self._config.output_dir) / self._config.rootfs_name)
 
         # Check if already exists
         if os.path.exists(output_path):
@@ -288,10 +283,8 @@ exec /bin/sh
     def _get_kernel_url(self) -> str:
         """Get URL for prebuilt kernel."""
         # Firecracker team provides prebuilt kernels
-        version = self._config.kernel_version
         return (
-            f"https://s3.amazonaws.com/spec.ccfc.min/img/quickstart_guide/"
-            f"x86_64/kernels/vmlinux.bin"
+            "https://s3.amazonaws.com/spec.ccfc.min/img/quickstart_guide/x86_64/kernels/vmlinux.bin"
         )
 
     async def _download_file(self, url: str, output_path: str) -> None:

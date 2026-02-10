@@ -1,6 +1,5 @@
 """Tests for complete war machine operations (Phase 16B)."""
 
-import asyncio
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -8,7 +7,6 @@ import pytest
 from hive.machines import (
     MachineDynamics,
     MachineOperation,
-    MachineState,
     MachineType,
     OperationType,
 )
@@ -98,7 +96,9 @@ class TestWarMachineOperations:
         assert dynamics._state.striation_level < 0.5  # Reduced
 
     @pytest.mark.asyncio
-    async def test_smooth_operation_specific_territory(self, dynamics, mock_topology_with_territories):
+    async def test_smooth_operation_specific_territory(
+        self, dynamics, mock_topology_with_territories
+    ):
         """Test smooth operation on specific territory."""
         operation = await dynamics.smooth_operation(territory_id="territory_1")
 
@@ -137,7 +137,9 @@ class TestWarMachineOperations:
         assert "escape_vector" in operation.metadata
 
     @pytest.mark.asyncio
-    async def test_line_of_flight_updates_escape_rate(self, dynamics, mock_topology_with_territories):
+    async def test_line_of_flight_updates_escape_rate(
+        self, dynamics, mock_topology_with_territories
+    ):
         """Test line of flight updates escape rate."""
         mock_topology_with_territories.initiate_line_of_flight = MagicMock(return_value=True)
 
@@ -172,7 +174,9 @@ class TestWarMachineOperations:
         # Check that fixed_position was removed from metadata
         for node in mock_deterritorialized_topology.nodes.values():
             # The pop should have been called
-            assert "fixed_position" not in node.metadata or node.metadata.get("fixed_position") is None
+            assert (
+                "fixed_position" not in node.metadata or node.metadata.get("fixed_position") is None
+            )
 
     @pytest.mark.asyncio
     async def test_nomadize_specific_agents(self, dynamics, mock_deterritorialized_topology):
@@ -226,7 +230,6 @@ class TestWarMachineOperations:
     @pytest.mark.asyncio
     async def test_war_operations_affect_balance(self, dynamics):
         """Test war operations shift balance toward war machine."""
-        initial_balance = dynamics._state.balance
 
         await dynamics.smooth_operation()
         await dynamics.nomadize_operation()

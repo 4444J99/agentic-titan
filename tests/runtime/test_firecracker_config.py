@@ -2,9 +2,6 @@
 Tests for Firecracker Configuration (Phase 18B)
 """
 
-import pytest
-import os
-
 
 class TestFirecrackerConfig:
     """Tests for FirecrackerConfig."""
@@ -12,6 +9,7 @@ class TestFirecrackerConfig:
     def test_import(self):
         """Test that config can be imported."""
         from runtime.firecracker.config import FirecrackerConfig, VMState
+
         assert FirecrackerConfig is not None
         assert VMState is not None
 

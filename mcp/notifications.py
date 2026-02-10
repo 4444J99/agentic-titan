@@ -12,18 +12,18 @@ to deliver real-time updates to MCP clients about:
 from __future__ import annotations
 
 import asyncio
-import json
 import logging
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from datetime import datetime
-from enum import Enum
-from typing import Any, Callable, Awaitable
+from enum import StrEnum
+from typing import Any
 from uuid import uuid4
 
 logger = logging.getLogger("titan.mcp.notifications")
 
 
-class NotificationType(str, Enum):
+class NotificationType(StrEnum):
     """Types of MCP notifications."""
 
     # Agent notifications
@@ -157,15 +157,15 @@ class NotificationManager:
     async def _connect_event_bus(self) -> None:
         """Connect to the Hive event bus for automatic notifications."""
         try:
-            from hive.events import get_event_bus, EventType
+            from hive.events import EventType, get_event_bus
 
             event_bus = get_event_bus()
 
             # Map event types to notification types
             event_mappings: dict[EventType, NotificationType] = {
-                EventType.AGENT_STARTED: NotificationType.AGENT_SPAWNED,
-                EventType.AGENT_COMPLETED: NotificationType.AGENT_COMPLETED,
-                EventType.AGENT_FAILED: NotificationType.AGENT_FAILED,
+                EventType.AGENT_JOINED: NotificationType.AGENT_SPAWNED,
+                EventType.AGENT_LEFT: NotificationType.AGENT_COMPLETED,
+                EventType.TASK_FAILED: NotificationType.AGENT_FAILED,
                 EventType.TOPOLOGY_CHANGED: NotificationType.TOPOLOGY_CHANGED,
                 EventType.TASK_STARTED: NotificationType.INQUIRY_STARTED,
                 EventType.TASK_COMPLETED: NotificationType.INQUIRY_COMPLETED,
@@ -174,9 +174,7 @@ class NotificationManager:
             # Subscribe to relevant events
             for event_type, notif_type in event_mappings.items():
 
-                async def handler(
-                    event: Any, nt: NotificationType = notif_type
-                ) -> None:
+                async def handler(event: Any, nt: NotificationType = notif_type) -> None:
                     await self.notify(
                         nt,
                         {
@@ -274,9 +272,7 @@ class NotificationManager:
             tasks = [self._safe_dispatch(h, notification) for h in handlers]
             await asyncio.gather(*tasks, return_exceptions=True)
 
-        logger.debug(
-            f"Notification {notification_type.value} sent to {len(handlers)} handlers"
-        )
+        logger.debug(f"Notification {notification_type.value} sent to {len(handlers)} handlers")
 
         return notification
 
@@ -312,9 +308,7 @@ class NotificationManager:
 
         # Filter by type
         if notification_type:
-            notifications = [
-                n for n in notifications if n.notification_type == notification_type
-            ]
+            notifications = [n for n in notifications if n.notification_type == notification_type]
 
         # Filter by time
         if since:

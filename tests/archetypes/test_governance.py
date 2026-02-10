@@ -4,10 +4,9 @@ from __future__ import annotations
 
 import pytest
 
-from agents.archetypes.jury import JuryAgent
-from agents.archetypes.government import ExecutiveAgent, LegislativeAgent, JudicialAgent
 from agents.archetypes.bureaucracy import BureaucracyAgent
-from agents.framework.base_agent import AgentState
+from agents.archetypes.government import ExecutiveAgent, JudicialAgent, LegislativeAgent
+from agents.archetypes.jury import JuryAgent
 
 
 class TestJuryAgent:

@@ -10,8 +10,9 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from collections.abc import AsyncGenerator, Callable
 from datetime import datetime, timedelta
-from typing import TYPE_CHECKING, Any, AsyncGenerator, Callable
+from typing import TYPE_CHECKING, Any, Protocol, cast
 from uuid import UUID, uuid4
 
 from titan.batch.models import (
@@ -31,6 +32,18 @@ if TYPE_CHECKING:
     from titan.persistence.postgres import PostgresClient
 
 logger = logging.getLogger("titan.batch.orchestrator")
+
+
+class _CeleryAsyncResultLike(Protocol):
+    """Minimal task-result surface used by the orchestrator."""
+
+    id: str
+
+
+class _CeleryTaskLike(Protocol):
+    """Minimal Celery task surface used by the orchestrator."""
+
+    def delay(self, *args: Any, **kwargs: Any) -> _CeleryAsyncResultLike: ...
 
 
 class BatchOrchestrator:
@@ -89,7 +102,7 @@ class BatchOrchestrator:
         self._on_session_completed: list[Callable[[BatchJob, QueuedSession], None]] = []
 
         # Background tasks
-        self._monitoring_tasks: dict[UUID, asyncio.Task] = {}
+        self._monitoring_tasks: dict[UUID, asyncio.Task[Any]] = {}
         self._initialized = False
 
         logger.info("Batch orchestrator initialized")
@@ -107,6 +120,7 @@ class BatchOrchestrator:
         if self._postgres is None:
             try:
                 from titan.persistence.postgres import get_postgres_client
+
                 self._postgres = get_postgres_client()
                 await self._postgres.connect()
             except Exception as e:
@@ -150,24 +164,28 @@ class BatchOrchestrator:
                 # Reconstruct BatchJob
                 sessions = []
                 for sess_row in session_rows:
-                    sessions.append(QueuedSession(
-                        id=UUID(sess_row["id"]) if isinstance(sess_row["id"], str) else sess_row["id"],
-                        batch_id=batch_id,
-                        topic=sess_row["topic"],
-                        status=SessionQueueStatus(sess_row["status"]),
-                        worker_id=sess_row.get("worker_id"),
-                        celery_task_id=sess_row.get("celery_task_id"),
-                        artifact_uri=sess_row.get("artifact_uri"),
-                        inquiry_session_id=sess_row.get("inquiry_session_id"),
-                        tokens_used=sess_row.get("tokens_used", 0),
-                        cost_usd=sess_row.get("cost_usd", 0.0),
-                        retry_count=sess_row.get("retry_count", 0),
-                        error=sess_row.get("error"),
-                        created_at=sess_row["created_at"],
-                        started_at=sess_row.get("started_at"),
-                        completed_at=sess_row.get("completed_at"),
-                        metadata=sess_row.get("metadata", {}),
-                    ))
+                    sessions.append(
+                        QueuedSession(
+                            id=UUID(sess_row["id"])
+                            if isinstance(sess_row["id"], str)
+                            else sess_row["id"],
+                            batch_id=batch_id,
+                            topic=sess_row["topic"],
+                            status=SessionQueueStatus(sess_row["status"]),
+                            worker_id=sess_row.get("worker_id"),
+                            celery_task_id=sess_row.get("celery_task_id"),
+                            artifact_uri=sess_row.get("artifact_uri"),
+                            inquiry_session_id=sess_row.get("inquiry_session_id"),
+                            tokens_used=sess_row.get("tokens_used", 0),
+                            cost_usd=sess_row.get("cost_usd", 0.0),
+                            retry_count=sess_row.get("retry_count", 0),
+                            error=sess_row.get("error"),
+                            created_at=sess_row["created_at"],
+                            started_at=sess_row.get("started_at"),
+                            completed_at=sess_row.get("completed_at"),
+                            metadata=sess_row.get("metadata", {}),
+                        )
+                    )
 
                 batch = BatchJob(
                     id=batch_id,
@@ -226,10 +244,7 @@ class BatchOrchestrator:
         # Validate workflow
         workflow = get_workflow(request.workflow)
         if not workflow:
-            raise ValueError(
-                f"Unknown workflow: {request.workflow}. "
-                f"Available: {list_workflows()}"
-            )
+            raise ValueError(f"Unknown workflow: {request.workflow}. Available: {list_workflows()}")
 
         # Create batch job
         batch = BatchJob(
@@ -284,9 +299,7 @@ class BatchOrchestrator:
             raise ValueError(f"Batch not found: {batch_id}")
 
         if batch.status not in (BatchStatus.PENDING, BatchStatus.PAUSED):
-            raise ValueError(
-                f"Cannot start batch in status {batch.status.value}"
-            )
+            raise ValueError(f"Cannot start batch in status {batch.status.value}")
 
         # Mark as processing
         batch.mark_started()
@@ -338,9 +351,7 @@ class BatchOrchestrator:
             BatchStatus.CANCELLED,
             BatchStatus.FAILED,
         ):
-            raise ValueError(
-                f"Cannot cancel batch in status {batch.status.value}"
-            )
+            raise ValueError(f"Cannot cancel batch in status {batch.status.value}")
 
         # Stop monitoring
         self._stop_monitoring(batch.id)
@@ -375,9 +386,7 @@ class BatchOrchestrator:
             raise ValueError(f"Batch not found: {batch_id}")
 
         if batch.status != BatchStatus.PROCESSING:
-            raise ValueError(
-                f"Cannot pause batch in status {batch.status.value}"
-            )
+            raise ValueError(f"Cannot pause batch in status {batch.status.value}")
 
         batch.status = BatchStatus.PAUSED
         self._stop_monitoring(batch.id)
@@ -524,9 +533,7 @@ class BatchOrchestrator:
             await self._queue_pending_sessions(batch)
 
         await self._persist_batch(batch)
-        logger.info(
-            f"Session {session_id} completed: {tokens_used} tokens, ${cost_usd:.4f}"
-        )
+        logger.info(f"Session {session_id} completed: {tokens_used} tokens, ${cost_usd:.4f}")
 
     async def handle_session_failed(
         self,
@@ -554,9 +561,7 @@ class BatchOrchestrator:
             logger.warning(f"Session not found: {session_id}")
             return
 
-        logger.warning(
-            f"Session {session_id} failed (attempt {session.retry_count + 1}): {error}"
-        )
+        logger.warning(f"Session {session_id} failed (attempt {session.retry_count + 1}): {error}")
 
         # Check if should retry
         if session.retry_count < self._max_retries:
@@ -728,7 +733,7 @@ class BatchOrchestrator:
             from titan.batch.worker import run_inquiry_session_task
 
             # Submit to Celery
-            task = run_inquiry_session_task.delay(
+            task = cast(_CeleryTaskLike, run_inquiry_session_task).delay(
                 session_data={
                     "session_id": str(session.id),
                     "batch_id": str(batch.id),
@@ -750,11 +755,10 @@ class BatchOrchestrator:
     ) -> None:
         """Requeue a session for retry with exponential backoff."""
         # Calculate backoff delay
-        backoff = min(30, 2 ** session.retry_count)
+        backoff = min(30, 2**session.retry_count)
 
         logger.info(
-            f"Requeuing session {session.id} after {backoff}s "
-            f"(attempt {session.retry_count})"
+            f"Requeuing session {session.id} after {backoff}s (attempt {session.retry_count})"
         )
 
         await asyncio.sleep(backoff)
@@ -953,9 +957,7 @@ class BatchOrchestrator:
                     if session.started_at:
                         elapsed = (now - session.started_at).total_seconds()
                         if elapsed > 1800:  # 30 minutes
-                            logger.warning(
-                                f"Session {session.id} stalled after {elapsed}s"
-                            )
+                            logger.warning(f"Session {session.id} stalled after {elapsed}s")
                             await self.handle_session_failed(
                                 batch_id,
                                 session.id,
@@ -994,7 +996,6 @@ class BatchOrchestrator:
         Returns:
             List of stalled batch IDs
         """
-        from datetime import timedelta
 
         stalled = []
         cutoff = datetime.now() - timedelta(minutes=threshold_minutes)

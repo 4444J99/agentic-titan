@@ -8,8 +8,7 @@ from __future__ import annotations
 
 import logging
 import uuid
-from datetime import datetime, timezone
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Protocol, cast
 
 from titan.metrics.assembly import (
     AssemblyMetrics,
@@ -24,14 +23,25 @@ if TYPE_CHECKING:
 logger = logging.getLogger("titan.metrics.assembly_tracker")
 
 
-def _get_prometheus_metrics():
+class _PrometheusMetricsLike(Protocol):
+    """Typed surface for assembly metrics recording."""
+
+    def assembly_path_recorded(self, session_id: str, path_type: str, length: int) -> None: ...
+    def assembly_step_recorded(self, session_id: str, step_type: str) -> None: ...
+    def set_assembly_index(self, session_id: str, decision_type: str, index: int) -> None: ...
+    def set_total_assembly(self, session_id: str, value: float) -> None: ...
+    def set_selection_signal(self, session_id: str, signal: str) -> None: ...
+
+
+def _get_prometheus_metrics() -> _PrometheusMetricsLike:
     """Lazy import to avoid circular dependency.
 
     Uses the parent package's get_metrics which handles the
     shadowing of titan/metrics.py by the titan/metrics/ package.
     """
     from titan.metrics import get_metrics
-    return get_metrics()
+
+    return cast(_PrometheusMetricsLike, get_metrics())
 
 
 class AssemblyTracker:
@@ -179,10 +189,7 @@ class AssemblyTracker:
         )
 
         path.add_step(step)
-        logger.debug(
-            f"Added step {step_id} to path {path_id} "
-            f"(total steps: {path.assembly_index})"
-        )
+        logger.debug(f"Added step {step_id} to path {path_id} (total steps: {path.assembly_index})")
 
         return step
 
@@ -210,10 +217,7 @@ class AssemblyTracker:
         while len(self._metrics.paths) > self._max_paths:
             self._metrics.paths.pop(0)
 
-        logger.info(
-            f"Completed assembly path {path_id} with "
-            f"assembly index {path.assembly_index}"
-        )
+        logger.info(f"Completed assembly path {path_id} with assembly index {path.assembly_index}")
 
         return path
 
@@ -381,9 +385,7 @@ class AssemblyTracker:
         return {
             "ensemble_id": self._ensemble_id,
             "metrics": self._metrics.to_dict(),
-            "active_paths": {
-                pid: path.to_dict() for pid, path in self._active_paths.items()
-            },
+            "active_paths": {pid: path.to_dict() for pid, path in self._active_paths.items()},
             "step_counter": self._step_counter,
         }
 

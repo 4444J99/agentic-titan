@@ -9,13 +9,13 @@ from __future__ import annotations
 import logging
 import re
 from dataclasses import dataclass, field
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 logger = logging.getLogger("titan.safety.policies")
 
 
-class RiskLevel(str, Enum):
+class RiskLevel(StrEnum):
     """Risk levels for actions."""
 
     LOW = "low"
@@ -24,7 +24,7 @@ class RiskLevel(str, Enum):
     CRITICAL = "critical"
 
 
-class ActionCategory(str, Enum):
+class ActionCategory(StrEnum):
     """Categories of actions."""
 
     READ = "read"

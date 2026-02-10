@@ -3,18 +3,19 @@
 from __future__ import annotations
 
 import os
-import pytest
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
-from titan.ray import is_ray_available, RAY_AVAILABLE
-from titan.ray.config import RayConfig, get_ray_config, set_ray_config
+import pytest
+
+from titan.ray import RAY_AVAILABLE, is_ray_available
 from titan.ray.backend_selector import (
     ComputeBackend,
-    select_backend,
-    is_distributed,
     get_backend,
+    is_distributed,
     reset_backend,
+    select_backend,
 )
+from titan.ray.config import RayConfig, get_ray_config, set_ray_config
 
 
 class TestRayAvailability:
@@ -44,11 +45,14 @@ class TestRayConfig:
 
     def test_config_from_env(self):
         """Test configuration from environment variables."""
-        with patch.dict(os.environ, {
-            "RAY_ADDRESS": "ray://head:6379",
-            "RAY_NAMESPACE": "test",
-            "RAY_REPLICAS": "4",
-        }):
+        with patch.dict(
+            os.environ,
+            {
+                "RAY_ADDRESS": "ray://head:6379",
+                "RAY_NAMESPACE": "test",
+                "RAY_REPLICAS": "4",
+            },
+        ):
             config = RayConfig()
             assert config.address == "ray://head:6379"
             assert config.namespace == "test"
@@ -128,11 +132,15 @@ class TestComputeBackend:
 
     def test_select_backend_default_local(self):
         """Test default local backend selection."""
-        with patch.dict(os.environ, {
-            "TITAN_COMPUTE_BACKEND": "",
-            "TITAN_USE_RAY": "",
-            "TITAN_USE_CELERY": "",
-        }, clear=False):
+        with patch.dict(
+            os.environ,
+            {
+                "TITAN_COMPUTE_BACKEND": "",
+                "TITAN_USE_RAY": "",
+                "TITAN_USE_CELERY": "",
+            },
+            clear=False,
+        ):
             reset_backend()
             backend = select_backend()
             assert backend == ComputeBackend.LOCAL
@@ -183,5 +191,6 @@ class TestRayBackendWhenUnavailable:
         """Test that get_ray_backend raises ImportError when Ray unavailable."""
         with patch("titan.ray.RAY_AVAILABLE", False):
             from titan.ray import get_ray_backend
+
             with pytest.raises(ImportError, match="Ray is not installed"):
                 get_ray_backend()

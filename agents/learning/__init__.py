@@ -8,6 +8,12 @@ Provides:
 - Entity extraction for memory enrichment
 """
 
+from agents.learning.entity_extractor import (
+    ExtractedEntities,
+    extract_entities,
+    extract_entities_pattern,
+    extract_keywords,
+)
 from agents.learning.episodic import (
     Episode,
     EpisodeOutcome,
@@ -15,12 +21,6 @@ from agents.learning.episodic import (
     LearningSignal,
 )
 from agents.learning.learner import LearningAgent
-from agents.learning.entity_extractor import (
-    ExtractedEntities,
-    extract_entities,
-    extract_entities_pattern,
-    extract_keywords,
-)
 
 __all__ = [
     "Episode",

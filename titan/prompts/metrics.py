@@ -21,15 +21,15 @@ import logging
 import statistics
 from collections import defaultdict
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta, timezone
-from enum import Enum
+from datetime import UTC, datetime, timedelta
+from enum import StrEnum
 from typing import Any
 from uuid import UUID, uuid4
 
 logger = logging.getLogger("titan.prompts.metrics")
 
 
-class MetricAggregation(str, Enum):
+class MetricAggregation(StrEnum):
     """Aggregation methods for metrics."""
 
     MEAN = "mean"
@@ -67,7 +67,7 @@ class PromptMetrics:
     cost_usd: float = 0.0
 
     # Metadata
-    timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    timestamp: datetime = field(default_factory=lambda: datetime.now(UTC))
     prompt_variant: str = "default"  # For A/B testing
     adaptations_applied: list[str] = field(default_factory=list)
     metadata: dict[str, Any] = field(default_factory=dict)
@@ -312,7 +312,7 @@ class PromptTracker:
         efficiency_ratios = [m.efficiency_ratio for m in metrics]
         cost_efficiencies = [m.cost_efficiency for m in metrics if m.cost_efficiency > 0]
         costs = [m.cost_usd for m in metrics]
-        latencies = [m.latency_ms for m in metrics]
+        latencies = [float(m.latency_ms) for m in metrics]
 
         return AggregatedMetrics(
             stage_name=stage_name or "",
@@ -351,12 +351,17 @@ class PromptTracker:
 
         # Check if we have enough data
         if len(self._metrics) < min_samples:
-            return [OptimizationRecommendation(
-                recommendation_type="insufficient_data",
-                priority="medium",
-                description=f"Need at least {min_samples} samples for analysis. Current: {len(self._metrics)}",
-                expected_improvement="N/A",
-            )]
+            return [
+                OptimizationRecommendation(
+                    recommendation_type="insufficient_data",
+                    priority="medium",
+                    description=(
+                        f"Need at least {min_samples} samples for analysis. "
+                        f"Current: {len(self._metrics)}"
+                    ),
+                    expected_improvement="N/A",
+                )
+            ]
 
         # Analyze by stage
         stage_recommendations = self._analyze_stages(min_samples)
@@ -410,6 +415,28 @@ class PromptTracker:
         agg_a = self.get_aggregated_metrics(stage_name, None, variant_a)
         agg_b = self.get_aggregated_metrics(stage_name, None, variant_b)
 
+        quality_winner = (
+            variant_a if agg_a.avg_quality_score > agg_b.avg_quality_score else variant_b
+        )
+        efficiency_winner = (
+            variant_a if agg_a.avg_efficiency_ratio > agg_b.avg_efficiency_ratio else variant_b
+        )
+        cost_winner = variant_a if agg_a.avg_cost_usd < agg_b.avg_cost_usd else variant_b
+        quality_diff_pct = (
+            ((agg_a.avg_quality_score - agg_b.avg_quality_score) / agg_b.avg_quality_score * 100)
+            if agg_b.avg_quality_score > 0
+            else 0
+        )
+        efficiency_diff_pct = (
+            (
+                (agg_a.avg_efficiency_ratio - agg_b.avg_efficiency_ratio)
+                / agg_b.avg_efficiency_ratio
+                * 100
+            )
+            if agg_b.avg_efficiency_ratio > 0
+            else 0
+        )
+
         return {
             "variant_a": {
                 "name": variant_a,
@@ -425,13 +452,11 @@ class PromptTracker:
                 "avg_efficiency": agg_b.avg_efficiency_ratio,
                 "avg_cost": agg_b.avg_cost_usd,
             },
-            "quality_winner": variant_a if agg_a.avg_quality_score > agg_b.avg_quality_score else variant_b,
-            "efficiency_winner": variant_a if agg_a.avg_efficiency_ratio > agg_b.avg_efficiency_ratio else variant_b,
-            "cost_winner": variant_a if agg_a.avg_cost_usd < agg_b.avg_cost_usd else variant_b,
-            "quality_diff_pct": ((agg_a.avg_quality_score - agg_b.avg_quality_score) / agg_b.avg_quality_score * 100)
-                if agg_b.avg_quality_score > 0 else 0,
-            "efficiency_diff_pct": ((agg_a.avg_efficiency_ratio - agg_b.avg_efficiency_ratio) / agg_b.avg_efficiency_ratio * 100)
-                if agg_b.avg_efficiency_ratio > 0 else 0,
+            "quality_winner": quality_winner,
+            "efficiency_winner": efficiency_winner,
+            "cost_winner": cost_winner,
+            "quality_diff_pct": quality_diff_pct,
+            "efficiency_diff_pct": efficiency_diff_pct,
         }
 
     def get_stage_summary(self) -> dict[str, dict[str, Any]]:
@@ -450,7 +475,7 @@ class PromptTracker:
 
     def prune_old_metrics(self) -> int:
         """Remove metrics older than retention period."""
-        cutoff = datetime.now(timezone.utc) - timedelta(days=self.retention_days)
+        cutoff = datetime.now(UTC) - timedelta(days=self.retention_days)
         original_count = len(self._metrics)
 
         self._metrics = [m for m in self._metrics if m.timestamp >= cutoff]
@@ -509,33 +534,43 @@ class PromptTracker:
 
             # Check for low efficiency
             if agg.avg_efficiency_ratio < 0.5 and agg.avg_quality_score > 0:
-                recommendations.append(OptimizationRecommendation(
-                    recommendation_type="low_efficiency_stage",
-                    priority="high",
-                    description=f"Stage '{stage_name}' has low efficiency ratio ({agg.avg_efficiency_ratio:.2f}). "
-                                f"Consider using concise prompts or compressing context.",
-                    expected_improvement="20-40% token reduction",
-                    affected_stages=[stage_name],
-                    metrics_basis={
-                        "efficiency_ratio": agg.avg_efficiency_ratio,
-                        "avg_tokens": agg.avg_prompt_tokens + agg.avg_completion_tokens,
-                    },
-                ))
+                recommendations.append(
+                    OptimizationRecommendation(
+                        recommendation_type="low_efficiency_stage",
+                        priority="high",
+                        description=(
+                            f"Stage '{stage_name}' has low efficiency ratio "
+                            f"({agg.avg_efficiency_ratio:.2f}). "
+                            "Consider using concise prompts or compressing context."
+                        ),
+                        expected_improvement="20-40% token reduction",
+                        affected_stages=[stage_name],
+                        metrics_basis={
+                            "efficiency_ratio": agg.avg_efficiency_ratio,
+                            "avg_tokens": agg.avg_prompt_tokens + agg.avg_completion_tokens,
+                        },
+                    )
+                )
 
             # Check for high quality variance
             if agg.quality_std_dev > 0.2:
-                recommendations.append(OptimizationRecommendation(
-                    recommendation_type="high_quality_variance",
-                    priority="medium",
-                    description=f"Stage '{stage_name}' has high quality variance (std={agg.quality_std_dev:.2f}). "
-                                f"Add more examples or explicit instructions.",
-                    expected_improvement="More consistent quality",
-                    affected_stages=[stage_name],
-                    metrics_basis={
-                        "quality_std_dev": agg.quality_std_dev,
-                        "avg_quality": agg.avg_quality_score,
-                    },
-                ))
+                recommendations.append(
+                    OptimizationRecommendation(
+                        recommendation_type="high_quality_variance",
+                        priority="medium",
+                        description=(
+                            f"Stage '{stage_name}' has high quality variance "
+                            f"(std={agg.quality_std_dev:.2f}). "
+                            "Add more examples or explicit instructions."
+                        ),
+                        expected_improvement="More consistent quality",
+                        affected_stages=[stage_name],
+                        metrics_basis={
+                            "quality_std_dev": agg.quality_std_dev,
+                            "avg_quality": agg.avg_quality_score,
+                        },
+                    )
+                )
 
         return recommendations
 
@@ -559,26 +594,33 @@ class PromptTracker:
             best_model = max(model_efficiencies, key=lambda m: model_efficiencies[m]["efficiency"])
             worst_model = min(model_efficiencies, key=lambda m: model_efficiencies[m]["efficiency"])
 
-            if model_efficiencies[best_model]["efficiency"] > model_efficiencies[worst_model]["efficiency"] * 1.5:
-                recommendations.append(OptimizationRecommendation(
-                    recommendation_type="model_efficiency_gap",
-                    priority="medium",
-                    description=f"'{best_model}' is significantly more efficient than '{worst_model}'. "
-                                f"Consider routing more tasks to efficient models.",
-                    expected_improvement="15-30% cost reduction",
-                    metrics_basis={
-                        "best_model": best_model,
-                        "best_efficiency": model_efficiencies[best_model]["efficiency"],
-                        "worst_model": worst_model,
-                        "worst_efficiency": model_efficiencies[worst_model]["efficiency"],
-                    },
-                ))
+            if (
+                model_efficiencies[best_model]["efficiency"]
+                > model_efficiencies[worst_model]["efficiency"] * 1.5
+            ):
+                recommendations.append(
+                    OptimizationRecommendation(
+                        recommendation_type="model_efficiency_gap",
+                        priority="medium",
+                        description=(
+                            f"'{best_model}' is significantly more efficient than '{worst_model}'. "
+                            "Consider routing more tasks to efficient models."
+                        ),
+                        expected_improvement="15-30% cost reduction",
+                        metrics_basis={
+                            "best_model": best_model,
+                            "best_efficiency": model_efficiencies[best_model]["efficiency"],
+                            "worst_model": worst_model,
+                            "worst_efficiency": model_efficiencies[worst_model]["efficiency"],
+                        },
+                    )
+                )
 
         return recommendations
 
     def _analyze_variants(self, min_samples: int) -> list[OptimizationRecommendation]:
         """Analyze prompt variants for A/B testing insights."""
-        recommendations = []
+        recommendations: list[OptimizationRecommendation] = []
 
         if len(self._by_variant) < 2:
             return recommendations
@@ -594,28 +636,46 @@ class PromptTracker:
                 variant_agg = self.get_aggregated_metrics(variant=variant)
 
                 # Check if variant is significantly better
-                quality_improvement = (variant_agg.avg_quality_score - default_agg.avg_quality_score) / default_agg.avg_quality_score if default_agg.avg_quality_score > 0 else 0
-                efficiency_improvement = (variant_agg.avg_efficiency_ratio - default_agg.avg_efficiency_ratio) / default_agg.avg_efficiency_ratio if default_agg.avg_efficiency_ratio > 0 else 0
+                quality_improvement = (
+                    (variant_agg.avg_quality_score - default_agg.avg_quality_score)
+                    / default_agg.avg_quality_score
+                    if default_agg.avg_quality_score > 0
+                    else 0
+                )
+                efficiency_improvement = (
+                    (variant_agg.avg_efficiency_ratio - default_agg.avg_efficiency_ratio)
+                    / default_agg.avg_efficiency_ratio
+                    if default_agg.avg_efficiency_ratio > 0
+                    else 0
+                )
 
                 if quality_improvement > 0.1 and efficiency_improvement > 0:
-                    recommendations.append(OptimizationRecommendation(
-                        recommendation_type="superior_variant",
-                        priority="high",
-                        description=f"Variant '{variant}' outperforms 'default' by {quality_improvement*100:.1f}% quality "
-                                    f"and {efficiency_improvement*100:.1f}% efficiency. Consider making it default.",
-                        expected_improvement=f"{quality_improvement*100:.0f}% quality improvement",
-                        metrics_basis={
-                            "variant": variant,
-                            "quality_improvement": quality_improvement,
-                            "efficiency_improvement": efficiency_improvement,
-                        },
-                    ))
+                    recommendations.append(
+                        OptimizationRecommendation(
+                            recommendation_type="superior_variant",
+                            priority="high",
+                            description=(
+                                f"Variant '{variant}' outperforms 'default' by "
+                                f"{quality_improvement * 100:.1f}% quality and "
+                                f"{efficiency_improvement * 100:.1f}% efficiency. "
+                                "Consider making it default."
+                            ),
+                            expected_improvement=(
+                                f"{quality_improvement * 100:.0f}% quality improvement"
+                            ),
+                            metrics_basis={
+                                "variant": variant,
+                                "quality_improvement": quality_improvement,
+                                "efficiency_improvement": efficiency_improvement,
+                            },
+                        )
+                    )
 
         return recommendations
 
     def _analyze_token_efficiency(self) -> list[OptimizationRecommendation]:
         """Analyze overall token efficiency."""
-        recommendations = []
+        recommendations: list[OptimizationRecommendation] = []
 
         if not self._metrics:
             return recommendations
@@ -627,35 +687,41 @@ class PromptTracker:
 
         # Check cache utilization
         if cache_rate < 0.1 and total_tokens > 10000:
-            recommendations.append(OptimizationRecommendation(
-                recommendation_type="low_cache_utilization",
-                priority="medium",
-                description=f"Cache utilization is only {cache_rate*100:.1f}%. "
-                            f"Enable prompt caching for repeated context.",
-                expected_improvement="10-40% cost reduction",
-                metrics_basis={
-                    "cache_rate": cache_rate,
-                    "total_tokens": total_tokens,
-                },
-            ))
+            recommendations.append(
+                OptimizationRecommendation(
+                    recommendation_type="low_cache_utilization",
+                    priority="medium",
+                    description=f"Cache utilization is only {cache_rate * 100:.1f}%. "
+                    f"Enable prompt caching for repeated context.",
+                    expected_improvement="10-40% cost reduction",
+                    metrics_basis={
+                        "cache_rate": cache_rate,
+                        "total_tokens": total_tokens,
+                    },
+                )
+            )
 
         # Check for prompt bloat
         avg_prompt_tokens = statistics.mean(m.prompt_tokens for m in self._metrics)
         avg_completion_tokens = statistics.mean(m.completion_tokens for m in self._metrics)
 
         if avg_prompt_tokens > avg_completion_tokens * 5:
-            recommendations.append(OptimizationRecommendation(
-                recommendation_type="prompt_bloat",
-                priority="high",
-                description=f"Prompts are {avg_prompt_tokens/avg_completion_tokens:.1f}x larger than completions. "
-                            f"Consider context compression or concise prompts.",
-                expected_improvement="30-50% token reduction",
-                metrics_basis={
-                    "avg_prompt_tokens": avg_prompt_tokens,
-                    "avg_completion_tokens": avg_completion_tokens,
-                    "ratio": avg_prompt_tokens / avg_completion_tokens,
-                },
-            ))
+            recommendations.append(
+                OptimizationRecommendation(
+                    recommendation_type="prompt_bloat",
+                    priority="high",
+                    description=(
+                        f"Prompts are {avg_prompt_tokens / avg_completion_tokens:.1f}x larger "
+                        "than completions. Consider context compression or concise prompts."
+                    ),
+                    expected_improvement="30-50% token reduction",
+                    metrics_basis={
+                        "avg_prompt_tokens": avg_prompt_tokens,
+                        "avg_completion_tokens": avg_completion_tokens,
+                        "ratio": avg_prompt_tokens / avg_completion_tokens,
+                    },
+                )
+            )
 
         return recommendations
 

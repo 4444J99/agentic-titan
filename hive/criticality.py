@@ -22,26 +22,26 @@ import asyncio
 import logging
 import math
 import statistics
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
-from enum import Enum
-from typing import TYPE_CHECKING, Any, Callable
+from datetime import UTC, datetime
+from enum import StrEnum
+from typing import TYPE_CHECKING, Any
 
 from titan.metrics import get_metrics
 
 if TYPE_CHECKING:
     from hive.events import EventBus
     from hive.neighborhood import TopologicalNeighborhood
-    from hive.topology import TopologyType
 
 logger = logging.getLogger("titan.hive.criticality")
 
 
-class CriticalityState(str, Enum):
+class CriticalityState(StrEnum):
     """States of system criticality."""
 
-    SUBCRITICAL = "subcritical"      # Too rigid/bureaucratic, low responsiveness
-    CRITICAL = "critical"             # Optimal - edge of chaos, maximally adaptive
+    SUBCRITICAL = "subcritical"  # Too rigid/bureaucratic, low responsiveness
+    CRITICAL = "critical"  # Optimal - edge of chaos, maximally adaptive
     SUPERCRITICAL = "supercritical"  # Too chaotic, unstable dynamics
 
 
@@ -56,12 +56,12 @@ class CriticalityMetrics:
     - fluctuation_size: Variance in system state
     """
 
-    correlation_length: float = 0.0    # Range 0-1, normalized by system size
-    susceptibility: float = 0.0        # Range 0-inf, typically 0-10
-    relaxation_time: float = 0.0       # Seconds to equilibrium
-    fluctuation_size: float = 0.0      # Variance in order parameter
-    order_parameter: float = 0.5       # Measure of system organization (0-1)
-    timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    correlation_length: float = 0.0  # Range 0-1, normalized by system size
+    susceptibility: float = 0.0  # Range 0-inf, typically 0-10
+    relaxation_time: float = 0.0  # Seconds to equilibrium
+    fluctuation_size: float = 0.0  # Variance in order parameter
+    order_parameter: float = 0.5  # Measure of system organization (0-1)
+    timestamp: datetime = field(default_factory=lambda: datetime.now(UTC))
 
     @property
     def criticality_score(self) -> float:
@@ -84,12 +84,7 @@ class CriticalityMetrics:
         fluct_norm = min(1.0, self.fluctuation_size * 4)  # Amplify small fluctuations
 
         # Weighted combination - all indicators should be high at criticality
-        return (
-            0.3 * corr_norm +
-            0.3 * susc_norm +
-            0.2 * relax_norm +
-            0.2 * fluct_norm
-        )
+        return 0.3 * corr_norm + 0.3 * susc_norm + 0.2 * relax_norm + 0.2 * fluct_norm
 
     def infer_state(self) -> CriticalityState:
         """Infer criticality state from metrics."""
@@ -122,7 +117,7 @@ class PhaseTransition:
     trigger: str
     metrics_before: CriticalityMetrics
     metrics_after: CriticalityMetrics
-    timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    timestamp: datetime = field(default_factory=lambda: datetime.now(UTC))
     metadata: dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -240,7 +235,7 @@ class CriticalityMonitor:
 
         # Trim history
         if len(self._metrics_history) > self.HISTORY_SIZE:
-            self._metrics_history = self._metrics_history[-self.HISTORY_SIZE:]
+            self._metrics_history = self._metrics_history[-self.HISTORY_SIZE :]
 
         # Check for phase transition
         new_state = metrics.infer_state()
@@ -255,7 +250,9 @@ class CriticalityMonitor:
                 from_state=old_state,
                 to_state=new_state,
                 trigger="criticality_evaluation",
-                metrics_before=self._metrics_history[-2] if len(self._metrics_history) >= 2 else metrics,
+                metrics_before=(
+                    self._metrics_history[-2] if len(self._metrics_history) >= 2 else metrics
+                ),
                 metrics_after=metrics,
             )
             self._transitions.append(transition)
@@ -270,6 +267,7 @@ class CriticalityMonitor:
             # Emit event
             if self._event_bus:
                 from hive.events import EventType
+
                 await self._event_bus.emit(
                     EventType.PHASE_TRANSITION_DETECTED,
                     {
@@ -332,8 +330,8 @@ class CriticalityMonitor:
 
         # Get network statistics
         stats = self._neighborhood.get_network_stats()
-        total_agents = stats.get("total_agents", 0)
-        avg_clustering = stats.get("average_clustering", 0.0)
+        total_agents = int(stats.get("total_agents", 0))
+        avg_clustering = float(stats.get("average_clustering", 0.0))
 
         if total_agents < 2:
             return 0.0
@@ -371,7 +369,6 @@ class CriticalityMonitor:
 
         # Calculate autocorrelation at different lags
         samples = self._state_samples[-50:]
-        mean = statistics.mean(samples)
         variance = statistics.variance(samples) if len(samples) > 1 else 1.0
 
         if variance < 0.001:
@@ -402,16 +399,16 @@ class CriticalityMonitor:
             return 0.5  # Default balanced
 
         stats = self._neighborhood.get_network_stats()
-        total_agents = stats.get("total_agents", 0)
-        density = stats.get("density", 0.0)
-        avg_clustering = stats.get("average_clustering", 0.0)
+        total_agents = int(stats.get("total_agents", 0))
+        density = float(stats.get("density", 0.0))
+        avg_clustering = float(stats.get("average_clustering", 0.0))
 
         if total_agents < 2:
             return 0.5
 
         # Order parameter based on network organization
         # High density + high clustering = high order
-        order = (density * 0.5 + avg_clustering * 0.5)
+        order = density * 0.5 + avg_clustering * 0.5
 
         # Record for tracking
         self._state_samples.append(order)
@@ -489,7 +486,7 @@ class CriticalityMonitor:
             magnitude: Size of the perturbation applied.
             response: Size of the system's response.
         """
-        self._perturbations.append((datetime.now(timezone.utc), magnitude, response))
+        self._perturbations.append((datetime.now(UTC), magnitude, response))
 
         # Trim history
         if len(self._perturbations) > 100:

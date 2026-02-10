@@ -9,12 +9,12 @@ import pytest
 
 from mcp.notifications import (
     MCPNotification,
-    NotificationType,
     NotificationManager,
+    NotificationType,
+    get_notification_history,
     get_notification_manager,
     notify,
     subscribe,
-    get_notification_history,
 )
 
 
@@ -285,6 +285,7 @@ class TestGlobalFunctions:
 
     def test_subscribe_function(self) -> None:
         """Test the global subscribe function."""
+
         async def handler(n: MCPNotification) -> None:
             pass
 

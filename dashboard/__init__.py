@@ -14,6 +14,6 @@ Start the dashboard:
     titan dashboard serve --port 8080
 """
 
-from dashboard.app import create_app, TitanDashboard
+from dashboard.app import TitanDashboard, create_app
 
 __all__ = ["create_app", "TitanDashboard"]

@@ -15,25 +15,25 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
-from enum import Enum
+from datetime import UTC, datetime
+from enum import StrEnum
 from typing import Any
 
-from agents.framework.base_agent import BaseAgent, AgentState
+from agents.framework.base_agent import AgentState, BaseAgent
 
 logger = logging.getLogger("titan.agents.bureaucracy")
 
 
-class RuleType(str, Enum):
+class RuleType(StrEnum):
     """Types of bureaucratic rules."""
 
-    PROCEDURE = "procedure"      # How to do something
-    CONSTRAINT = "constraint"    # What cannot be done
+    PROCEDURE = "procedure"  # How to do something
+    CONSTRAINT = "constraint"  # What cannot be done
     REQUIREMENT = "requirement"  # What must be done
     AUTHORIZATION = "authorization"  # Who can do what
 
 
-class RequestStatus(str, Enum):
+class RequestStatus(StrEnum):
     """Status of a bureaucratic request."""
 
     SUBMITTED = "submitted"
@@ -45,11 +45,11 @@ class RequestStatus(str, Enum):
     COMPLETED = "completed"
 
 
-class BureaucraticRole(str, Enum):
+class BureaucraticRole(StrEnum):
     """Roles within the bureaucracy."""
 
-    CLERK = "clerk"          # Handles routine processing
-    REVIEWER = "reviewer"    # Reviews and validates
+    CLERK = "clerk"  # Handles routine processing
+    REVIEWER = "reviewer"  # Reviews and validates
     SUPERVISOR = "supervisor"  # Approves and escalates
     ADMINISTRATOR = "administrator"  # Sets policies
     ARCHIVIST = "archivist"  # Maintains records
@@ -65,7 +65,7 @@ class Rule:
     applies_to: list[str] = field(default_factory=list)  # Roles
     conditions: dict[str, Any] = field(default_factory=dict)
     active: bool = True
-    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
 
     def applies(self, role: BureaucraticRole, context: dict[str, Any]) -> bool:
         """Check if this rule applies in context.
@@ -103,17 +103,19 @@ class Request:
     assigned_to: str | None = None
     data: dict[str, Any] = field(default_factory=dict)
     history: list[dict[str, Any]] = field(default_factory=list)
-    submitted_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    submitted_at: datetime = field(default_factory=lambda: datetime.now(UTC))
     completed_at: datetime | None = None
 
     def add_history(self, action: str, by: str, notes: str = "") -> None:
         """Add an entry to request history."""
-        self.history.append({
-            "action": action,
-            "by": by,
-            "notes": notes,
-            "timestamp": datetime.now(timezone.utc).isoformat(),
-        })
+        self.history.append(
+            {
+                "action": action,
+                "by": by,
+                "notes": notes,
+                "timestamp": datetime.now(UTC).isoformat(),
+            }
+        )
 
 
 @dataclass
@@ -159,12 +161,15 @@ class BureaucracyAgent(BaseAgent):
             **kwargs: Base agent arguments.
         """
         kwargs.setdefault("name", f"bureaucracy_{role.value}")
-        kwargs.setdefault("capabilities", [
-            "request_processing",
-            "rule_enforcement",
-            "documentation",
-            "escalation",
-        ])
+        kwargs.setdefault(
+            "capabilities",
+            [
+                "request_processing",
+                "rule_enforcement",
+                "documentation",
+                "escalation",
+            ],
+        )
         super().__init__(**kwargs)
 
         self._role = role
@@ -217,27 +222,32 @@ class BureaucracyAgent(BaseAgent):
 
     async def work(self) -> dict[str, Any]:
         """Process pending requests according to role."""
-        result = {
+        processed: list[dict[str, Any]] = []
+        escalated: list[str] = []
+        completed: list[str] = []
+        result: dict[str, Any] = {
             "role": self._role.value,
-            "processed": [],
-            "escalated": [],
-            "completed": [],
+            "processed": processed,
+            "escalated": escalated,
+            "completed": completed,
         }
 
         # Process based on role
         for request in self._pending_requests[:10]:
             try:
                 action_result = await self._process_request(request)
-                result["processed"].append({
-                    "request_id": request.request_id,
-                    "action": action_result["action"],
-                    "new_status": request.status.value,
-                })
+                processed.append(
+                    {
+                        "request_id": request.request_id,
+                        "action": action_result["action"],
+                        "new_status": request.status.value,
+                    }
+                )
 
                 if action_result["action"] == "escalated":
-                    result["escalated"].append(request.request_id)
+                    escalated.append(request.request_id)
                 elif request.status == RequestStatus.COMPLETED:
-                    result["completed"].append(request.request_id)
+                    completed.append(request.request_id)
 
             except Exception as e:
                 logger.error(f"Error processing request {request.request_id}: {e}")
@@ -263,7 +273,8 @@ class BureaucracyAgent(BaseAgent):
         Returns:
             Processing result.
         """
-        result = {"action": "processed", "violations": []}
+        violations: list[str] = []
+        result: dict[str, Any] = {"action": "processed", "violations": violations}
 
         # Check applicable rules
         context = {
@@ -276,15 +287,15 @@ class BureaucracyAgent(BaseAgent):
             if rule.applies(self._role, context):
                 violation = self._check_rule_compliance(rule, request)
                 if violation:
-                    result["violations"].append(violation)
+                    violations.append(violation)
 
         # Handle violations in strict mode
-        if result["violations"] and self._config.strict_rule_enforcement:
+        if violations and self._config.strict_rule_enforcement:
             request.status = RequestStatus.REQUIRES_INFO
             request.add_history(
                 "requires_info",
                 self.agent_id,
-                f"Rule violations: {result['violations']}",
+                f"Rule violations: {violations}",
             )
             return result
 
@@ -363,9 +374,7 @@ class BureaucracyAgent(BaseAgent):
 
         # Check if needs supervisor approval
         needs_supervisor = request.data.get("requires_supervisor", False)
-        processing_attempts = len([
-            h for h in request.history if h["action"] == "reviewed"
-        ])
+        processing_attempts = len([h for h in request.history if h["action"] == "reviewed"])
 
         if needs_supervisor or processing_attempts >= self._config.escalation_threshold:
             # Escalate to supervisor
@@ -388,10 +397,9 @@ class BureaucracyAgent(BaseAgent):
         result = {"action": "supervisor_reviewed"}
 
         # Count approvals in chain
-        approvals = len([
-            h for h in request.history
-            if h["action"] in ["approved", "supervisor_approved"]
-        ])
+        approvals = len(
+            [h for h in request.history if h["action"] in ["approved", "supervisor_approved"]]
+        )
 
         if approvals >= self._config.approval_chain_length - 1:
             # Final approval
@@ -422,7 +430,7 @@ class BureaucracyAgent(BaseAgent):
         # Move completed requests to archive
         if request.status == RequestStatus.APPROVED:
             request.status = RequestStatus.COMPLETED
-            request.completed_at = datetime.now(timezone.utc)
+            request.completed_at = datetime.now(UTC)
             request.add_history("archived", self.agent_id, "Request completed and archived")
 
             if request in self._pending_requests:
@@ -454,6 +462,7 @@ class BureaucracyAgent(BaseAgent):
             The created Request.
         """
         import uuid
+
         request = Request(
             request_id=f"REQ-{uuid.uuid4().hex[:8]}",
             request_type=request_type,
@@ -538,8 +547,5 @@ class BureaucracyAgent(BaseAgent):
             "pending_requests": len(self._pending_requests),
             "completed_requests": len(self._completed_requests),
             "active_rules": len([r for r in self._rules if r.active]),
-            "peers": {
-                role.value: len(agents)
-                for role, agents in self._peers.items()
-            },
+            "peers": {role.value: len(agents) for role, agents in self._peers.items()},
         }

@@ -11,7 +11,6 @@ Provides capabilities for:
 from __future__ import annotations
 
 import logging
-from pathlib import Path
 from typing import Any
 
 from tools.base import Tool, ToolParameter, ToolResult, register_tool
@@ -197,7 +196,7 @@ class XLSXTool(Tool):
                 headers = []
                 if total_rows > 0:
                     first_row = next(ws.iter_rows(min_row=1, max_row=1, values_only=True))
-                    headers = [str(h) if h else f"Col{i+1}" for i, h in enumerate(first_row)]
+                    headers = [str(h) if h else f"Col{i + 1}" for i, h in enumerate(first_row)]
 
                 # Sample some data types
                 col_types: dict[int, set] = {}
@@ -213,11 +212,13 @@ class XLSXTool(Tool):
                 column_info = []
                 for i, header in enumerate(headers):
                     types = list(col_types.get(i, set()))
-                    column_info.append({
-                        "header": header,
-                        "index": i,
-                        "types": types,
-                    })
+                    column_info.append(
+                        {
+                            "header": header,
+                            "index": i,
+                            "types": types,
+                        }
+                    )
 
                 return ToolResult(
                     success=True,

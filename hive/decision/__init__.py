@@ -7,16 +7,16 @@ Provides:
 - DecisionProtocol: Different voting strategies
 """
 
+from hive.decision.consensus import (
+    ConsensusConfig,
+    ConsensusEngine,
+    ConsensusResult,
+)
 from hive.decision.voting import (
     Vote,
+    VotingResult,
     VotingSession,
     VotingStrategy,
-    VotingResult,
-)
-from hive.decision.consensus import (
-    ConsensusEngine,
-    ConsensusConfig,
-    ConsensusResult,
 )
 
 __all__ = [

@@ -15,16 +15,15 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime
-from enum import Enum
-from typing import Any, Callable
+from enum import StrEnum
+from typing import Any
 
 from agents.personas import (
     Persona,
-    PersonaRole,
     get_persona,
-    register_persona,
     say,
     think,
 )
@@ -37,27 +36,27 @@ logger = logging.getLogger("titan.agents.persona_coordination")
 # ============================================================================
 
 
-class CoordinationMode(str, Enum):
+class CoordinationMode(StrEnum):
     """Modes of persona coordination."""
 
-    SEQUENTIAL = "sequential"    # Personas work one after another
-    PARALLEL = "parallel"        # Personas work simultaneously
+    SEQUENTIAL = "sequential"  # Personas work one after another
+    PARALLEL = "parallel"  # Personas work simultaneously
     HIERARCHICAL = "hierarchical"  # Leader-follower structure
     COLLABORATIVE = "collaborative"  # Peer-to-peer collaboration
-    DEBATE = "debate"            # Personas argue different positions
+    DEBATE = "debate"  # Personas argue different positions
 
 
-class InteractionType(str, Enum):
+class InteractionType(StrEnum):
     """Types of inter-persona interactions."""
 
-    REQUEST = "request"          # Ask another persona to do something
-    INFORM = "inform"            # Share information
-    DELEGATE = "delegate"        # Assign a task
-    QUERY = "query"              # Ask a question
-    CRITIQUE = "critique"        # Provide feedback
-    AGREE = "agree"              # Express agreement
-    DISAGREE = "disagree"        # Express disagreement
-    SYNTHESIZE = "synthesize"    # Combine perspectives
+    REQUEST = "request"  # Ask another persona to do something
+    INFORM = "inform"  # Share information
+    DELEGATE = "delegate"  # Assign a task
+    QUERY = "query"  # Ask a question
+    CRITIQUE = "critique"  # Provide feedback
+    AGREE = "agree"  # Express agreement
+    DISAGREE = "disagree"  # Express disagreement
+    SYNTHESIZE = "synthesize"  # Combine perspectives
 
 
 # ============================================================================
@@ -143,7 +142,7 @@ class PersonaCoordinator:
         self.mode = mode
         self._states: dict[str, PersonaState] = {}
         self._message_history: list[PersonaMessage] = []
-        self._message_handlers: dict[str, list[Callable]] = {}
+        self._message_handlers: dict[str, list[Callable[[PersonaMessage], Any]]] = {}
         self._running = False
 
     def add_persona(
@@ -307,15 +306,12 @@ class PersonaCoordinator:
                     state.current_task = None
                 return name, f"Completed: {task}"
 
-            tasks = [
-                execute_task(name, task)
-                for name, task in persona_tasks.items()
-            ]
+            tasks = [execute_task(name, task) for name, task in persona_tasks.items()]
 
             results = await asyncio.gather(*tasks, return_exceptions=True)
-            for result in results:
-                if isinstance(result, tuple):
-                    name, output = result
+            for task_result in results:
+                if isinstance(task_result, tuple):
+                    name, output = task_result
                     outputs[name] = output
 
         elif self.mode == CoordinationMode.HIERARCHICAL:
@@ -433,7 +429,8 @@ class PersonaCoordinator:
 
         if persona_name:
             messages = [
-                m for m in messages
+                m
+                for m in messages
                 if m.from_persona == persona_name or m.to_persona == persona_name
             ]
 
@@ -446,10 +443,7 @@ class PersonaCoordinator:
             "total_personas": len(self._states),
             "active_personas": len(self.list_active_personas()),
             "total_messages": len(self._message_history),
-            "persona_stats": {
-                name: state.to_dict()
-                for name, state in self._states.items()
-            },
+            "persona_stats": {name: state.to_dict() for name, state in self._states.items()},
         }
 
     def reset(self) -> None:
@@ -483,7 +477,7 @@ def create_coordinator(
     """
     coordinator = PersonaCoordinator(mode=mode)
 
-    for persona_name in (personas or []):
+    for persona_name in personas or []:
         try:
             coordinator.add_persona(persona_name)
         except ValueError:

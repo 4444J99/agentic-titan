@@ -325,8 +325,15 @@ class StressMetrics:
             f"Error Rate: {self.error_rate:.1%}",
             "",
             "Latency (ms):",
-            f"  Total Agent: p50={self.total_agent_latency.p50:.0f}, p95={self.total_agent_latency.p95:.0f}, p99={self.total_agent_latency.p99:.0f}",
-            f"  Spawn: p50={self.agent_spawn_latency.p50:.0f}, p95={self.agent_spawn_latency.p95:.0f}",
+            (
+                f"  Total Agent: p50={self.total_agent_latency.p50:.0f}, "
+                f"p95={self.total_agent_latency.p95:.0f}, "
+                f"p99={self.total_agent_latency.p99:.0f}"
+            ),
+            (
+                f"  Spawn: p50={self.agent_spawn_latency.p50:.0f}, "
+                f"p95={self.agent_spawn_latency.p95:.0f}"
+            ),
             f"  Work: p50={self.agent_work_latency.p50:.0f}, p95={self.agent_work_latency.p95:.0f}",
             "",
             "Throughput:",

@@ -11,7 +11,7 @@ import logging
 import os
 import random
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 from uuid import uuid4
@@ -38,9 +38,7 @@ class DeploymentConfig:
 
     # Gradual rollout
     enable_gradual_rollout: bool = True
-    rollout_increments: list[float] = field(
-        default_factory=lambda: [0.1, 0.25, 0.5, 0.75, 1.0]
-    )
+    rollout_increments: list[float] = field(default_factory=lambda: [0.1, 0.25, 0.5, 0.75, 1.0])
     hours_between_increments: float = 24.0
 
     # Storage
@@ -156,8 +154,8 @@ class ABTest:
     config: DeploymentConfig = field(default_factory=DeploymentConfig)
 
     status: str = "running"
-    started_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
-    updated_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    started_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+    updated_at: datetime = field(default_factory=lambda: datetime.now(UTC))
     completed_at: datetime | None = None
 
     current_percentage: float = 0.1
@@ -376,7 +374,7 @@ class RLHFDeployment:
         elif feedback == -1:
             metrics.negative_feedback += 1
 
-        test.updated_at = datetime.now(timezone.utc)
+        test.updated_at = datetime.now(UTC)
 
         # Check for automatic actions
         self._check_auto_actions(test)
@@ -410,19 +408,17 @@ class RLHFDeployment:
             else:
                 test.current_percentage = 1.0
                 test.status = "completed"
-                test.completed_at = datetime.now(timezone.utc)
+                test.completed_at = datetime.now(UTC)
                 self._complete_test(test)
         else:
             # Immediate promotion
             test.current_percentage = 1.0
             test.status = "completed"
-            test.completed_at = datetime.now(timezone.utc)
+            test.completed_at = datetime.now(UTC)
             self._complete_test(test)
 
         self._save_state()
-        logger.info(
-            f"Promoted test {test_id}: new model at {test.current_percentage:.0%} traffic"
-        )
+        logger.info(f"Promoted test {test_id}: new model at {test.current_percentage:.0%} traffic")
         return True
 
     def rollback(self, test_id: str) -> bool:
@@ -442,7 +438,7 @@ class RLHFDeployment:
 
         test.status = "rolled_back"
         test.current_percentage = 0.0
-        test.completed_at = datetime.now(timezone.utc)
+        test.completed_at = datetime.now(UTC)
 
         self._complete_test(test)
         self._save_state()
@@ -467,7 +463,7 @@ class RLHFDeployment:
         test.rollout_stage += 1
         if test.rollout_stage < len(test.config.rollout_increments):
             test.current_percentage = test.config.rollout_increments[test.rollout_stage]
-            test.updated_at = datetime.now(timezone.utc)
+            test.updated_at = datetime.now(UTC)
             self._save_state()
             logger.info(
                 f"Advanced test {test_id} to stage {test.rollout_stage}: "
@@ -480,11 +476,12 @@ class RLHFDeployment:
 
     def list_active_tests(self) -> list[ABTestStats]:
         """List all active A/B tests."""
-        return [
-            self.get_ab_stats(test_id)
-            for test_id in self._active_tests
-            if self.get_ab_stats(test_id) is not None
-        ]
+        stats: list[ABTestStats] = []
+        for test_id in self._active_tests:
+            test_stats = self.get_ab_stats(test_id)
+            if test_stats is not None:
+                stats.append(test_stats)
+        return stats
 
     def _check_auto_actions(self, test: ABTest) -> None:
         """Check if automatic rollback or promotion is needed."""
@@ -498,19 +495,13 @@ class RLHFDeployment:
         baseline_metrics = test.baseline_metrics
 
         # Error rate check
-        if (
-            new_metrics.requests >= 10
-            and new_metrics.error_rate > baseline_metrics.error_rate * 2
-        ):
+        if new_metrics.requests >= 10 and new_metrics.error_rate > baseline_metrics.error_rate * 2:
             logger.warning(f"Test {test.test_id}: High error rate, rolling back")
             self.rollback(test.test_id)
             return
 
         # Latency check
-        if (
-            new_metrics.requests >= 10
-            and new_metrics.avg_latency_ms > config.latency_threshold_ms
-        ):
+        if new_metrics.requests >= 10 and new_metrics.avg_latency_ms > config.latency_threshold_ms:
             logger.warning(f"Test {test.test_id}: High latency, rolling back")
             self.rollback(test.test_id)
             return
@@ -562,9 +553,7 @@ class RLHFDeployment:
         p2 = test.baseline_metrics.feedback_score
 
         # Pooled proportion
-        p = (
-            test.new_model_metrics.positive_feedback + test.baseline_metrics.positive_feedback
-        ) / (
+        p = (test.new_model_metrics.positive_feedback + test.baseline_metrics.positive_feedback) / (
             test.new_model_metrics.positive_feedback
             + test.new_model_metrics.negative_feedback
             + test.baseline_metrics.positive_feedback
@@ -608,12 +597,16 @@ class RLHFDeployment:
         total_samples = test.new_model_metrics.requests + test.baseline_metrics.requests
 
         if total_samples < config.min_samples_before_promote:
-            return f"COLLECTING_DATA: Need {config.min_samples_before_promote - total_samples} more samples"
+            needed = config.min_samples_before_promote - total_samples
+            return f"COLLECTING_DATA: Need {needed} more samples"
 
         if relative_improvement < config.rollback_threshold:
             return "ROLLBACK_RECOMMENDED: New model significantly underperforming"
 
-        if relative_improvement >= config.quality_threshold and confidence >= config.confidence_threshold:
+        if (
+            relative_improvement >= config.quality_threshold
+            and confidence >= config.confidence_threshold
+        ):
             return "PROMOTE_RECOMMENDED: New model shows significant improvement"
 
         if relative_improvement >= 0:

@@ -4,9 +4,8 @@ from __future__ import annotations
 
 import pytest
 
-from agents.archetypes.eusocial import EusocialColonyAgent, CasteType
-from agents.archetypes.cell import CellAgent, SignalType, CellType, CellState
-from agents.framework.base_agent import AgentState
+from agents.archetypes.cell import CellAgent, CellState, CellType, SignalType
+from agents.archetypes.eusocial import CasteType, EusocialColonyAgent
 
 
 class TestEusocialColonyAgent:

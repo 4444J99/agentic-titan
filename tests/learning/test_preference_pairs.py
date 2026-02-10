@@ -2,17 +2,16 @@
 Tests for Preference Pairs Builder (Phase 18A)
 """
 
-import pytest
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from uuid import uuid4
 
-from titan.learning.rlhf import RLHFSample, FeedbackType, ResponseQuality
 from titan.learning.preference_pairs import (
     PreferencePair,
-    PreferencePairDataset,
     PreferencePairBuilder,
+    PreferencePairDataset,
     get_preference_pair_builder,
 )
+from titan.learning.rlhf import RLHFSample
 
 
 class TestPreferencePair:
@@ -94,7 +93,7 @@ class TestPreferencePair:
             "rejected": "Bad",
             "margin": 0.5,
             "source": "test",
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
         }
 
         pair = PreferencePair.from_dict(data)
@@ -160,11 +159,13 @@ class TestPreferencePairDataset:
         """Test train/eval split."""
         dataset = PreferencePairDataset()
         for i in range(10):
-            dataset.add(PreferencePair(
-                prompt=f"Q{i}",
-                chosen=f"A{i}",
-                rejected=f"B{i}",
-            ))
+            dataset.add(
+                PreferencePair(
+                    prompt=f"Q{i}",
+                    chosen=f"A{i}",
+                    rejected=f"B{i}",
+                )
+            )
 
         train, eval_ds = dataset.split(train_ratio=0.8)
 
@@ -251,7 +252,10 @@ class TestPreferencePairBuilder:
             ),
             self.create_sample(
                 "Explain AI",
-                "AI refers to computer systems that can perform tasks typically requiring human intelligence.",
+                (
+                    "AI refers to computer systems that can perform tasks "
+                    "typically requiring human intelligence."
+                ),
                 accepted=True,
                 session_id="s1",
             ),
@@ -334,7 +338,7 @@ class TestPreferencePairBuilder:
             self.create_sample("Q", "Hello world", correction="Hello, world"),
         ]
 
-        dataset = builder.from_corrections(samples)
+        builder.from_corrections(samples)
         # May or may not include based on actual edit ratio
 
 

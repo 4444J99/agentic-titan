@@ -8,15 +8,16 @@ Identifies common themes, patterns, and insights.
 from __future__ import annotations
 
 import logging
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import TYPE_CHECKING, Any, Callable
+from typing import TYPE_CHECKING, Any, cast
 
 from titan.batch.artifact_store import get_artifact_store
-from titan.batch.models import BatchJob, QueuedSession, SessionArtifact
+from titan.batch.models import BatchJob, SessionArtifact
 
 if TYPE_CHECKING:
-    from hive.memory import HiveMind
+    pass
 
 logger = logging.getLogger("titan.batch.synthesizer")
 
@@ -24,6 +25,7 @@ logger = logging.getLogger("titan.batch.synthesizer")
 # =============================================================================
 # Synthesis Models
 # =============================================================================
+
 
 @dataclass
 class SynthesisResult:
@@ -57,6 +59,7 @@ class SynthesisResult:
 # =============================================================================
 # Batch Synthesizer
 # =============================================================================
+
 
 class BatchSynthesizer:
     """
@@ -145,8 +148,7 @@ class BatchSynthesizer:
             result.artifact_uri = artifact_uri
 
         logger.info(
-            f"Synthesis complete: {len(result.themes)} themes, "
-            f"{len(result.key_insights)} insights"
+            f"Synthesis complete: {len(result.themes)} themes, {len(result.key_insights)} insights"
         )
 
         return result.to_dict()
@@ -163,9 +165,7 @@ class BatchSynthesizer:
                 content = await self._artifact_store.get_artifact(artifact.artifact_uri)
                 contents[str(artifact.session_id)] = content.decode("utf-8")
             except Exception as e:
-                logger.warning(
-                    f"Failed to load artifact {artifact.session_id}: {e}"
-                )
+                logger.warning(f"Failed to load artifact {artifact.session_id}: {e}")
 
         return contents
 
@@ -193,7 +193,7 @@ class BatchSynthesizer:
     ) -> dict[str, Any]:
         """Parse session markdown content for key information."""
         lines = content.split("\n")
-        summary = {
+        summary: dict[str, Any] = {
             "session_id": session_id,
             "topic": "",
             "workflow": "",
@@ -201,7 +201,7 @@ class BatchSynthesizer:
             "stages": [],
         }
 
-        current_stage = None
+        current_stage: dict[str, str] | None = None
         in_results = False
 
         for line in lines:
@@ -281,7 +281,7 @@ class BatchSynthesizer:
 
         for summary in summaries:
             part = f"""
-## Topic: {summary['topic']}
+## Topic: {summary["topic"]}
 
 ### Key Points:
 """
@@ -339,12 +339,10 @@ Format your response as:
         summaries: list[dict[str, Any]],
     ) -> SynthesisResult:
         """Parse LLM synthesis response."""
-        sections = {
-            "summary": "",
-            "themes": [],
-            "insights": [],
-            "cross_refs": [],
-        }
+        summary_lines: list[str] = []
+        themes: list[str] = []
+        insights: list[str] = []
+        cross_refs: list[dict[str, Any]] = []
 
         current_section = None
         lines = response.split("\n")
@@ -354,32 +352,36 @@ Format your response as:
 
             if line.lower().startswith("## summary"):
                 current_section = "summary"
-            elif line.lower().startswith("## themes") or line.lower().startswith("## common themes"):
+            elif line.lower().startswith("## themes") or line.lower().startswith(
+                "## common themes"
+            ):
                 current_section = "themes"
-            elif line.lower().startswith("## key insights") or line.lower().startswith("## insights"):
+            elif line.lower().startswith("## key insights") or line.lower().startswith(
+                "## insights"
+            ):
                 current_section = "insights"
             elif line.lower().startswith("## cross"):
                 current_section = "cross_refs"
             elif line and current_section:
                 if current_section == "summary":
-                    sections["summary"] += line + "\n"
+                    summary_lines.append(line)
                 elif line.startswith("- ") or line.startswith("* "):
                     item = line[2:].strip()
                     if current_section == "themes":
-                        sections["themes"].append(item)
+                        themes.append(item)
                     elif current_section == "cross_refs":
-                        sections["cross_refs"].append({"connection": item})
+                        cross_refs.append({"connection": item})
                 elif line[0].isdigit() and "." in line[:3]:
                     item = line.split(".", 1)[1].strip()
                     if current_section == "insights":
-                        sections["insights"].append(item)
+                        insights.append(item)
 
         return SynthesisResult(
             batch_id=batch_id,
-            summary=sections["summary"].strip(),
-            themes=sections["themes"],
-            key_insights=sections["insights"],
-            cross_references=sections["cross_refs"],
+            summary="\n".join(summary_lines).strip(),
+            themes=themes,
+            key_insights=insights,
+            cross_references=cross_refs,
             metadata={
                 "session_count": len(summaries),
                 "topics": [s["topic"] for s in summaries],
@@ -393,12 +395,12 @@ Format your response as:
     ) -> SynthesisResult:
         """Extract synthesis without LLM (simple aggregation)."""
         # Collect all topics
-        topics = [s["topic"] for s in summaries if s.get("topic")]
+        topics = [str(s["topic"]) for s in summaries if s.get("topic")]
 
         # Collect all key points
-        all_points = []
-        for summary in summaries:
-            all_points.extend(summary.get("key_points", []))
+        all_points: list[str] = []
+        for session_summary in summaries:
+            all_points.extend(cast(list[str], session_summary.get("key_points", [])))
 
         # Find common words/themes (simple frequency analysis)
         word_freq: dict[str, int] = {}
@@ -413,14 +415,14 @@ Format your response as:
         themes = [word for word, count in sorted_words[:5] if count > 1]
 
         # Build summary
-        summary = f"This batch explored {len(topics)} topics: {', '.join(topics[:5])}"
+        summary_text = f"This batch explored {len(topics)} topics: {', '.join(topics[:5])}"
         if len(topics) > 5:
-            summary += f" and {len(topics) - 5} more"
-        summary += f". A total of {len(all_points)} key insights were identified."
+            summary_text += f" and {len(topics) - 5} more"
+        summary_text += f". A total of {len(all_points)} key insights were identified."
 
         return SynthesisResult(
             batch_id=batch_id,
-            summary=summary,
+            summary=summary_text,
             themes=themes,
             key_insights=all_points[:10],  # Top 10 points
             cross_references=[],

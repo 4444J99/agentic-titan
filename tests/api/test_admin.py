@@ -4,10 +4,11 @@ Tests for titan.api.admin_routes module.
 Tests admin API endpoints.
 """
 
-import pytest
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import uuid4
+
+import pytest
 
 from titan.auth.models import User, UserRole
 
@@ -21,7 +22,7 @@ def admin_user():
         hashed_password="hashed",  # allow-secret
         role=UserRole.ADMIN,
         is_active=True,
-        created_at=datetime.now(timezone.utc),
+        created_at=datetime.now(UTC),
     )
 
 
@@ -35,6 +36,7 @@ class TestDetailedHealth:
 
         with patch.dict("sys.modules", {"redis": MagicMock()}):
             import sys
+
             mock_redis = sys.modules["redis"]
             mock_client = MagicMock()
             mock_client.ping.return_value = True
@@ -42,7 +44,9 @@ class TestDetailedHealth:
 
             with patch("titan.persistence.postgres.get_postgres_client") as mock_pg:
                 mock_pg_client = MagicMock()
-                mock_pg_client.health_check = AsyncMock(return_value={"healthy": True, "status": "healthy"})
+                mock_pg_client.health_check = AsyncMock(
+                    return_value={"healthy": True, "status": "healthy"}
+                )
                 mock_pg.return_value = mock_pg_client
 
                 result = await detailed_health()
@@ -56,12 +60,15 @@ class TestDetailedHealth:
 
         with patch.dict("sys.modules", {"redis": MagicMock()}):
             import sys
+
             mock_redis = sys.modules["redis"]
             mock_redis.from_url.side_effect = Exception("Connection refused")
 
             with patch("titan.persistence.postgres.get_postgres_client") as mock_pg:
                 mock_pg_client = MagicMock()
-                mock_pg_client.health_check = AsyncMock(return_value={"healthy": True, "status": "healthy"})
+                mock_pg_client.health_check = AsyncMock(
+                    return_value={"healthy": True, "status": "healthy"}
+                )
                 mock_pg.return_value = mock_pg_client
 
                 result = await detailed_health()
@@ -113,7 +120,7 @@ class TestUserManagement:
                 "email": "user1@example.com",
                 "role": "user",
                 "is_active": True,
-                "created_at": datetime.now(timezone.utc),
+                "created_at": datetime.now(UTC),
                 "last_login": None,
             },
             {
@@ -122,8 +129,8 @@ class TestUserManagement:
                 "email": None,
                 "role": "admin",
                 "is_active": True,
-                "created_at": datetime.now(timezone.utc),
-                "last_login": datetime.now(timezone.utc),
+                "created_at": datetime.now(UTC),
+                "last_login": datetime.now(UTC),
             },
         ]
 
@@ -141,7 +148,7 @@ class TestUserManagement:
     @pytest.mark.asyncio
     async def test_create_user_success(self, admin_user):
         """Test creating a new user."""
-        from titan.api.admin_routes import create_user, UserCreateRequest
+        from titan.api.admin_routes import UserCreateRequest, create_user
 
         request = UserCreateRequest(
             username="newuser",
@@ -168,8 +175,9 @@ class TestUserManagement:
     @pytest.mark.asyncio
     async def test_create_user_duplicate_username(self, admin_user):
         """Test creating user with duplicate username."""
-        from titan.api.admin_routes import create_user, UserCreateRequest
         from fastapi import HTTPException
+
+        from titan.api.admin_routes import UserCreateRequest, create_user
 
         request = UserCreateRequest(
             username="existing",
@@ -190,7 +198,7 @@ class TestUserManagement:
     @pytest.mark.asyncio
     async def test_update_user_success(self, admin_user):
         """Test updating a user."""
-        from titan.api.admin_routes import update_user, UserUpdateRequest
+        from titan.api.admin_routes import UserUpdateRequest, update_user
 
         user_id = str(uuid4())
         request = UserUpdateRequest(
@@ -204,7 +212,7 @@ class TestUserManagement:
             "email": "updated@example.com",
             "role": "admin",
             "is_active": True,
-            "created_at": datetime.now(timezone.utc),
+            "created_at": datetime.now(UTC),
             "last_login": None,
         }
 
@@ -222,8 +230,9 @@ class TestUserManagement:
     @pytest.mark.asyncio
     async def test_update_user_not_found(self, admin_user):
         """Test updating non-existent user."""
-        from titan.api.admin_routes import update_user, UserUpdateRequest
         from fastapi import HTTPException
+
+        from titan.api.admin_routes import UserUpdateRequest, update_user
 
         request = UserUpdateRequest(email="new@example.com")
 
@@ -273,7 +282,7 @@ class TestConfiguration:
     @pytest.mark.asyncio
     async def test_update_config_success(self, admin_user):
         """Test updating configuration."""
-        from titan.api.admin_routes import update_config, ConfigUpdateRequest
+        from titan.api.admin_routes import ConfigUpdateRequest, update_config
 
         request = ConfigUpdateRequest(value="200/minute")
 
@@ -285,8 +294,9 @@ class TestConfiguration:
     @pytest.mark.asyncio
     async def test_update_config_not_found(self, admin_user):
         """Test updating non-existent config."""
-        from titan.api.admin_routes import update_config, ConfigUpdateRequest
         from fastapi import HTTPException
+
+        from titan.api.admin_routes import ConfigUpdateRequest, update_config
 
         request = ConfigUpdateRequest(value="test")
 
@@ -316,7 +326,7 @@ class TestBatchManagement:
     @pytest.mark.asyncio
     async def test_recover_batch_success(self, admin_user):
         """Test recovering a stalled batch."""
-        from titan.api.admin_routes import recover_batch, RecoveryRequest
+        from titan.api.admin_routes import RecoveryRequest, recover_batch
 
         request = RecoveryRequest(strategy="retry")
 
@@ -333,8 +343,9 @@ class TestBatchManagement:
     @pytest.mark.asyncio
     async def test_recover_batch_invalid_strategy(self, admin_user):
         """Test recovering batch with invalid strategy."""
-        from titan.api.admin_routes import recover_batch, RecoveryRequest
         from fastapi import HTTPException
+
+        from titan.api.admin_routes import RecoveryRequest, recover_batch
 
         request = RecoveryRequest(strategy="invalid")
 
@@ -354,6 +365,7 @@ class TestSystemOperations:
 
         with patch.dict("sys.modules", {"redis": MagicMock()}):
             import sys
+
             mock_redis = sys.modules["redis"]
             mock_client = MagicMock()
             mock_client.keys.return_value = [b"key1", b"key2"]
@@ -372,7 +384,7 @@ class TestSystemOperations:
         mock_events = [
             {
                 "id": uuid4(),
-                "timestamp": datetime.now(timezone.utc),
+                "timestamp": datetime.now(UTC),
                 "event_type": "agent.created",
                 "action": "create",
                 "agent_id": "agent-1",

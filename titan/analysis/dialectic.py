@@ -12,10 +12,11 @@ import json
 import logging
 import re
 import uuid
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime
-from enum import Enum
-from typing import TYPE_CHECKING, Any, Callable
+from enum import StrEnum
+from typing import Any
 
 from titan.analysis.contradictions import (
     Contradiction,
@@ -26,7 +27,7 @@ from titan.analysis.contradictions import (
 logger = logging.getLogger("titan.analysis.dialectic")
 
 
-class SynthesisStrategy(str, Enum):
+class SynthesisStrategy(StrEnum):
     """Strategies for synthesizing contradictions."""
 
     INTEGRATION = "integration"  # Combine both perspectives into unified view
@@ -82,7 +83,7 @@ class SynthesisResult:
         }
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> "SynthesisResult":
+    def from_dict(cls, data: dict[str, Any]) -> SynthesisResult:
         """Create from dictionary."""
         return cls(
             synthesis_id=data.get("synthesis_id", ""),
@@ -202,6 +203,9 @@ class DialecticSynthesizer:
         strategy: SynthesisStrategy,
     ) -> SynthesisResult:
         """Use LLM for dialectic synthesis."""
+        if self._llm_caller is None:
+            return self._heuristic_synthesis(contradiction, strategy)
+
         prompt = self._build_synthesis_prompt(contradiction, strategy)
 
         try:
@@ -220,12 +224,25 @@ class DialecticSynthesizer:
     ) -> str:
         """Build prompt for LLM synthesis."""
         strategy_instructions = {
-            SynthesisStrategy.INTEGRATION: "Create a unified view that incorporates the valid aspects of both perspectives.",
-            SynthesisStrategy.CONTEXTUALIZATION: "Show how both perspectives are valid in different contexts or domains.",
-            SynthesisStrategy.HIERARCHICAL: "Identify if one perspective operates at a higher level that encompasses the other.",
-            SynthesisStrategy.COMPLEMENTARY: "Demonstrate how both perspectives address different aspects of the same phenomenon.",
-            SynthesisStrategy.TEMPORAL: "Explain how the contradiction is resolved through temporal sequence or evolution.",
-            SynthesisStrategy.CONDITIONAL: "Identify the conditions under which each perspective holds true.",
+            SynthesisStrategy.INTEGRATION: (
+                "Create a unified view that incorporates the valid aspects of both perspectives."
+            ),
+            SynthesisStrategy.CONTEXTUALIZATION: (
+                "Show how both perspectives are valid in different contexts or domains."
+            ),
+            SynthesisStrategy.HIERARCHICAL: (
+                "Identify if one perspective operates at a higher level that encompasses the other."
+            ),
+            SynthesisStrategy.COMPLEMENTARY: (
+                "Demonstrate how both perspectives address different aspects "
+                "of the same phenomenon."
+            ),
+            SynthesisStrategy.TEMPORAL: (
+                "Explain how the contradiction is resolved through temporal sequence or evolution."
+            ),
+            SynthesisStrategy.CONDITIONAL: (
+                "Identify the conditions under which each perspective holds true."
+            ),
         }
 
         return f"""Perform a dialectic synthesis of the following contradiction:
@@ -276,8 +293,12 @@ Provide a dialectic synthesis that transcends the opposition. Respond in JSON:
                 strategy=strategy,
                 confidence=data.get("confidence", 0.7),
                 completeness=data.get("completeness", 0.7),
-                key_insights=data.get("key_insights", [])[:self._config.max_insights],
-                remaining_tensions=data.get("remaining_tensions", []) if self._config.include_remaining_tensions else [],
+                key_insights=data.get("key_insights", [])[: self._config.max_insights],
+                remaining_tensions=(
+                    data.get("remaining_tensions", [])
+                    if self._config.include_remaining_tensions
+                    else []
+                ),
                 implications=data.get("implications", []),
                 metadata={"source": "llm_synthesis"},
             )
@@ -306,7 +327,7 @@ Provide a dialectic synthesis that transcends the opposition. Respond in JSON:
                 "perspective applies within its appropriate context or domain."
             ),
             SynthesisStrategy.HIERARCHICAL: (
-                f"Upon deeper analysis, one perspective may operate at a level "
+                "Upon deeper analysis, one perspective may operate at a level "
                 "that encompasses the other, suggesting a hierarchical relationship "
                 "rather than direct opposition."
             ),
@@ -326,32 +347,27 @@ Provide a dialectic synthesis that transcends the opposition. Respond in JSON:
         }
 
         synthesis = synthesis_templates.get(
-            strategy,
-            "Further analysis needed to synthesize these perspectives."
+            strategy, "Further analysis needed to synthesize these perspectives."
         )
 
         # Generate insights from key terms
         insights = []
         if contradiction.key_terms:
-            insights.append(
-                f"Key concepts involved: {', '.join(contradiction.key_terms[:3])}"
-            )
+            insights.append(f"Key concepts involved: {', '.join(contradiction.key_terms[:3])}")
         if contradiction.resolution_suggestions:
-            insights.append(
-                f"Suggested resolution path: {contradiction.resolution_suggestions[0]}"
-            )
+            insights.append(f"Suggested resolution path: {contradiction.resolution_suggestions[0]}")
 
         # Identify remaining tensions
         tensions = []
         if contradiction.severity in (ContradictionSeverity.HIGH, ContradictionSeverity.CRITICAL):
-            tensions.append(
-                "Deep structural tension remains between fundamental assumptions"
-            )
+            tensions.append("Deep structural tension remains between fundamental assumptions")
 
         return SynthesisResult(
             contradiction_id=contradiction.contradiction_id,
             thesis=f"{contradiction.source_a}'s perspective: {contradiction.content_a[:150]}...",
-            antithesis=f"{contradiction.source_b}'s perspective: {contradiction.content_b[:150]}...",
+            antithesis=(
+                f"{contradiction.source_b}'s perspective: {contradiction.content_b[:150]}..."
+            ),
             synthesis=synthesis,
             strategy=strategy,
             confidence=0.5,  # Heuristic synthesis has lower confidence
@@ -378,10 +394,7 @@ Provide a dialectic synthesis that transcends the opposition. Respond in JSON:
             List of synthesis results
         """
         if parallel:
-            tasks = [
-                self.synthesize_contradiction(c)
-                for c in contradictions
-            ]
+            tasks = [self.synthesize_contradiction(c) for c in contradictions]
             return await asyncio.gather(*tasks)
         else:
             return await self.synthesize(contradictions)
@@ -401,7 +414,7 @@ class DialecticReport:
     created_at: datetime = field(default_factory=datetime.now)
 
     @classmethod
-    def from_results(cls, results: list[SynthesisResult]) -> "DialecticReport":
+    def from_results(cls, results: list[SynthesisResult]) -> DialecticReport:
         """Build report from synthesis results."""
         strategies: dict[str, int] = {}
         all_insights: list[str] = []

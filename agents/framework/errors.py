@@ -18,22 +18,22 @@ from typing import Any
 class ErrorSeverity(Enum):
     """Severity levels for errors."""
 
-    LOW = "low"           # Informational, can be ignored
-    MEDIUM = "medium"     # Should be logged, may affect results
-    HIGH = "high"         # Requires attention, operation may fail
-    CRITICAL = "critical" # System cannot continue
+    LOW = "low"  # Informational, can be ignored
+    MEDIUM = "medium"  # Should be logged, may affect results
+    HIGH = "high"  # Requires attention, operation may fail
+    CRITICAL = "critical"  # System cannot continue
 
 
 class RecoveryStrategy(Enum):
     """Suggested recovery strategies for errors."""
 
-    RETRY = "retry"               # Retry the operation
+    RETRY = "retry"  # Retry the operation
     RETRY_WITH_BACKOFF = "retry_with_backoff"  # Retry with exponential backoff
-    SKIP = "skip"                 # Skip this operation
-    ABORT = "abort"               # Abort the entire task
-    ESCALATE = "escalate"         # Escalate to parent agent/human
+    SKIP = "skip"  # Skip this operation
+    ABORT = "abort"  # Abort the entire task
+    ESCALATE = "escalate"  # Escalate to parent agent/human
     CIRCUIT_BREAK = "circuit_break"  # Open circuit breaker
-    FALLBACK = "fallback"         # Use fallback behavior
+    FALLBACK = "fallback"  # Use fallback behavior
 
 
 @dataclass
