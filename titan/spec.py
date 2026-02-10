@@ -17,7 +17,7 @@ import logging
 from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
-from typing import Any, cast
+from typing import Any
 
 import yaml
 from pydantic import BaseModel, ConfigDict, Field, field_validator
@@ -271,7 +271,7 @@ class AgentSpec:
                 "timeoutMs": self.timeout_ms,
             },
         }
-        return cast(str, yaml.dump(data, default_flow_style=False, sort_keys=False))
+        return yaml.dump(data, default_flow_style=False, sort_keys=False)
 
     def to_dict(self) -> dict[str, Any]:
         """Serialize spec to dictionary."""

@@ -70,11 +70,11 @@ Last updated: 2026-02-10 (local run)
     - `hive/topology_extended.py`
     - `hive/neighborhood.py`
     - `hive/criticality.py`
-- Tranche 3 (Full-Typecheck Blocking): `PARTIAL`
+- Tranche 3 (Full-Typecheck Blocking): `GO`
   - Initial full-repo mypy debt at tranche start: `28` errors in `23` files.
   - Current strict core-scope debt: `0` errors (blocking gate green).
-  - Current full-repo command result: `0` errors with quarantine override active.
-  - Mypy quarantine modules: `71` (from `[[tool.mypy.overrides]] ignore_errors=true` in `pyproject.toml`).
+  - Current full-repo command result: `0` errors without quarantine.
+  - Mypy quarantine modules: `0` (no `ignore_errors=true` quarantine overrides remain).
   - Gate command currently passing under quarantine:
     - `.venv/bin/mypy --ignore-missing-imports hive agents titan mcp dashboard`
   - Completed type-fix ratchet set:
@@ -107,6 +107,21 @@ Last updated: 2026-02-10 (local run)
     - removed `titan.metrics.assembly_tracker`
     - removed `titan.tools.image_gen`
     - removed `titan.tools.m365`
+  - Latest Tranche 3B quarantine burn-down (batch 2):
+    - removed `agents.archetypes.actor_network`
+    - removed `agents.archetypes.assemblage`
+    - removed `agents.archetypes.bureaucracy`
+    - removed `agents.archetypes.cell`
+    - removed `agents.archetypes.dao`
+  - Latest Tranche 3B quarantine burn-down (batch 3):
+    - removed `agents.archetypes.eusocial`
+    - removed `agents.archetypes.government`
+    - removed `agents.archetypes.jury`
+    - removed `agents.archetypes.orchestrator`
+    - removed `agents.archetypes.paper2code`
+  - Latest Tranche 3B quarantine burn-down (final):
+    - removed all remaining quarantined modules from `pyproject.toml`.
+    - full-repo mypy now passes with quarantine count `0`.
 - Tranche 4 (Runtime Test Completion): `GO`
   - Current summary: `1312 passed, 16 skipped`.
   - Gate commands passing:
@@ -119,5 +134,5 @@ Last updated: 2026-02-10 (local run)
 
 ## Completion Verdict
 - Completion program gate status: `ALL GREEN` for blocking lint/core-type/runtime tests.
-- Omega status: `NOT COMPLETE` until mypy quarantine is burned down and full-repo typecheck is truly blocking without `ignore_errors` quarantine.
-- Blocking ratchets remaining: `71` quarantined modules for full-repo typecheck closure.
+- Omega status: `COMPLETE` for quarantine burn-down scope (full-repo typecheck no longer relies on quarantine).
+- Blocking ratchets remaining: `0` quarantined modules.

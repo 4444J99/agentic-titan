@@ -163,7 +163,7 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -e .
-          pip install mypy
+          pip install mypy types-PyYAML
 
       - name: Run mypy on core scope
         run: |
@@ -186,7 +186,7 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -e ".[dashboard,metrics]"
-          pip install mypy types-redis
+          pip install mypy types-redis types-PyYAML
 
       - name: Run full-repo mypy
         run: mypy --ignore-missing-imports hive agents titan mcp dashboard || true
