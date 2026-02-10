@@ -65,6 +65,22 @@ Drive the repository from partial hardening to full project completion with expl
 - Exit Criteria:
   - Full typecheck is blocking and green.
 
+## Tranche 3B: Quarantine Burn-Down to True Blocking
+- Goal:
+  - Remove temporary mypy quarantine and make full-repo typecheck truly
+    representative of repository health.
+- Work:
+  - Burn down modules listed under `[[tool.mypy.overrides]]` with
+    `ignore_errors=true`.
+  - Remove fixed modules from quarantine in small ratchets.
+  - Keep `typecheck-core` and runtime test gates green while reducing quarantine.
+- Stop/Go Gate:
+  - `python .ci/check_mypy_quarantine.py`
+  - Quarantine count trends downward release-over-release.
+- Exit Criteria:
+  - Quarantine module count reaches zero.
+  - Full-repo mypy remains green with no `ignore_errors` quarantine.
+
 ## Tranche 4: Runtime Test Completion
 - Goal:
   - Make full suite reliable and green in CI-like environment.
@@ -106,4 +122,6 @@ Drive the repository from partial hardening to full project completion with expl
   - Repo can be onboarded and operated from docs alone.
 
 ## Definition of Done (Omega)
-Project is complete only when all tranches have passed stop/go gates and there are no open blocker-severity issues in lint, typecheck, tests, deploy, or security.
+Project is complete only when all tranches have passed stop/go gates and there
+are no open blocker-severity issues in lint, typecheck, tests, deploy, or
+security, and mypy quarantine is zero.

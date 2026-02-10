@@ -70,12 +70,14 @@ Last updated: 2026-02-10 (local run)
     - `hive/topology_extended.py`
     - `hive/neighborhood.py`
     - `hive/criticality.py`
-- Tranche 3 (Full-Typecheck Blocking): `GO`
+- Tranche 3 (Full-Typecheck Blocking): `PARTIAL`
   - Initial full-repo mypy debt at tranche start: `28` errors in `23` files.
-  - Current full-repo mypy debt: `0` errors.
-  - Gate command passing:
+  - Current strict core-scope debt: `0` errors (blocking gate green).
+  - Current full-repo command result: `0` errors with quarantine override active.
+  - Mypy quarantine modules: `76` (from `[[tool.mypy.overrides]] ignore_errors=true` in `pyproject.toml`).
+  - Gate command currently passing under quarantine:
     - `.venv/bin/mypy --ignore-missing-imports hive agents titan mcp dashboard`
-  - Final completed type-fix ratchet set:
+  - Completed type-fix ratchet set:
     - `titan/batch/orchestrator.py`
     - `titan/memory/chromadb_backend.py`
     - `titan/metrics/assembly_tracker.py`
@@ -110,5 +112,6 @@ Last updated: 2026-02-10 (local run)
   - Verified with targeted and full test runs.
 
 ## Completion Verdict
-- Completion program gate status: `ALL GREEN`
-- Blocking ratchets remaining: `0`
+- Completion program gate status: `ALL GREEN` for blocking lint/core-type/runtime tests.
+- Omega status: `NOT COMPLETE` until mypy quarantine is burned down and full-repo typecheck is truly blocking without `ignore_errors` quarantine.
+- Blocking ratchets remaining: `76` quarantined modules for full-repo typecheck closure.

@@ -65,6 +65,21 @@ jobs:
         run: |
           python .ci/check_core_boundary_manifest.py
 
+  mypy-quarantine-governance:
+    name: Mypy Quarantine Governance
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Validate mypy quarantine claims
+        run: |
+          python .ci/check_mypy_quarantine.py
+
   import-boundary-tests:
     name: Import Boundary Tests
     runs-on: ubuntu-latest

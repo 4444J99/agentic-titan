@@ -34,7 +34,8 @@
 
 ```bash
 # Clone the repository
-cd /Users/4jp/agentic-titan
+git clone git@github.com:4444J99/agentic-titan.git
+cd agentic-titan
 
 # Create virtual environment
 python3 -m venv .venv
@@ -441,6 +442,15 @@ pytest tests/ -m "not slow"   # Skip slow tests
 1. Implement `LLMAdapter` in `adapters/base.py`
 2. Add to router detection in `adapters/router.py`
 3. Update `DEFAULT_MODELS` and `PROVIDER_INFO`
+
+### Quality and Release Governance
+
+- CI quality gate model: `docs/ci-quality-gates.md`
+- Completion program and tranche gates: `plans/completion_program.md`
+- Current completion status snapshot: `.ci/completion_status.md`
+- Evaluation-to-growth artifacts: `plans/evaluation-to-growth/`
+- Deploy smoke protocol: `docs/deploy-smoke-runbook.md`
+- Release closure checklist: `docs/release-closure-checklist.md`
 
 ## Sources
 

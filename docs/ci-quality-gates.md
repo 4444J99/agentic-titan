@@ -17,15 +17,19 @@ This repository uses a staged quality-gate model:
 3. `import-boundary-tests`
 - Runs `tests/integration/test_import_boundaries.py`.
 
-4. `lint`
+4. `mypy-quarantine-governance`
+- Validates that `.ci/completion_status.md` truthfully reports mypy quarantine
+  state from `pyproject.toml`.
+
+5. `lint`
 - Runs `ruff check` and `ruff format --check` on files listed in
   `.ci/core_import_boundary_files.txt`.
 
-5. `typecheck-core`
+6. `typecheck-core`
 - Runs mypy only on `.ci/typecheck_core_targets.txt` with
   `--follow-imports=skip`.
 
-6. `test-core-blocking`
+7. `test-core-blocking`
 - Runs `pytest tests/ -q` in a CI-like environment with Redis.
 
 ## Advisory Jobs
@@ -41,6 +45,15 @@ This repository uses a staged quality-gate model:
 1. Expand blocking lint/typecheck scopes only when current scope is green.
 2. Land scope expansion and cleanup in the same PR.
 3. Keep advisory jobs enabled until blocking scopes cover agreed core surfaces.
+
+## Mypy Quarantine Semantics
+
+1. A green full-repo mypy command is only considered "true blocking complete"
+   when quarantine module count is zero.
+2. If `[[tool.mypy.overrides]]` has `ignore_errors=true` modules, Tranche 3 is
+   considered `PARTIAL` even if command output is green.
+3. `.ci/check_mypy_quarantine.py` enforces status-file consistency with the
+   current quarantine count.
 
 ## How To Add A New Core Boundary File
 
