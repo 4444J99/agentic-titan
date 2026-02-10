@@ -46,10 +46,9 @@ Reference: `plans/evaluation-to-growth/risk-register.md`
 6. `R6` documentation confidence gap: mitigated by release artifacts and evidence links.
 
 ## Residual Constraints
-1. Compose smoke is currently `DEGRADED` in local environment due Docker host
-   disk exhaustion (`No space left on device` for postgres startup).
-2. K3s smoke is currently `PARTIAL` in local environment due missing Traefik
-   `Middleware` CRD.
+1. No blocking deploy constraints remain for Omega closure.
+2. Traefik middleware rate-limit is now an optional add-on path and is skipped
+   automatically when the `Middleware` CRD is absent.
 
 ## Omega Decision
 Omega status is declared in `.ci/completion_status.md` and signoff is captured

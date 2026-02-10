@@ -11,42 +11,49 @@ Provide a deterministic smoke verification path after deployment changes.
 ## Docker Compose Smoke
 1. Start stack:
 ```bash
-CHROMADB_HOST_PORT=18000 docker compose -f deploy/compose.yaml --profile api up -d
+CHROMADB_HOST_PORT=18000 docker compose -p titan_smoke -f deploy/compose.yaml --profile api up -d
 ```
 2. Check container health:
 ```bash
-CHROMADB_HOST_PORT=18000 docker compose -f deploy/compose.yaml --profile api ps
+CHROMADB_HOST_PORT=18000 docker compose -p titan_smoke -f deploy/compose.yaml --profile api ps
 ```
 3. Verify API liveness and dashboard entrypoint:
 ```bash
 curl -sf http://localhost:8080/api/status
-curl -sfI http://localhost:8080/
+curl -sf http://localhost:8080/ > /dev/null
 ```
 4. Verify metrics endpoint:
 ```bash
-curl -sf http://localhost:9100/metrics | head -n 20
+curl -sf http://localhost:8080/api/metrics | head -n 20
 ```
 5. Tear down stack after capture:
 ```bash
-CHROMADB_HOST_PORT=18000 docker compose -f deploy/compose.yaml --profile api down
+CHROMADB_HOST_PORT=18000 docker compose -p titan_smoke -f deploy/compose.yaml --profile api down -v --remove-orphans
 ```
 
 ## Kubernetes / K3s Smoke
-1. Apply manifests:
+1. Apply base manifests:
 ```bash
 kubectl apply -k deploy/k3s/
 ```
-2. Wait for rollout:
+2. Apply optional Traefik rate-limit middleware when the `Middleware` CRD exists:
+```bash
+kubectl apply -f deploy/k3s/overlays/traefik-rate-limit/middleware.yaml
+kubectl -n titan annotate ingress titan-ingress \
+  traefik.ingress.kubernetes.io/router.middlewares=titan-ratelimit@kubernetescrd \
+  --overwrite
+```
+3. Wait for rollout:
 ```bash
 kubectl -n titan rollout status deploy/titan-api
 kubectl -n titan rollout status deploy/titan-agent
 ```
-3. Verify probes and pods:
+4. Verify probes and pods:
 ```bash
 kubectl -n titan get pods
 kubectl -n titan get events --sort-by=.metadata.creationTimestamp | tail -n 50
 ```
-4. Port-forward and probe:
+5. Port-forward and probe:
 ```bash
 kubectl -n titan port-forward deploy/titan-api 8000:8000
 curl -sf http://localhost:8000/health
@@ -54,9 +61,8 @@ curl -sf http://localhost:8000/ready
 ```
 
 ### K3s Prerequisite Note
-If `kubectl apply -k deploy/k3s/` fails on `traefik.io/v1alpha1` resources,
-install the Traefik `Middleware` CRD in the target cluster before running the
-full smoke sequence.
+`deploy/k3s/` base manifests are CRD-independent. The optional Traefik
+rate-limit overlay requires the `traefik.io/v1alpha1` `Middleware` CRD.
 
 ## Artifact Capture
 Save command outputs to `.ci/` for traceability:
@@ -66,7 +72,7 @@ Save command outputs to `.ci/` for traceability:
 
 ## Stop/Go Criteria
 Go:
-- All smoke commands pass with HTTP 200 on `/health` and `/ready`.
+- All smoke commands pass with HTTP 200 on `/api/status`, `/health`, and `/ready`.
 - No crashloop/restart patterns in deployment logs.
 
 Stop:
@@ -76,4 +82,4 @@ Stop:
 Rollback immediately if:
 1. API readiness fails for more than 10 minutes.
 2. Error rate spikes above baseline and does not recover.
-3. Critical paths (`/health`, `/ready`, `/metrics`) fail repeatedly.
+3. Critical paths (`/api/status`, `/api/metrics`, `/health`, `/ready`) fail repeatedly.

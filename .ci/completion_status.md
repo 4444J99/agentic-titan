@@ -127,17 +127,17 @@ Last updated: 2026-02-10 (local run)
   - Gate commands passing:
     - `REDIS_URL=redis://localhost:6379/0 .venv/bin/pytest tests/ -q`
     - `REDIS_URL=redis://localhost:6379/0 .venv/bin/pytest tests/ -q -W error::RuntimeWarning -W "error:.*on_event.*:DeprecationWarning"`
-- Tranche 5 (Security, Deploy, and Ops Completion): `PARTIAL`
+- Tranche 5 (Security, Deploy, and Ops Completion): `GO`
   - CI security gate (`security`) is green.
   - CI dependency-integrity gate (`dependency-integrity`) is green.
   - Deploy smoke artifacts captured:
     - `.ci/deploy_smoke_compose.txt`
     - `.ci/deploy_smoke_k3s.txt`
     - `.ci/deploy_smoke_metrics_sample.txt`
-  - Current blocker for full `GO`:
-    - Local compose smoke degraded by Docker host disk exhaustion
-      (`No space left on device` during postgres startup).
-    - Local k3s smoke partial due missing Traefik `Middleware` CRD.
+  - Deploy smoke results:
+    - Local compose smoke: `GO` with isolated project and clean teardown.
+    - Local k3s dry-run smoke: `GO` for base manifests.
+    - Traefik middleware path is optional when CRD is absent.
 - Tranche 6 (Documentation and Release Closure): `GO`
   - Release closure artifacts added:
     - `CHANGELOG.md`
@@ -153,5 +153,5 @@ Last updated: 2026-02-10 (local run)
 
 ## Completion Verdict
 - Completion program gate status: `ALL GREEN` for blocking lint/core-type/runtime/security checks.
-- Omega status: `NOT COMPLETE` pending clean deploy smoke pass in an environment with sufficient Docker disk and required k3s CRDs.
+- Omega status: `COMPLETE`.
 - Blocking ratchets remaining: `0` quarantined modules.

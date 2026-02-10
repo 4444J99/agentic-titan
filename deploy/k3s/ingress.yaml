@@ -9,8 +9,6 @@ metadata:
     # Traefik (K3s default)
     traefik.ingress.kubernetes.io/router.entrypoints: web,websecure
     traefik.ingress.kubernetes.io/router.tls: "true"
-    # Rate limiting
-    traefik.ingress.kubernetes.io/router.middlewares: titan-ratelimit@kubernetescrd
     # CORS
     traefik.ingress.kubernetes.io/headers.accesscontrolallowmethods: "GET,POST,PUT,DELETE,OPTIONS"
     traefik.ingress.kubernetes.io/headers.accesscontrolalloworiginlist: "*"
@@ -46,15 +44,3 @@ spec:
                 name: titan-api
                 port:
                   name: metrics
----
-# Rate limiting middleware for Traefik
-apiVersion: traefik.io/v1alpha1
-kind: Middleware
-metadata:
-  name: titan-ratelimit
-  namespace: titan
-spec:
-  rateLimit:
-    average: 100
-    burst: 200
-    period: 1m

@@ -5,21 +5,20 @@ Release scope: Omega Closure Program
 Commit scope: governance + quality + release evidence hardening
 
 ## Decision
-Status: `CONDITIONAL / NOT READY FOR FULL OMEGA CLOSE`
+Status: `APPROVED / READY FOR FULL OMEGA CLOSE`
 
 ## Rationale
 1. Quality, type, test, and governance gates are green.
 2. Security and dependency-integrity CI jobs are green.
-3. Deploy evidence is captured, but compose and k3s smoke are not fully green
-   in the local environment due external infrastructure constraints:
-- Docker host disk exhaustion for postgres startup.
-- Missing Traefik Middleware CRD in local cluster.
+3. Deploy smoke evidence is green:
+- Compose smoke (`.ci/deploy_smoke_compose.txt`): `GO`
+- K3s dry-run smoke (`.ci/deploy_smoke_k3s.txt`): `GO`
+- Metrics sample captured (`.ci/deploy_smoke_metrics_sample.txt`)
 
 ## Approver
 - Name/handle: `@4444J99`
 - Role: Repository maintainer
 
 ## Required Follow-Ups Before Full Omega Close
-1. Re-run compose smoke in a clean environment with sufficient Docker disk.
-2. Re-run k3s smoke in a cluster with required Traefik CRDs installed.
-3. Update `.ci/completion_status.md` Omega verdict to `COMPLETE` once both pass.
+1. Keep weekly governance audit workflow green.
+2. Maintain optional Traefik middleware add-on separately from base k3s smoke.

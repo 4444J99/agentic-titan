@@ -23,6 +23,13 @@ docker compose logs -f
 # Apply manifests
 kubectl apply -k deploy/k3s/
 
+# Optional: apply Traefik middleware rate-limit
+# (requires traefik.io/v1alpha1 Middleware CRD)
+kubectl apply -f deploy/k3s/overlays/traefik-rate-limit/middleware.yaml
+kubectl -n titan annotate ingress titan-ingress \
+  traefik.ingress.kubernetes.io/router.middlewares=titan-ratelimit@kubernetescrd \
+  --overwrite
+
 # Or with Helm
 helm install titan deploy/helm/titan/
 ```
@@ -65,7 +72,7 @@ cd deploy
 docker compose up -d
 
 # Services available at:
-# - API: http://localhost:8000
+# - API: http://localhost:8080
 # - Prometheus: http://localhost:9090
 # - Grafana: http://localhost:3000
 ```
@@ -80,6 +87,12 @@ kubectl kustomize deploy/k3s/
 
 # Apply
 kubectl apply -k deploy/k3s/
+
+# Optional Traefik middleware rate-limit:
+kubectl apply -f deploy/k3s/overlays/traefik-rate-limit/middleware.yaml
+kubectl -n titan annotate ingress titan-ingress \
+  traefik.ingress.kubernetes.io/router.middlewares=titan-ratelimit@kubernetescrd \
+  --overwrite
 
 # Check status
 kubectl -n titan get pods

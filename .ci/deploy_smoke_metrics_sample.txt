@@ -1,4 +1,325 @@
-[deploy-smoke-metrics] no metrics sample captured.
-reason=compose_api_stack_degraded
-details=postgres_unhealthy_due_no_space_left_on_device
-reference=.ci/deploy_smoke_compose.txt
+# HELP titan_agents_spawned_total Total number of agents spawned
+# TYPE titan_agents_spawned_total counter
+# HELP titan_agents_completed_total Total number of agents completed
+# TYPE titan_agents_completed_total counter
+# HELP titan_agents_active Number of currently active agents
+# TYPE titan_agents_active gauge
+# HELP titan_agent_duration_seconds Agent execution duration in seconds
+# TYPE titan_agent_duration_seconds histogram
+# HELP titan_agent_turns Number of turns taken by agents
+# TYPE titan_agent_turns histogram
+# HELP titan_agent_errors_total Total number of agent errors
+# TYPE titan_agent_errors_total counter
+# HELP titan_topology_current Current active topology (1 = active)
+# TYPE titan_topology_current gauge
+# HELP titan_topology_switches_total Total number of topology switches
+# TYPE titan_topology_switches_total counter
+# HELP titan_topology_switch_duration_seconds Time to switch topology
+# TYPE titan_topology_switch_duration_seconds histogram
+# HELP titan_topology_agents Number of agents in topology
+# TYPE titan_topology_agents gauge
+# HELP titan_messages_sent_total Total messages sent
+# TYPE titan_messages_sent_total counter
+# HELP titan_message_latency_seconds Message delivery latency
+# TYPE titan_message_latency_seconds histogram
+# HELP titan_pubsub_subscribers Number of active subscribers
+# TYPE titan_pubsub_subscribers gauge
+# HELP titan_batch_submitted_total Total batch jobs submitted
+# TYPE titan_batch_submitted_total counter
+# HELP titan_batch_started_total Total batch jobs started
+# TYPE titan_batch_started_total counter
+# HELP titan_batch_completed_total Total batch jobs completed
+# TYPE titan_batch_completed_total counter
+# HELP titan_batch_active Number of active batch jobs
+# TYPE titan_batch_active gauge
+titan_batch_active 0.0
+# HELP titan_batch_session_started_total Total batch sessions started
+# TYPE titan_batch_session_started_total counter
+titan_batch_session_started_total 0.0
+# HELP titan_batch_session_started_created Total batch sessions started
+# TYPE titan_batch_session_started_created gauge
+titan_batch_session_started_created 1.7707435816183078e+09
+# HELP titan_batch_session_completed_total Total batch sessions completed
+# TYPE titan_batch_session_completed_total counter
+# HELP titan_batch_tokens_total Total tokens used by batch processing
+# TYPE titan_batch_tokens_total counter
+titan_batch_tokens_total 0.0
+# HELP titan_batch_tokens_created Total tokens used by batch processing
+# TYPE titan_batch_tokens_created gauge
+titan_batch_tokens_created 1.770743581618325e+09
+# HELP titan_batch_cost_usd_total Total cost of batch processing in USD
+# TYPE titan_batch_cost_usd_total counter
+titan_batch_cost_usd_total 0.0
+# HELP titan_batch_cost_usd_created Total cost of batch processing in USD
+# TYPE titan_batch_cost_usd_created gauge
+titan_batch_cost_usd_created 1.7707435816183324e+09
+# HELP titan_batch_duration_seconds Batch job duration in seconds
+# TYPE titan_batch_duration_seconds histogram
+# HELP titan_memory_operations_total Total memory operations
+# TYPE titan_memory_operations_total counter
+# HELP titan_memory_mget_total Total Redis MGET operations
+# TYPE titan_memory_mget_total counter
+titan_memory_mget_total 0.0
+# HELP titan_memory_mget_created Total Redis MGET operations
+# TYPE titan_memory_mget_created gauge
+titan_memory_mget_created 1.7707435816183589e+09
+# HELP titan_memory_latency_seconds Memory operation latency
+# TYPE titan_memory_latency_seconds histogram
+# HELP titan_embedding_executor_wait_seconds Time spent waiting for embedding executor
+# TYPE titan_embedding_executor_wait_seconds histogram
+titan_embedding_executor_wait_seconds_bucket{le="0.001"} 0.0
+titan_embedding_executor_wait_seconds_bucket{le="0.005"} 0.0
+titan_embedding_executor_wait_seconds_bucket{le="0.01"} 0.0
+titan_embedding_executor_wait_seconds_bucket{le="0.025"} 0.0
+titan_embedding_executor_wait_seconds_bucket{le="0.05"} 0.0
+titan_embedding_executor_wait_seconds_bucket{le="0.1"} 0.0
+titan_embedding_executor_wait_seconds_bucket{le="0.25"} 0.0
+titan_embedding_executor_wait_seconds_bucket{le="0.5"} 0.0
+titan_embedding_executor_wait_seconds_bucket{le="1.0"} 0.0
+titan_embedding_executor_wait_seconds_bucket{le="+Inf"} 0.0
+titan_embedding_executor_wait_seconds_count 0.0
+titan_embedding_executor_wait_seconds_sum 0.0
+# HELP titan_embedding_executor_wait_seconds_created Time spent waiting for embedding executor
+# TYPE titan_embedding_executor_wait_seconds_created gauge
+titan_embedding_executor_wait_seconds_created 1.7707435816183777e+09
+# HELP titan_memory_entries Number of entries in memory stores
+# TYPE titan_memory_entries gauge
+# HELP titan_llm_requests_total Total LLM requests
+# TYPE titan_llm_requests_total counter
+# HELP titan_llm_errors_total Total LLM errors
+# TYPE titan_llm_errors_total counter
+# HELP titan_llm_latency_seconds LLM request latency
+# TYPE titan_llm_latency_seconds histogram
+# HELP titan_llm_tokens_total Total LLM tokens
+# TYPE titan_llm_tokens_total counter
+# HELP titan_runtime_active Active runtimes (1 = active)
+# TYPE titan_runtime_active gauge
+# HELP titan_runtime_spawns_total Total runtime spawns
+# TYPE titan_runtime_spawns_total counter
+# HELP titan_runtime_errors_total Total runtime errors
+# TYPE titan_runtime_errors_total counter
+# HELP titan_episodes_recorded_total Total episodes recorded
+# TYPE titan_episodes_recorded_total counter
+# HELP titan_episode_score Episode outcome scores
+# TYPE titan_episode_score histogram
+# HELP titan_learning_recommendations_total Total learning-based recommendations
+# TYPE titan_learning_recommendations_total counter
+# HELP titan_learning_signals_total Total learning signals recorded
+# TYPE titan_learning_signals_total counter
+# HELP titan_learning_reward Reward values from learning pipeline
+# TYPE titan_learning_reward histogram
+titan_learning_reward_bucket{le="-1.0"} 0.0
+titan_learning_reward_bucket{le="-0.5"} 0.0
+titan_learning_reward_bucket{le="-0.25"} 0.0
+titan_learning_reward_bucket{le="0.0"} 0.0
+titan_learning_reward_bucket{le="0.25"} 0.0
+titan_learning_reward_bucket{le="0.5"} 0.0
+titan_learning_reward_bucket{le="0.75"} 0.0
+titan_learning_reward_bucket{le="1.0"} 0.0
+titan_learning_reward_bucket{le="+Inf"} 0.0
+titan_learning_reward_count 0.0
+# HELP titan_learning_reward_created Reward values from learning pipeline
+# TYPE titan_learning_reward_created gauge
+titan_learning_reward_created 1.7707435816184545e+09
+# HELP titan_learning_confidence Confidence values from learning pipeline
+# TYPE titan_learning_confidence histogram
+titan_learning_confidence_bucket{le="0.1"} 0.0
+titan_learning_confidence_bucket{le="0.2"} 0.0
+titan_learning_confidence_bucket{le="0.3"} 0.0
+titan_learning_confidence_bucket{le="0.4"} 0.0
+titan_learning_confidence_bucket{le="0.5"} 0.0
+titan_learning_confidence_bucket{le="0.6"} 0.0
+titan_learning_confidence_bucket{le="0.7"} 0.0
+titan_learning_confidence_bucket{le="0.8"} 0.0
+titan_learning_confidence_bucket{le="0.9"} 0.0
+titan_learning_confidence_bucket{le="1.0"} 0.0
+titan_learning_confidence_bucket{le="+Inf"} 0.0
+titan_learning_confidence_count 0.0
+titan_learning_confidence_sum 0.0
+# HELP titan_learning_confidence_created Confidence values from learning pipeline
+# TYPE titan_learning_confidence_created gauge
+titan_learning_confidence_created 1.7707435816184666e+09
+# HELP titan_rlhf_samples_total Total RLHF samples collected
+# TYPE titan_rlhf_samples_total counter
+# HELP titan_assembly_index Current assembly index (minimum steps to construct)
+# TYPE titan_assembly_index gauge
+# HELP titan_total_assembly Total assembly metric A = Σ(e^ai × (ni - 1)) / NT
+# TYPE titan_total_assembly gauge
+# HELP titan_selection_signal Selection signal strength (0=ABSENT, 1=WEAK, 2=MODERATE, 3=STRONG)
+# TYPE titan_selection_signal gauge
+# HELP titan_assembly_paths_total Total assembly paths recorded
+# TYPE titan_assembly_paths_total counter
+# HELP titan_assembly_steps_total Total assembly steps recorded
+# TYPE titan_assembly_steps_total counter
+# HELP titan_assembly_path_length Distribution of assembly path lengths
+# TYPE titan_assembly_path_length histogram
+# HELP titan_pheromone_deposits_total Total pheromone deposits
+# TYPE titan_pheromone_deposits_total counter
+# HELP titan_pheromone_intensity Current pheromone intensity at location
+# TYPE titan_pheromone_intensity gauge
+# HELP titan_trail_follows_total Total trail follows
+# TYPE titan_trail_follows_total counter
+# HELP titan_neighbor_interactions_total Total topological neighbor interactions
+# TYPE titan_neighbor_interactions_total counter
+# HELP titan_information_propagation_total Total information propagation events
+# TYPE titan_information_propagation_total counter
+titan_information_propagation_total 0.0
+# HELP titan_information_propagation_created Total information propagation events
+# TYPE titan_information_propagation_created gauge
+titan_information_propagation_created 1.7707435816185222e+09
+# HELP titan_neighbor_count Current number of topological neighbors per agent
+# TYPE titan_neighbor_count gauge
+# HELP titan_territory_count Number of active territories
+# TYPE titan_territory_count gauge
+titan_territory_count 0.0
+# HELP titan_deterritorializations_total Total deterritorialization events
+# TYPE titan_deterritorializations_total counter
+# HELP titan_territorializations_total Total territorialization events
+# TYPE titan_territorializations_total counter
+# HELP titan_lines_of_flight_total Total lines of flight initiated
+# TYPE titan_lines_of_flight_total counter
+titan_lines_of_flight_total 0.0
+# HELP titan_lines_of_flight_created Total lines of flight initiated
+# TYPE titan_lines_of_flight_created gauge
+titan_lines_of_flight_created 1.7707435816185436e+09
+# HELP titan_assembly_state Current assembly state (0=FORMING, 1=STABLE, 2=UNSTABLE, 3=DISSOLVING, 4=TRANSFORMING)
+# TYPE titan_assembly_state gauge
+titan_assembly_state 0.0
+# HELP titan_criticality_state Current criticality state (0=SUBCRITICAL, 1=CRITICAL, 2=SUPERCRITICAL)
+# TYPE titan_criticality_state gauge
+titan_criticality_state 0.0
+# HELP titan_criticality_correlation_length How far influence propagates through the system
+# TYPE titan_criticality_correlation_length gauge
+titan_criticality_correlation_length 0.0
+# HELP titan_criticality_susceptibility System response to perturbations
+# TYPE titan_criticality_susceptibility gauge
+titan_criticality_susceptibility 0.0
+# HELP titan_criticality_relaxation_time Time to return to equilibrium
+# TYPE titan_criticality_relaxation_time gauge
+titan_criticality_relaxation_time 0.0
+# HELP titan_criticality_fluctuation_size Variance in system state
+# TYPE titan_criticality_fluctuation_size gauge
+titan_criticality_fluctuation_size 0.0
+# HELP titan_phase_transitions_total Total phase transitions detected
+# TYPE titan_phase_transitions_total counter
+# HELP titan_fission_fusion_state Current fission-fusion state (0=FISSION, 1=FUSION, 2=TRANSITIONING)
+# TYPE titan_fission_fusion_state gauge
+titan_fission_fusion_state 0.0
+# HELP titan_cluster_count Number of active clusters
+# TYPE titan_cluster_count gauge
+titan_cluster_count 0.0
+# HELP titan_fission_events_total Total fission events
+# TYPE titan_fission_events_total counter
+titan_fission_events_total 0.0
+# HELP titan_fission_events_created Total fission events
+# TYPE titan_fission_events_created gauge
+titan_fission_events_created 1.770743581618585e+09
+# HELP titan_fusion_events_total Total fusion events
+# TYPE titan_fusion_events_total counter
+titan_fusion_events_total 0.0
+# HELP titan_fusion_events_created Total fusion events
+# TYPE titan_fusion_events_created gauge
+titan_fusion_events_created 1.7707435816185892e+09
+# HELP titan_info_centers_active Number of active information centers
+# TYPE titan_info_centers_active gauge
+# HELP titan_patterns_stored_total Total patterns stored in information centers
+# TYPE titan_patterns_stored_total counter
+# HELP titan_patterns_broadcast_total Total patterns broadcast from information centers
+# TYPE titan_patterns_broadcast_total counter
+titan_patterns_broadcast_total 0.0
+# HELP titan_patterns_broadcast_created Total patterns broadcast from information centers
+# TYPE titan_patterns_broadcast_created gauge
+titan_patterns_broadcast_created 1.7707435816186018e+09
+# HELP titan_generations_archived_total Total generations archived
+# TYPE titan_generations_archived_total counter
+titan_generations_archived_total 0.0
+# HELP titan_generations_archived_created Total generations archived
+# TYPE titan_generations_archived_created gauge
+titan_generations_archived_created 1.7707435816186056e+09
+# HELP titan_war_machine_operations_total Total war machine operations performed
+# TYPE titan_war_machine_operations_total counter
+# HELP titan_rlhf_training_runs_total Total RLHF training runs
+# TYPE titan_rlhf_training_runs_total counter
+# HELP titan_rlhf_training_loss RLHF training loss values
+# TYPE titan_rlhf_training_loss histogram
+titan_rlhf_training_loss_bucket{le="0.1"} 0.0
+titan_rlhf_training_loss_bucket{le="0.2"} 0.0
+titan_rlhf_training_loss_bucket{le="0.3"} 0.0
+titan_rlhf_training_loss_bucket{le="0.5"} 0.0
+titan_rlhf_training_loss_bucket{le="0.7"} 0.0
+titan_rlhf_training_loss_bucket{le="1.0"} 0.0
+titan_rlhf_training_loss_bucket{le="1.5"} 0.0
+titan_rlhf_training_loss_bucket{le="2.0"} 0.0
+titan_rlhf_training_loss_bucket{le="3.0"} 0.0
+titan_rlhf_training_loss_bucket{le="5.0"} 0.0
+titan_rlhf_training_loss_bucket{le="+Inf"} 0.0
+titan_rlhf_training_loss_count 0.0
+titan_rlhf_training_loss_sum 0.0
+# HELP titan_rlhf_training_loss_created RLHF training loss values
+# TYPE titan_rlhf_training_loss_created gauge
+titan_rlhf_training_loss_created 1.7707435816186173e+09
+# HELP titan_rlhf_eval_win_rate Model win rate vs baseline
+# TYPE titan_rlhf_eval_win_rate gauge
+titan_rlhf_eval_win_rate 0.0
+# HELP titan_rlhf_preference_pairs_total Preference pairs created
+# TYPE titan_rlhf_preference_pairs_total counter
+# HELP titan_rlhf_ab_tests_active Number of active A/B tests
+# TYPE titan_rlhf_ab_tests_active gauge
+titan_rlhf_ab_tests_active 0.0
+# HELP titan_rlhf_ab_test_results_total A/B test results recorded
+# TYPE titan_rlhf_ab_test_results_total counter
+# HELP titan_inquiry_logic_density Density of logical reasoning in inquiry (0-1)
+# TYPE titan_inquiry_logic_density gauge
+# HELP titan_inquiry_mythic_depth Depth of mythopoetic exploration (0-1)
+# TYPE titan_inquiry_mythic_depth gauge
+# HELP titan_inquiry_lateral_breadth Breadth of cross-domain connections (0-1)
+# TYPE titan_inquiry_lateral_breadth gauge
+# HELP titan_inquiry_recursive_depth Depth of self-referential/meta analysis (0-1)
+# TYPE titan_inquiry_recursive_depth gauge
+# HELP titan_inquiry_pattern_strength Strength of emergent meta-patterns detected (0-1)
+# TYPE titan_inquiry_pattern_strength gauge
+# HELP titan_dialectic_friction_total Total contradictions or tensions detected between perspectives
+# TYPE titan_dialectic_friction_total counter
+# HELP titan_firecracker_vms_active Number of active Firecracker microVMs
+# TYPE titan_firecracker_vms_active gauge
+titan_firecracker_vms_active 0.0
+# HELP titan_firecracker_boot_time_seconds VM boot time in seconds
+# TYPE titan_firecracker_boot_time_seconds histogram
+titan_firecracker_boot_time_seconds_bucket{le="0.1"} 0.0
+titan_firecracker_boot_time_seconds_bucket{le="0.2"} 0.0
+titan_firecracker_boot_time_seconds_bucket{le="0.5"} 0.0
+titan_firecracker_boot_time_seconds_bucket{le="1.0"} 0.0
+titan_firecracker_boot_time_seconds_bucket{le="2.0"} 0.0
+titan_firecracker_boot_time_seconds_bucket{le="3.0"} 0.0
+titan_firecracker_boot_time_seconds_bucket{le="5.0"} 0.0
+titan_firecracker_boot_time_seconds_bucket{le="10.0"} 0.0
+titan_firecracker_boot_time_seconds_bucket{le="+Inf"} 0.0
+titan_firecracker_boot_time_seconds_count 0.0
+titan_firecracker_boot_time_seconds_sum 0.0
+# HELP titan_firecracker_boot_time_seconds_created VM boot time in seconds
+# TYPE titan_firecracker_boot_time_seconds_created gauge
+titan_firecracker_boot_time_seconds_created 1.7707435816186817e+09
+# HELP titan_firecracker_execution_time_seconds Code execution time in VM
+# TYPE titan_firecracker_execution_time_seconds histogram
+titan_firecracker_execution_time_seconds_bucket{le="0.1"} 0.0
+titan_firecracker_execution_time_seconds_bucket{le="0.5"} 0.0
+titan_firecracker_execution_time_seconds_bucket{le="1.0"} 0.0
+titan_firecracker_execution_time_seconds_bucket{le="2.0"} 0.0
+titan_firecracker_execution_time_seconds_bucket{le="5.0"} 0.0
+titan_firecracker_execution_time_seconds_bucket{le="10.0"} 0.0
+titan_firecracker_execution_time_seconds_bucket{le="30.0"} 0.0
+titan_firecracker_execution_time_seconds_bucket{le="60.0"} 0.0
+titan_firecracker_execution_time_seconds_bucket{le="+Inf"} 0.0
+titan_firecracker_execution_time_seconds_count 0.0
+titan_firecracker_execution_time_seconds_sum 0.0
+# HELP titan_firecracker_execution_time_seconds_created Code execution time in VM
+# TYPE titan_firecracker_execution_time_seconds_created gauge
+titan_firecracker_execution_time_seconds_created 1.7707435816186917e+09
+# HELP titan_firecracker_vm_errors_total VM errors
+# TYPE titan_firecracker_vm_errors_total counter
+# HELP titan_firecracker_pool_size VM pool size
+# TYPE titan_firecracker_pool_size gauge
+titan_firecracker_pool_size 0.0
+# HELP titan_info Titan system information
+# TYPE titan_info gauge
+titan_info 1.0

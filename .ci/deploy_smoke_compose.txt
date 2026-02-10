@@ -1,58 +1,72 @@
-[deploy-smoke-compose] started 2026-02-10T15:05:39Z
-[cwd] /Users/4jp/world/realm/operate/org/liminal/repo/agentic-titan
-[docker] Docker version 29.2.0, build 0b9d198
-[compose] Docker Compose version v5.0.2
-[step] CHROMADB_HOST_PORT=18000 docker compose --profile api up -d postgres redis chromadb
- Container titan-postgres Creating 
- Container titan-chromadb Creating 
+[deploy-smoke-compose] started 2026-02-10T17:12:48Z
+[project] titan_smoke
+[step] CHROMADB_HOST_PORT=18000 docker compose -p titan_smoke -f deploy/compose.yaml --profile api down -v --remove-orphans
+time="2026-02-10T12:12:48-05:00" level=warning msg="a network with name titan-network exists but was not created for project \"titan_smoke\".\nSet `external: true` to use an existing network"
+ Volume titan_smoke_chroma-data Creating 
+ Volume titan_smoke_chroma-data Created 
+ Volume titan_smoke_redis-data Creating 
+ Volume titan_smoke_redis-data Created 
+ Volume titan_smoke_postgres-data Creating 
+ Volume titan_smoke_postgres-data Created 
  Container titan-redis Creating 
+ Container titan-chromadb Creating 
+ Container titan-postgres Creating 
  Container titan-chromadb Created 
- Container titan-postgres Created 
  Container titan-redis Created 
- Container titan-chromadb Starting 
+ Container titan-postgres Created 
+ Container titan-api Creating 
+ Container titan-api Created 
  Container titan-postgres Starting 
  Container titan-redis Starting 
- Container titan-postgres Started 
- Container titan-chromadb Started 
+ Container titan-chromadb Starting 
  Container titan-redis Started 
-[step] docker compose ps
-NAME                     IMAGE                    COMMAND                  SERVICE         CREATED                  STATUS                                     PORTS
-deploy-celery-worker-1   deploy-celery-worker     "celery -A titan.bat…"   celery-worker   12 days ago              Up 11 seconds (health: starting)           
-deploy-celery-worker-2   deploy-celery-worker     "celery -A titan.bat…"   celery-worker   12 days ago              Up 2 minutes (unhealthy)                   
-titan-chromadb           chromadb/chroma:latest   "dumb-init -- chroma…"   chromadb        Less than a second ago   Up Less than a second (health: starting)   0.0.0.0:18000->8000/tcp, [::]:18000->8000/tcp
-titan-minio              minio/minio:latest       "/usr/bin/docker-ent…"   minio           12 days ago              Up 28 hours (healthy)                      0.0.0.0:9000-9001->9000-9001/tcp, [::]:9000-9001->9000-9001/tcp
-titan-postgres           postgres:16-alpine       "docker-entrypoint.s…"   postgres        Less than a second ago   Up Less than a second (health: starting)   5432/tcp
-titan-redis              redis:7-alpine           "docker-entrypoint.s…"   redis           Less than a second ago   Up Less than a second (health: starting)   0.0.0.0:6379->6379/tcp, [::]:6379->6379/tcp
-[step] postgres logs (tail)
-
-PostgreSQL Database directory appears to contain a database; Skipping initialization
-
-2026-02-10 15:05:39.496 UTC [1] FATAL:  could not write lock file "postmaster.pid": No space left on device
-[step] disk usage
-Filesystem        Size    Used   Avail Capacity iused ifree %iused  Mounted on
-/dev/disk3s1s1   460Gi    11Gi    16Gi    42%    453k  172M    0%   /
-devfs            207Ki   207Ki     0Bi   100%     716     0  100%   /dev
-/dev/disk3s6     460Gi   5.0Gi    16Gi    24%       5  172M    0%   /System/Volumes/VM
-/dev/disk3s2     460Gi   7.8Gi    16Gi    33%    1.4k  172M    0%   /System/Volumes/Preboot
-/dev/disk3s4     460Gi   8.6Mi    16Gi     1%     108  172M    0%   /System/Volumes/Update
-/dev/disk1s2     550Mi   6.0Mi   531Mi     2%       1  5.4M    0%   /System/Volumes/xarts
-/dev/disk1s1     550Mi   5.9Mi   531Mi     2%      37  5.4M    0%   /System/Volumes/iSCPreboot
-/dev/disk1s3     550Mi   2.3Mi   531Mi     1%     106  5.4M    0%   /System/Volumes/Hardware
-/dev/disk3s5     460Gi   418Gi    16Gi    97%    6.1M  172M    3%   /System/Volumes/Data
-map auto_home      0Bi     0Bi     0Bi   100%       0     0     -   /System/Volumes/Data/home
-/dev/disk5s1      16Gi    16Gi   436Mi    98%    607k  4.5M   12%   /Library/Developer/CoreSimulator/Volumes/iOS_23C54
-[deploy-smoke-compose] status=DEGRADED
+ Container titan-postgres Started 
+ Container titan-postgres Waiting 
+ Container titan-redis Waiting 
+ Container titan-chromadb Started 
+ Container titan-redis Healthy 
+ Container titan-postgres Healthy 
+ Container titan-api Starting 
+ Container titan-api Started 
+[step] CHROMADB_HOST_PORT=18000 docker compose -p titan_smoke -f deploy/compose.yaml --profile api ps
+NAME             IMAGE                    COMMAND                  SERVICE     CREATED          STATUS                                     PORTS
+titan-api        titan_smoke-titan-api    "python -m uvicorn d…"   titan-api   11 seconds ago   Up Less than a second (health: starting)   0.0.0.0:8080->8080/tcp, [::]:8080->8080/tcp, 0.0.0.0:9100->9100/tcp, [::]:9100->9100/tcp
+titan-chromadb   chromadb/chroma:latest   "dumb-init -- chroma…"   chromadb    11 seconds ago   Up 10 seconds (health: starting)           0.0.0.0:18000->8000/tcp, [::]:18000->8000/tcp
+titan-postgres   postgres:16-alpine       "docker-entrypoint.s…"   postgres    11 seconds ago   Up 10 seconds (healthy)                    0.0.0.0:5432->5432/tcp, [::]:5432->5432/tcp
+titan-redis      redis:7-alpine           "docker-entrypoint.s…"   redis       11 seconds ago   Up 10 seconds (healthy)                    0.0.0.0:6379->6379/tcp, [::]:6379->6379/tcp
+[step] waiting for API on :8080
+[wait] api_status_ready at attempt=2
+[step] curl -sf http://localhost:8080/api/status
+{"status":"healthy","active_agents":0,"current_topology":"swarm","timestamp":"2026-02-10T17:13:01.480147"}
+[step] curl -sf http://localhost:8080/ > /dev/null
+ok
+[step] waiting for /api/metrics on :8080
+[wait] metrics_ready at attempt=1
+[info] metrics_sample_path=.ci/deploy_smoke_metrics_sample.txt
+[info] metrics_sample_lines=325
+[deploy-smoke-compose] status=GO
+[step] CHROMADB_HOST_PORT=18000 docker compose -p titan_smoke -f deploy/compose.yaml --profile api down -v --remove-orphans
  Container titan-chromadb Stopping 
- Container titan-postgres Stopping 
- Container titan-redis Stopping 
+ Container titan-api Stopping 
  Container titan-chromadb Stopped 
  Container titan-chromadb Removing 
  Container titan-chromadb Removed 
+ Container titan-api Stopped 
+ Container titan-api Removing 
+ Container titan-api Removed 
+ Container titan-redis Stopping 
+ Container titan-postgres Stopping 
  Container titan-postgres Stopped 
  Container titan-postgres Removing 
  Container titan-postgres Removed 
  Container titan-redis Stopped 
  Container titan-redis Removing 
  Container titan-redis Removed 
- Network titan-network Removing 
- Network titan-network Resource is still in use 
+ Volume titan_smoke_postgres-data Removing 
+ Volume titan_smoke_redis-data Removing 
+ Volume titan_smoke_chroma-data Removing 
+ Volume titan_smoke_postgres-data Removed 
+ Volume titan_smoke_redis-data Removed 
+ Volume titan_smoke_chroma-data Removed 
+[deploy-smoke-compose] teardown_done
+[deploy-smoke-compose] exit_code=0

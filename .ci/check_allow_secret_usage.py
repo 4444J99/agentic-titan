@@ -19,6 +19,7 @@ EXCLUDED_PREFIXES = (
     ".mypy_cache/",
     ".pytest_cache/",
     ".ruff_cache/",
+    ".ci/allow_secret_baseline.txt",
     ".ci/baseline_",
     ".ci/current_",
 )
