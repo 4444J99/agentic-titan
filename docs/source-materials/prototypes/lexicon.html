@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-8">
+    <div class="flex justify-between items-center mb-6">
+        <h1 class="text-3xl font-bold">Organizational Body Lexicon</h1>
+        <div class="flex space-x-2">
+            <button class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">Refresh</button>
+            <button class="px-4 py-2 bg-gray-200 text-gray-800 rounded hover:bg-gray-300">Export</button>
+        </div>
+    </div>
+
+    <!-- Graph Container -->
+    <div class="bg-white rounded-lg shadow p-1 mb-8" style="height: 600px;">
+        <div id="lexicon-container" class="w-full h-full flex items-center justify-center bg-gray-50 rounded">
+            <p class="text-gray-400">Loading visualization...</p>
+        </div>
+    </div>
+
+    <!-- Stats -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+        <div class="bg-white p-6 rounded-lg shadow">
+            <h3 class="text-lg font-semibold text-gray-700">Categories</h3>
+            <p class="text-3xl font-bold text-blue-600">7</p>
+        </div>
+        <div class="bg-white p-6 rounded-lg shadow">
+            <h3 class="text-lg font-semibold text-gray-700">Total Bodies</h3>
+            <p class="text-3xl font-bold text-green-600">142</p>
+        </div>
+        <div class="bg-white p-6 rounded-lg shadow">
+            <h3 class="text-lg font-semibold text-gray-700">Cross-Links</h3>
+            <p class="text-3xl font-bold text-purple-600">28</p>
+        </div>
+    </div>
+</div>
+
+<script src="/static/js/lexicon_viz.js"></script>
+{% endblock %}
