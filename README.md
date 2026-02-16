@@ -13,6 +13,13 @@
 [![Python](https://img.shields.io/badge/python-%E2%89%A53.11-blue?style=flat-square)]()
 [![License](https://img.shields.io/badge/license-MIT-blue?style=flat-square)](LICENSE)
 [![Status](https://img.shields.io/badge/status-production--hardened-e65100?style=flat-square)]()
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.110+-009688?style=flat-square&logo=fastapi)](https://fastapi.tiangolo.com/)
+[![Docker](https://img.shields.io/badge/Docker-ready-2496ED?style=flat-square&logo=docker)](deploy/)
+[![Redis](https://img.shields.io/badge/Redis-state%20%26%20events-DC382D?style=flat-square&logo=redis)]()
+[![Celery](https://img.shields.io/badge/Celery-task%20queue-37814A?style=flat-square&logo=celery)]()
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-audit%20log-4169E1?style=flat-square&logo=postgresql)]()
+[![Grafana](https://img.shields.io/badge/Grafana-6%20dashboards-F46800?style=flat-square&logo=grafana)](deploy/grafana/)
+[![Helm](https://img.shields.io/badge/Helm-k8s%20charts-0F1689?style=flat-square&logo=helm)](deploy/helm/)
 
 > A polymorphic, model-agnostic multi-agent orchestration framework with nine topology patterns, 22 agent archetypes, and production-grade safety infrastructure — from two agents on a laptop to 100+ agents across Firecracker microVMs.
 
