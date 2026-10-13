@@ -11,6 +11,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Platinum Sprint: CI/CD workflow, standardized badge row, ADR documentation
 - Initial CHANGELOG following Keep a Changelog format
+- Activation (#93): CI `package` job builds the distributable wheel + sdist on every green run and uploads it as the `agentic-titan-dist` artifact; the installed wheel is smoke-checked via `titan --help`
+- Packaging contract test (`tests/ci/test_packaging.py`) guarding the console script, wheel package list, and README smoke-check documentation
 
 ## [0.1.0] - 2026-02-11
 
