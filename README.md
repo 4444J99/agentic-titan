@@ -217,6 +217,18 @@ pip install -e ".[memori]"       # SQL-native memory backend
 pip install -e ".[dev,dashboard,metrics,vector-db,documents,postgres,langfuse,memori]"
 ```
 
+### Package artifacts
+
+Every CI run builds the distributable package (wheel + sdist) in the `package` job and uploads it as the `agentic-titan-dist` workflow artifact, so any green commit on `main` is directly installable. A first versioned GitHub release is pending; until then the CI artifacts are the distribution channel.
+
+### Smoke check
+
+One instruction builds, installs, and validates the package end-to-end:
+
+```bash
+python -m build && pip install dist/agentic_titan-*.whl && titan --help
+```
+
 ### Start Infrastructure
 
 ```bash
