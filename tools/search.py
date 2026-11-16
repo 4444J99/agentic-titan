@@ -366,7 +366,6 @@ class CitationManager:
         # Use URL as key to deduplicate
         if source.url not in self._sources:
             self._citation_index += 1
-            source.relevance_score = self._citation_index
             self._sources[source.url] = source
 
         # Return the citation number
